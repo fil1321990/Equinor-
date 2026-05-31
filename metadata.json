@@ -1,5 +1,6 @@
 {
-  "name": "Iconic App",
-  "description": "Deposit and withdrawal management application",
-  "requestFramePermissions": []
+  "name": "Iconic",
+  "description": "Professional investment platform with ROI tracking, Paystack integration, and administrative dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
 }

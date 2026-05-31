@@ -53,14 +53,13 @@ import {
   ArrowRightCircle,
   Layers,
   UserCheck,
-  Triangle,
-  Download
+  Triangle
 } from "lucide-react";
-import { AppProvider, useAppStore } from "./lib/store";
+import { AppProvider, useAppStore } from "./store";
 import { getDailyIncome } from "./lib/earnings";
 import { EquinorStar } from "./components/EquinorStar";
 import { RankBadge } from "./components/RankBadge";
-import { VIP_LEVELS, EQUITY_EXCHANGE_TIERS, VIP_MEMBER_EXCLUSIVE_TIERS } from "./lib/vip";
+import { VIP_LEVELS, EQUITY_EXCHANGE_TIERS, VIP_MEMBER_EXCLUSIVE_TIERS } from "./services/vip";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-NG", {
@@ -338,23 +337,23 @@ function MainApp() {
   const [copiedCode, setCopiedCode] = useState(false);
   const [loginIdentifier, setLoginIdentifier] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [isRegistering, setIsRegistering] = useState(() => window.location.hash === '#/registration');
+  const [isRegistering, setIsRegistering] = useState(() => window.location.hash !== '#/login');
   const [authRoute, setAuthRoute] = useState(() => {
     const hash = window.location.hash;
     if (hash === '#/admin') return 'admin';
-    if (hash === '#/registration') return 'register';
-    return 'login';
+    if (hash === '#/login') return 'login';
+    return 'register';
   });
   
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash;
       if (hash === '#/admin') setAuthRoute('admin');
-      else if (hash === '#/registration') setAuthRoute('register');
-      else setAuthRoute('login');
+      else if (hash === '#/login') setAuthRoute('login');
+      else setAuthRoute('register');
       
-      if (hash === '#/registration') setIsRegistering(true);
-      else if (hash === '#/') setIsRegistering(false);
+      if (hash === '#/login') setIsRegistering(false);
+      else if (hash !== '#/admin') setIsRegistering(true);
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
@@ -679,7 +678,7 @@ function MainApp() {
             <div className="flex bg-[#1a1e4e]/50 rounded-full p-1 mb-8">
               <button 
                 onClick={() => {
-                  window.location.hash = '';
+                  window.location.hash = '#/login';
                   setIsRegistering(false);
                 }} 
                 className="flex-1 py-3 text-white/50 font-semibold rounded-full w-1/2"
@@ -1761,7 +1760,7 @@ function MainApp() {
                         amount: plan.min,
                         expectedRoi: plan.roi,
                         fixedDailyReturn: plan.fixedDailyReturn,
-                      } as import('./lib/store').Investment;
+                      } as import('./store').Investment;
                       
                       const calculatedDailyReturn = getDailyIncome(mockInv, currentUser, users, investments);
                       const totalIncome = calculatedDailyReturn * plan.days;
@@ -2003,7 +2002,7 @@ function MainApp() {
                       amount: plan.min,
                       expectedRoi: plan.roi,
                       fixedDailyReturn: plan.fixedDailyReturn,
-                    } as import('./lib/store').Investment;
+                    } as import('./store').Investment;
                     const calculatedDailyReturn = getDailyIncome(mockInv, currentUser, users, investments);
                     const totalIncome = calculatedDailyReturn * plan.days;
                     

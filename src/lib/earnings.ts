@@ -1,5 +1,5 @@
-import type { Investment, User } from "./store";
-import { VIP_LEVELS, VIP_MEMBER_EXCLUSIVE_TIERS } from "./vip";
+import type { Investment, User } from "../store";
+import { VIP_LEVELS, VIP_MEMBER_EXCLUSIVE_TIERS } from "../services/vip";
 
 export function getDailyIncome(
   investment: Investment,

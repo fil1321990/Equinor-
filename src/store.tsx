@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { VIP_LEVELS, VIP_MEMBER_EXCLUSIVE_TIERS } from "./vip";
-import { getDailyIncome } from "./earnings";
+import { VIP_LEVELS, VIP_MEMBER_EXCLUSIVE_TIERS } from "./services/vip";
+import { getDailyIncome } from "./lib/earnings";
+import { supabase } from "./supabase";
 
 export type UserRole = "user" | "admin";
+
 
 export type TransactionStatus = "pending" | "approved" | "rejected";
 export type TransactionType = "deposit" | "withdrawal";
@@ -210,167 +212,124 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const savedAvatar = localStorage.getItem('userAvatar');
-    if (savedAvatar) {
-      return { ...defaultUsers[0], avatar: savedAvatar };
-    }
-    return defaultUsers[0];
-  });
-  const [globalWithdrawalLimit, setGlobalWithdrawalLimit] =
-    useState<number>(5000000);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [globalWithdrawalLimit, setGlobalWithdrawalLimit] = useState<number>(5000000);
   const [managerLink, setManagerLink] = useState<string>("https://t.me/manager");
   const [groupLink, setGroupLink] = useState<string>("https://t.me/group");
-  const [systemDepositAccounts, setSystemDepositAccounts] = useState<SystemDepositAccount[]>(() => {
-    const saved = localStorage.getItem('app_system_deposit_accounts');
-    if (saved) {
-      try { return JSON.parse(saved); } catch(e) {}
-    }
-    return [
-      { id: "sda1", bankName: "Opay", accountName: "Equinor Global", accountNumber: "1234567890" }
-    ];
-  });
-  
-  useEffect(() => {
-    localStorage.setItem('app_system_deposit_accounts', JSON.stringify(systemDepositAccounts));
-  }, [systemDepositAccounts]);
-  const [users, setUsers] = useState<User[]>(() => {
-    const savedAvatar = localStorage.getItem('userAvatar');
-    if (savedAvatar) {
-      const newUsers = [...defaultUsers];
-      newUsers[0] = { ...newUsers[0], avatar: savedAvatar };
-      return newUsers;
-    }
-    return defaultUsers;
-  });
-  const [transactions, setTransactions] = useState<Transaction[]>([
-    {
-      id: "t1",
-      userId: "u1",
-      type: "deposit",
-      amount: 10000000,
-      status: "approved",
-      date: new Date(Date.now() - 86400000 * 2).toISOString(),
-    },
-  ]);
+  const [systemDepositAccounts, setSystemDepositAccounts] = useState<SystemDepositAccount[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('app_products');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return [
-      { id: "p1", name: "Starter VIP", title: "EQUINOR", roi: 12, min: 20000, days: 30, type: "general" },
-      { id: "p2", name: "Basic VIP", title: "EQUINOR", roi: 12, min: 30000, days: 30, type: "general" },
-      { id: "p3", name: "Standard VIP", title: "EQUINOR", roi: 12, min: 40000, days: 30, type: "general" },
-      { id: "p4", name: "Equinor Equity Exchange Project", title: "EQUINOR", roi: 0, min: 20000, days: 1, type: "vip" },
-      { id: "p5", name: "VIP Member Exclusive Project", title: "EQUINOR", roi: 0, min: 0, days: 500, type: "vip", fixedDailyReturn: 1650 },
-      { id: "p_vip_team", name: "VIP team exclusive project", title: "EQUINOR", roi: 0, min: 30000, days: 500, type: "vip", fixedDailyReturn: 300 },
-      { id: "p6", name: "Platinum VIP", title: "EQUINOR", roi: 12, min: 500000, days: 30, type: "special" },
-      { id: "p7", name: "Diamond VIP", title: "EQUINOR", roi: 12, min: 1000000, days: 30, type: "special" },
-    ];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('app_products', JSON.stringify(products));
-  }, [products]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [incomeRecords, setIncomeRecords] = useState<IncomeRecord[]>([]);
 
-  const addProduct = (product: Omit<Product, "id">) => {
-    const newProduct = { ...product, id: Math.random().toString(36).substr(2, 9) };
-    setProducts((prev) => [...prev, newProduct]);
-  };
-
-  const editProduct = (id: string, product: Partial<Product>) => {
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...product } : p))
-    );
-  };
-
-  const deleteProduct = (id: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-  };
-
-  const [announcement, setAnnouncement] = useState<string | null>(() => {
-    return localStorage.getItem('app_announcement') || null;
-  });
-
-  const [adminWhatsApp, setAdminWhatsApp] = useState<string | null>(() => {
-    return localStorage.getItem('app_adminWhatsApp') || null;
-  });
-
-  const [adminUsdtAddress, setAdminUsdtAddress] = useState<string | null>(() => {
-    return localStorage.getItem('app_adminUsdtAddress') || null;
-  });
-
-  const [promoImage, setPromoImage] = useState<string | null>(() => {
-    return localStorage.getItem('app_promoImage') || null;
-  });
-
-  const [aboutUsImage, setAboutUsImage] = useState<string | null>(() => {
-    return localStorage.getItem('app_aboutUsImage') || "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Equinor_logo.svg/1024px-Equinor_logo.svg.png";
-  });
+  const [announcement, setAnnouncement] = useState<string | null>(null);
+  const [adminWhatsApp, setAdminWhatsApp] = useState<string | null>(null);
+  const [adminUsdtAddress, setAdminUsdtAddress] = useState<string | null>(null);
+  const [promoImage, setPromoImage] = useState<string | null>(null);
+  const [aboutUsImage, setAboutUsImage] = useState<string | null>(null);
+  const [carouselImages, setCarouselImages] = useState<string[]>([]);
+  const [isLoadingStore, setIsLoadingStore] = useState(true);
 
   useEffect(() => {
-    if (announcement) {
-      localStorage.setItem('app_announcement', announcement);
-    } else {
-      localStorage.removeItem('app_announcement');
-    }
-  }, [announcement]);
-
-  useEffect(() => {
-    if (adminWhatsApp) {
-      localStorage.setItem('app_adminWhatsApp', adminWhatsApp);
-    } else {
-      localStorage.removeItem('app_adminWhatsApp');
-    }
-  }, [adminWhatsApp]);
-
-  useEffect(() => {
-    if (adminUsdtAddress) {
-      localStorage.setItem('app_adminUsdtAddress', adminUsdtAddress);
-    } else {
-      localStorage.removeItem('app_adminUsdtAddress');
-    }
-  }, [adminUsdtAddress]);
-  const [carouselImages, setCarouselImages] = useState<string[]>(() => {
-    const saved = localStorage.getItem('app_carouselImages');
-    if (saved) {
+    const fetchData = async () => {
+      setIsLoadingStore(true);
       try {
-        return JSON.parse(saved);
-      } catch (e) {}
-    }
-    return [
-      "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800",
-      "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?auto=format&fit=crop&q=80&w=800",
-    ];
-  });
+        const [
+          { data: usersData },
+          { data: txData },
+          { data: invData },
+          { data: prodData },
+          { data: commData },
+          { data: incData },
+          { data: sysData },
+          { data: settingsData }
+        ] = await Promise.all([
+          supabase.from("users").select("*"),
+          supabase.from("transactions").select("*"),
+          supabase.from("investments").select("*"),
+          supabase.from("products").select("*"),
+          supabase.from("commissions").select("*"),
+          supabase.from("incomeRecords").select("*"),
+          supabase.from("system_deposit_accounts").select("*"),
+          supabase.from("app_settings").select("*").single()
+        ]);
+
+        if (usersData) setUsers(usersData);
+        if (txData) setTransactions(txData);
+        if (invData) setInvestments(invData);
+        if (prodData) setProducts(prodData);
+        if (commData) setCommissions(commData);
+        if (incData) setIncomeRecords(incData);
+        if (sysData) setSystemDepositAccounts(sysData);
+
+        if (settingsData) {
+          setGlobalWithdrawalLimit(settingsData.globalWithdrawalLimit ?? 5000000);
+          setManagerLink(settingsData.managerLink || "https://t.me/manager");
+          setGroupLink(settingsData.groupLink || "https://t.me/group");
+          setAnnouncement(settingsData.announcement || null);
+          setAdminWhatsApp(settingsData.adminWhatsApp || null);
+          setAdminUsdtAddress(settingsData.adminUsdtAddress || null);
+          setPromoImage(settingsData.promoImage || null);
+          setAboutUsImage(settingsData.aboutUsImage || "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Equinor_logo.svg/1024px-Equinor_logo.svg.png");
+          setCarouselImages(settingsData.carouselImages || [
+             "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800",
+             "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?auto=format&fit=crop&q=80&w=800"
+          ]);
+        }
+        
+        // Restore currentUser from localStorage but sync with updated users list
+        const savedUser = localStorage.getItem('app_currentUser');
+        if (savedUser && usersData) {
+           try {
+              const parsed = JSON.parse(savedUser);
+              const latestUser = usersData.find(u => u.id === parsed.id);
+              if (latestUser) setCurrentUser(latestUser);
+           } catch(e) {}
+        }
+
+      } catch (err) {
+        console.error("Error fetching from supabase:", err);
+      } finally {
+        setIsLoadingStore(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   useEffect(() => {
-    if (promoImage) {
-      localStorage.setItem('app_promoImage', promoImage);
+    if (currentUser) {
+      localStorage.setItem('app_currentUser', JSON.stringify(currentUser));
     } else {
-      localStorage.removeItem('app_promoImage');
+      localStorage.removeItem('app_currentUser');
     }
-  }, [promoImage]);
+  }, [currentUser]);
 
-  useEffect(() => {
-    if (aboutUsImage) {
-      localStorage.setItem('app_aboutUsImage', aboutUsImage);
-    } else {
-      localStorage.removeItem('app_aboutUsImage');
+  // Sync products update
+  const addProduct = async (product: Omit<Product, "id">) => {
+    const { data, error } = await supabase.from('products').insert(product).select().single();
+    if (!error && data) {
+       setProducts((prev) => [...prev, data]);
     }
-  }, [aboutUsImage]);
+  };
 
-  useEffect(() => {
-    localStorage.setItem('app_carouselImages', JSON.stringify(carouselImages));
-  }, [carouselImages]);
+  const editProduct = async (id: string, product: Partial<Product>) => {
+    const { error } = await supabase.from('products').update(product).eq('id', id);
+    if (!error) {
+      setProducts((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, ...product } : p))
+      );
+    }
+  };
 
-  // Simulate email notification check for investments nearing expiry (e.g. within 1 day)
+  const deleteProduct = async (id: string) => {
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (!error) {
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+    }
+  };
+
   useEffect(() => {
     const checkExpiringInvestments = () => {
       setInvestments((prevInvestments) => {
@@ -427,48 +386,58 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       return;
     }
     setCurrentUser(user);
+    window.location.hash = '';
   };
 
-  const signup = (identifier: string, password?: string, referralCode?: string) => {
+  const signup = async (identifier: string, password?: string, referralCode?: string) => {
     const isEmail = identifier.includes('@');
     if (users.find((u) => u.phone === identifier || u.email === identifier)) {
       alert("User already exists with this email or phone number");
       return;
     }
-    const newUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
+    const newUser = {
       name: `User_${identifier.slice(0, 4)}`,
       email: isEmail ? identifier : `${identifier}@equinor-dummy.com`,
-      phone: isEmail ? undefined : identifier,
+      phone: isEmail ? null : identifier,
       password,
       role: "user",
       balance: 0,
       referralCode: String(Math.floor(100000 + Math.random() * 900000)),
-      referredBy: referralCode || undefined,
+      referredBy: referralCode || null,
       referralEarnings: 0,
-      createdAt: new Date().toISOString(),
     };
-    setUsers((prev) => [...prev, newUser]);
-    setCurrentUser(newUser);
+    const { data, error } = await supabase.from('users').insert(newUser).select().single();
+    if (data) {
+      setUsers((prev) => [...prev, data]);
+      setCurrentUser(data);
+      window.location.hash = '';
+    } else {
+      console.error(error);
+      alert("Failed to sign up.");
+    }
   };
 
-  const logout = () => setCurrentUser(null);
+  const logout = () => {
+    setCurrentUser(null);
+    window.location.hash = '#/login';
+  };
 
-  const requestDeposit = (amount: number) => {
+  const requestDeposit = async (amount: number) => {
     if (!currentUser) return;
-    const newTx: Transaction = {
-      id: Math.random().toString(36).substr(2, 9),
+    const newTx = {
       userId: currentUser.id,
       type: "deposit",
       amount,
       status: "pending",
-      date: new Date().toISOString(),
     };
-    setTransactions((prev) => [newTx, ...prev]);
-    alert("Deposit request submitted and is pending admin approval.");
+    const { data, error } = await supabase.from('transactions').insert(newTx).select().single();
+    if (data) {
+      setTransactions((prev) => [data, ...prev]);
+      alert("Deposit request submitted and is pending admin approval.");
+    }
   };
 
-  const requestWithdrawal = (
+  const requestWithdrawal = async (
     amount: number,
     bankDetails: { bankName: string; accountNumber: string },
   ) => {
@@ -476,6 +445,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (amount > currentUser.balance) {
       alert("Insufficient balance");
       return;
+    }
+
+    const { error } = await supabase.from('users').update({ balance: currentUser.balance - amount }).eq('id', currentUser.id);
+    if (error) {
+       alert("Withdrawal failed");
+       return;
     }
 
     // Deduct pending requested withdrawal
@@ -488,20 +463,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       prev ? { ...prev, balance: prev.balance - amount } : prev,
     );
 
-    const newTx: Transaction = {
-      id: Math.random().toString(36).substr(2, 9),
+    const newTx = {
       userId: currentUser.id,
       type: "withdrawal",
       amount,
       status: "pending",
-      date: new Date().toISOString(),
       bankDetails,
     };
-    setTransactions((prev) => [newTx, ...prev]);
+    const { data } = await supabase.from('transactions').insert(newTx).select().single();
+    if (data) setTransactions((prev) => [data, ...prev]);
     alert("Withdrawal request submitted and is pending admin approval.");
   };
 
-  const createInvestment = (
+  const createInvestment = async (
     planName: string,
     amount: number,
     expectedRoi: number,
@@ -513,6 +487,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!currentUser) return;
     if (amount > currentUser.balance) {
       alert("Insufficient balance for investment.");
+      return;
+    }
+
+    const { error: balanceError } = await supabase.from('users').update({ balance: currentUser.balance - amount }).eq('id', currentUser.id);
+    if (balanceError) {
+      alert("Investment failed");
       return;
     }
 
@@ -546,6 +526,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
               referralEarnings: referrer.referralEarnings + commissionAmount
             };
             
+            supabase.from('users').update({
+               balance: referrer.balance + commissionAmount,
+               referralEarnings: referrer.referralEarnings + commissionAmount
+            }).eq('id', referrer.id).then();
+            
             newCommissionsHere.push({
               id: Math.random().toString(36).substr(2, 9),
               userId: referrer.id,
@@ -555,6 +540,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
               level: level + 1,
               type: "investment"
             });
+            
+            supabase.from('commissions').insert({
+              userId: referrer.id,
+              fromUserId: buyer.id,
+              amount: commissionAmount,
+              level: level + 1,
+              type: "investment"
+            }).then();
             
             currentBuyer = referrer;
           }
@@ -571,8 +564,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       prev ? { ...prev, balance: prev.balance - amount } : prev,
     );
 
-    const inv: Investment = {
-      id: Math.random().toString(36).substr(2, 9),
+    const inv = {
       userId: currentUser.id,
       planName,
       amount,
@@ -584,7 +576,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       endDate: new Date(Date.now() + 86400000 * durationDays).toISOString(),
       status: "active",
     };
-    setInvestments((prev) => [inv, ...prev]);
+    
+    const { data: invData } = await supabase.from('investments').insert(inv).select().single();
+    if (invData) setInvestments((prev) => [invData, ...prev]);
     alert("Purchase successful!");
   };
 
@@ -715,13 +709,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     // For prototype we'll just simulate a tiny ROI bump.
   };
 
+  const updateSetting = async (field: string, value: any) => {
+    await supabase.from('app_settings').update({ [field]: value }).eq('id', 1);
+  };
+
   const updateGlobalWithdrawalLimit = (limit: number) => {
     setGlobalWithdrawalLimit(limit);
+    updateSetting('globalWithdrawalLimit', limit);
   };
 
   const updateContactLinks = (manager: string, group: string) => {
     setManagerLink(manager);
     setGroupLink(group);
+    updateSetting('managerLink', manager);
+    updateSetting('groupLink', group);
   };
 
   const updateUserWithdrawalLimit = (

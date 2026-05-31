@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import axios from "axios";
-import investmentRouter from "./routes/investment.js";
 import { sendNotificationEmail } from "./src/services/mailer.js";
 
 async function startServer() {
@@ -13,7 +12,6 @@ async function startServer() {
   app.use(express.json());
 
   // Mount API paths
-  app.use("/api", investmentRouter);
 
   app.post("/api/notify", async (req, res) => {
     try {
