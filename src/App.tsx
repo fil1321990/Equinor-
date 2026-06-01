@@ -337,29 +337,46 @@ function MainApp() {
   const [copiedCode, setCopiedCode] = useState(false);
   const [loginIdentifier, setLoginIdentifier] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [isRegistering, setIsRegistering] = useState(() => window.location.hash !== '#/login');
+  const [isRegistering, setIsRegistering] = useState(() => {
+    const path = window.location.pathname;
+    const hash = window.location.hash;
+    if (path === '/register') return true;
+    if (path === '/login' || hash === '#/login') return false;
+    return true; // Default to registration
+  });
   const [authRoute, setAuthRoute] = useState(() => {
+    const path = window.location.pathname;
     const hash = window.location.hash;
     if (hash === '#/admin') return 'admin';
-    if (hash === '#/login') return 'login';
-    return 'register';
+    if (path === '/login' || hash === '#/login') return 'login';
+    return 'register'; // By default, show register route
   });
   
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash;
-      if (hash === '#/admin') setAuthRoute('admin');
-      else if (hash === '#/login') setAuthRoute('login');
-      else setAuthRoute('register');
-      
-      if (hash === '#/login') setIsRegistering(false);
-      else if (hash !== '#/admin') setIsRegistering(true);
+      const path = window.location.pathname;
+      if (hash === '#/admin') {
+        setAuthRoute('admin');
+        setIsRegistering(false);
+      }
+      else if (hash === '#/login') {
+        setAuthRoute('login');
+        setIsRegistering(false);
+      }
+      else if (hash === '#/registration' || path === '/register') {
+        setAuthRoute('register');
+        setIsRegistering(true);
+      }
     };
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  const [registerForm, setRegisterForm] = useState({ phone: '', code: '', password: '', confirmParams: '', invitationCode: '' });
+  const [registerForm, setRegisterForm] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return { phone: '', code: '', password: '', confirmParams: '', invitationCode: params.get('ref') || '' };
+  });
   const referralLink = `${window.location.origin}/register?ref=${currentUser?.referralCode}`;
 
   // Removed auto-login effect to allow logout
@@ -954,7 +971,7 @@ function MainApp() {
             <div className="flex items-center py-4 px-4 sticky top-0 z-20 bg-[#0A0E2E]/90 backdrop-blur w-full flex-shrink-0 relative">
               <div className="flex items-center gap-2 cursor-pointer absolute left-4" onClick={() => setActiveTab("home")}>
                 <ChevronLeft className="w-6 h-6 text-white" />
-                <span className="text-white text-sm font-medium">₦{currentUser?.balance.toLocaleString() || '0'}</span>
+                <span className="text-white text-sm font-medium">₦{Number(currentUser?.balance || 0).toLocaleString()}</span>
               </div>
               <div className="flex-1 text-center font-bold text-[17px]">Task</div>
               <div className="absolute right-4 text-white">
@@ -2141,7 +2158,7 @@ function MainApp() {
             const filteredInvestments = investments.filter(inv => {
               if (inv.userId !== currentUser?.id) return false;
               const now = new Date();
-              const isExpired = new Date(inv.endDate) < now || inv.status === "completed";
+              const isExpired = inv.status === "completed";
               const product = products.find(p => p.name === inv.planName);
               const pType = product ? product.type : "general";
               

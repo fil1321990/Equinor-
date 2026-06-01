@@ -279,15 +279,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           ]);
         }
         
-        // Restore currentUser from localStorage but sync with updated users list
-        const savedUser = localStorage.getItem('app_currentUser');
-        if (savedUser && usersData) {
-           try {
-              const parsed = JSON.parse(savedUser);
-              const latestUser = usersData.find(u => u.id === parsed.id);
-              if (latestUser) setCurrentUser(latestUser);
-           } catch(e) {}
-        }
       } catch (err) {
         console.error("Error fetching from supabase:", err);
       } finally {
@@ -298,9 +289,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('app_currentUser', JSON.stringify(currentUser));
-    } else {
+    if (!currentUser) {
       localStorage.removeItem('app_currentUser');
     }
   }, [currentUser]);

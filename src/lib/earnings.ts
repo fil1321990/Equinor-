@@ -7,9 +7,9 @@ export function getDailyIncome(
   allUsers: User[],
   allInvestments: Investment[]
 ): number {
-  let dailyIncome = investment.fixedDailyReturn !== undefined 
-    ? investment.fixedDailyReturn 
-    : investment.amount * (investment.expectedRoi / 100);
+  let dailyIncome = investment.fixedDailyReturn != null 
+    ? Number(investment.fixedDailyReturn)
+    : Number(investment.amount || 0) * (Number(investment.expectedRoi || 0) / 100);
 
   if (investment.planName === "VIP Member Exclusive Project" && user) {
     const userLevelName = VIP_LEVELS[user.vipLevelIndex || 0]?.name || "VIP0";
