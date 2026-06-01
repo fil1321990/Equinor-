@@ -288,7 +288,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
               if (latestUser) setCurrentUser(latestUser);
            } catch(e) {}
         }
-
       } catch (err) {
         console.error("Error fetching from supabase:", err);
       } finally {
@@ -306,7 +305,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [currentUser]);
 
-  // Sync products update
   const addProduct = async (product: Omit<Product, "id">) => {
     const { data, error } = await supabase.from('products').insert(product).select().single();
     if (!error && data) {
@@ -370,9 +368,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setCarouselImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const login = (identifier: string, password?: string) => {
-    // Normal user login by phone or email
-    const user = users.find((u) => u.phone === identifier || u.email === identifier);
+  const login = async (identifier: string, password?: string) => {
+    let user = users.find((u) => u.phone === identifier || u.email === identifier);
+    
+    // Fallback: try fetching from Supabase if not found locally
+    if (!user) {
+       const isEmail = identifier.includes('@');
+       const { data, error } = await supabase.from('users').select('*').eq(isEmail ? 'email' : 'phone', identifier).single();
+       if (data) {
+         user = data;
+         setUsers(prev => [...prev, data]);
+       }
+    }
+
     if (!user) {
       alert("User not found.");
       return;
@@ -412,8 +420,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       setCurrentUser(data);
       window.location.hash = '';
     } else {
-      console.error(error);
-      alert("Failed to sign up.");
+      console.error("Signup error:", error);
+      alert(`Failed to sign up: ${error?.message || "Unknown error"}`);
     }
   };
 
@@ -426,9 +434,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!currentUser) return;
     const newTx = {
       userId: currentUser.id,
-      type: "deposit",
+      type: "deposit" as TransactionType,
       amount,
-      status: "pending",
+      status: "pending" as TransactionStatus,
     };
     const { data, error } = await supabase.from('transactions').insert(newTx).select().single();
     if (data) {
@@ -465,9 +473,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const newTx = {
       userId: currentUser.id,
-      type: "withdrawal",
+      type: "withdrawal" as TransactionType,
       amount,
-      status: "pending",
+      status: "pending" as TransactionStatus,
       bankDetails,
     };
     const { data } = await supabase.from('transactions').insert(newTx).select().single();
@@ -485,6 +493,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     quantity?: number,
   ) => {
     if (!currentUser) return;
+    
     if (amount > currentUser.balance) {
       alert("Insufficient balance for investment.");
       return;
@@ -574,7 +583,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       quantity: quantity || 1,
       startDate: new Date().toISOString(),
       endDate: new Date(Date.now() + 86400000 * durationDays).toISOString(),
-      status: "active",
+      status: "active" as const,
     };
     
     const { data: invData } = await supabase.from('investments').insert(inv).select().single();
@@ -674,7 +683,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       return prevTxs.map((t) =>
-        t.id === id ? { ...t, status: "approved" } : t,
+        t.id === id ? { ...t, status: "approved" as TransactionStatus } : t,
       );
     });
   };
@@ -699,7 +708,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       return prevTxs.map((t) =>
-        t.id === id ? { ...t, status: "rejected" } : t,
+        t.id === id ? { ...t, status: "rejected" as TransactionStatus } : t,
       );
     });
   };
