@@ -105,7 +105,7 @@ CREATE TABLE system_deposit_accounts (
 -- Insert demo users
 INSERT INTO users (id, name, email, phone, password, role, balance, "referralCode", "createdAt")
 VALUES 
-  ('11111111-1111-1111-1111-111111111111', 'Admin', 'doriangrey0366@gmail.com', 'admin_phone_temp', '1321990', 'admin', 0, 'ADMINX', now()),
+  ('11111111-1111-1111-1111-111111111111', 'Admin', 'doriangrey0366@gmail.com', 'admin_phone_temp', '882036', 'admin', 0, 'ADMINX', now()),
   ('22222222-2222-2222-2222-222222222222', 'Demo User', 'user@iconic.com', '1234567890', 'password123', 'user', 5000000, '893475', now());
 
 -- Insert dummy products

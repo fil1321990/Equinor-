@@ -17,8 +17,10 @@ export interface Transaction {
   status: TransactionStatus;
   date: string;
   bankDetails?: {
-    bankName: string;
-    accountNumber: string;
+    bankName?: string;
+    accountNumber?: string;
+    accountName?: string;
+    reference?: string;
   };
 }
 
@@ -64,7 +66,7 @@ export interface Product {
   roi: number;
   min: number;
   days: number;
-  type: "general" | "vip" | "special";
+  type: "general" | "vip" | "special" | "redemption_code";
   fixedDailyReturn?: number;
   imageUrl?: string;
   tPlusDays?: number;
@@ -104,6 +106,15 @@ export interface User {
   disabled?: boolean;
   createdAt?: string;
   claimedTasks?: string[];
+  balanceAlertThreshold?: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  receiverId?: string;
+  text: string;
+  timestamp: string;
 }
 
 interface AppState {
@@ -118,15 +129,17 @@ interface AppState {
   managerLink: string;
   groupLink: string;
   systemDepositAccounts: SystemDepositAccount[];
+  chatMessages: ChatMessage[];
 }
 
 interface AppContextType extends AppState {
   login: (email: string, password?: string) => void;
   logout: () => void;
-  requestDeposit: (amount: number) => void;
+  sendChatMessage: (text: string, toUserId?: string) => void;
+  requestDeposit: (amount: number, reference: string) => void;
   requestWithdrawal: (
     amount: number,
-    bankDetails: { bankName: string; accountNumber: string },
+    bankDetails: { bankName: string; accountNumber: string; accountName?: string },
   ) => void;
   createInvestment: (
     planName: string,
@@ -154,17 +167,17 @@ interface AppContextType extends AppState {
   updateAvatar: (avatarBase64: string) => void;
   updatePhone: (phone: string) => void;
   updatePassword: (password: string) => void;
+  updateBalanceAlertThreshold: (threshold: number) => void;
   adminResetUserPassword: (userId: string, newPassword?: string) => void;
   addProduct: (product: Omit<Product, "id">) => void;
   editProduct: (id: string, product: Partial<Product>) => void;
   deleteProduct: (id: string) => void;
+  refreshProducts: () => Promise<Product[] | null>;
   upgradeVip: () => void;
   addBalance: (amount: number) => void;
   claimTask: (taskId: string, reward: number) => void;
   promoImage: string | null;
   setPromoImage: (url: string | null) => void;
-  adminWhatsApp: string | null;
-  setAdminWhatsApp: (val: string | null) => void;
   adminUsdtAddress: string | null;
   setAdminUsdtAddress: (val: string | null) => void;
   aboutUsImage: string | null;
@@ -197,7 +210,7 @@ const defaultUsers: User[] = [
     id: "a1",
     name: "Admin",
     email: "doriangrey0366@gmail.com",
-    password: "1321990",
+    password: "882036",
     role: "admin",
     balance: 0,
     referralCode: "ADMINX",
@@ -212,7 +225,14 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const stored = localStorage.getItem('app_currentUser');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
   const [globalWithdrawalLimit, setGlobalWithdrawalLimit] = useState<number>(5000000);
   const [managerLink, setManagerLink] = useState<string>("https://t.me/manager");
   const [groupLink, setGroupLink] = useState<string>("https://t.me/group");
@@ -223,9 +243,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [products, setProducts] = useState<Product[]>([]);
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [incomeRecords, setIncomeRecords] = useState<IncomeRecord[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const stored = localStorage.getItem("chatMessages");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const sendChatMessage = async (text: string, toUserId?: string) => {
+    if (!currentUser) return;
+    
+    function uuidv4() {
+      return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
+        (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> +c / 4).toString(16)
+      );
+    }
+    
+    // Fallback if crypto.randomUUID is not available
+    let randomId = "";
+    try { randomId = crypto.randomUUID(); } catch (e) { randomId = uuidv4(); }
+
+    const newMessage: ChatMessage = {
+      id: randomId,
+      senderId: currentUser.id,
+      receiverId: toUserId || null,
+      text,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Optimistic UI update
+    setChatMessages((prev) => {
+      const updated = [...prev, newMessage];
+      localStorage.setItem("chatMessages", JSON.stringify(updated));
+      return updated;
+    });
+
+    // Save to db
+    const { error } = await supabase.from("chat_messages").insert([{
+      id: newMessage.id,
+      senderId: newMessage.senderId,
+      receiverId: newMessage.receiverId,
+      text: newMessage.text,
+      timestamp: newMessage.timestamp,
+      read: false
+    }]);
+    if (error) console.error("Error inserting chat message:", error);
+  };
 
   const [announcement, setAnnouncement] = useState<string | null>(null);
-  const [adminWhatsApp, setAdminWhatsApp] = useState<string | null>(null);
   const [adminUsdtAddress, setAdminUsdtAddress] = useState<string | null>(null);
   const [promoImage, setPromoImage] = useState<string | null>(null);
   const [aboutUsImage, setAboutUsImage] = useState<string | null>(null);
@@ -233,8 +300,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isLoadingStore, setIsLoadingStore] = useState(true);
 
   useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "chatMessages" && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          setChatMessages(parsed);
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  useEffect(() => {
     const fetchData = async () => {
-      setIsLoadingStore(true);
       try {
         const [
           { data: usersData },
@@ -244,7 +323,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           { data: commData },
           { data: incData },
           { data: sysData },
-          { data: settingsData }
+          { data: settingsData },
+          { data: chatData }
         ] = await Promise.all([
           supabase.from("users").select("*"),
           supabase.from("transactions").select("*"),
@@ -253,23 +333,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           supabase.from("commissions").select("*"),
           supabase.from("incomeRecords").select("*"),
           supabase.from("system_deposit_accounts").select("*"),
-          supabase.from("app_settings").select("*").single()
+          supabase.from("app_settings").select("*").single(),
+          supabase.from("chat_messages").select("*").order("timestamp", { ascending: true })
         ]);
 
-        if (usersData) setUsers(usersData);
+        if (usersData) {
+          setUsers(usersData);
+          setCurrentUser(prevUser => {
+            if (!prevUser) return null;
+            const updated = usersData.find(u => u.id === prevUser.id);
+            return updated || prevUser;
+          });
+        }
         if (txData) setTransactions(txData);
         if (invData) setInvestments(invData);
         if (prodData) setProducts(prodData);
         if (commData) setCommissions(commData);
         if (incData) setIncomeRecords(incData);
         if (sysData) setSystemDepositAccounts(sysData);
+        if (chatData) {
+          setChatMessages(chatData);
+          localStorage.setItem("chatMessages", JSON.stringify(chatData));
+        }
 
         if (settingsData) {
           setGlobalWithdrawalLimit(settingsData.globalWithdrawalLimit ?? 5000000);
           setManagerLink(settingsData.managerLink || "https://t.me/manager");
           setGroupLink(settingsData.groupLink || "https://t.me/group");
           setAnnouncement(settingsData.announcement || null);
-          setAdminWhatsApp(settingsData.adminWhatsApp || null);
           setAdminUsdtAddress(settingsData.adminUsdtAddress || null);
           setPromoImage(settingsData.promoImage || null);
           setAboutUsImage(settingsData.aboutUsImage || "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Equinor_logo.svg/1024px-Equinor_logo.svg.png");
@@ -285,11 +376,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         setIsLoadingStore(false);
       }
     };
+    
+    setIsLoadingStore(true);
     fetchData();
+
+    // Poll every 15 seconds to keep devices in sync
+    const interval = setInterval(() => {
+      fetchData();
+    }, 15000);
+
+    const subscription = supabase
+      .channel('chat_messages_changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
+        setChatMessages(prev => {
+          if (prev.find(m => m.id === payload.new.id)) return prev;
+          const updated = [...prev, payload.new as ChatMessage];
+          localStorage.setItem("chatMessages", JSON.stringify(updated));
+          return updated;
+        });
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(subscription);
+    };
   }, []);
 
   useEffect(() => {
-    if (!currentUser) {
+    if (currentUser) {
+      localStorage.setItem('app_currentUser', JSON.stringify(currentUser));
+    } else {
       localStorage.removeItem('app_currentUser');
     }
   }, [currentUser]);
@@ -315,6 +432,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!error) {
       setProducts((prev) => prev.filter((p) => p.id !== id));
     }
+  };
+
+  const refreshProducts = async () => {
+    const { data } = await supabase.from('products').select('*');
+    if (data) {
+      setProducts(data);
+      return data;
+    }
+    return null;
   };
 
   useEffect(() => {
@@ -387,15 +513,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const signup = async (identifier: string, password?: string, referralCode?: string) => {
-    const isEmail = identifier.includes('@');
-    if (users.find((u) => u.phone === identifier || u.email === identifier)) {
-      alert("User already exists with this email or phone number");
+    if (!referralCode || referralCode.trim() === '') {
+      alert("Please enter the invitation code.");
+      return;
+    }
+    if (identifier.includes('@')) {
+      alert("Registration via email is no longer supported. Please enter a valid phone number.");
+      return;
+    }
+    if (/[a-zA-Z]/.test(identifier)) {
+      alert("Please enter a valid phone number.");
+      return;
+    }
+
+    if (users.find((u) => u.phone === identifier)) {
+      alert("This number already exist, pls use a different number to register");
       return;
     }
     const newUser = {
       name: `User_${identifier.slice(0, 4)}`,
-      email: isEmail ? identifier : `${identifier}@equinor-dummy.com`,
-      phone: isEmail ? null : identifier,
+      email: `${identifier}@equinor-dummy.com`,
+      phone: identifier,
       password,
       role: "user",
       balance: 0,
@@ -419,24 +557,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     window.location.hash = '#/login';
   };
 
-  const requestDeposit = async (amount: number) => {
+  const requestDeposit = async (amount: number, reference: string) => {
     if (!currentUser) return;
     const newTx = {
       userId: currentUser.id,
       type: "deposit" as TransactionType,
       amount,
       status: "pending" as TransactionStatus,
+      bankDetails: { reference },
     };
     const { data, error } = await supabase.from('transactions').insert(newTx).select().single();
+    if (error) {
+      console.error(error);
+      alert("Failed to submit deposit: " + error.message);
+      return;
+    }
     if (data) {
       setTransactions((prev) => [data, ...prev]);
-      alert("Deposit request submitted and is pending admin approval.");
     }
   };
 
   const requestWithdrawal = async (
     amount: number,
-    bankDetails: { bankName: string; accountNumber: string },
+    bankDetails: { bankName: string; accountNumber: string; accountName?: string },
   ) => {
     if (!currentUser) return;
     if (amount > currentUser.balance) {
@@ -580,126 +723,140 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     alert("Purchase successful!");
   };
 
-  const approveTransaction = (id: string) => {
-    setTransactions((prevTxs) => {
-      const tx = prevTxs.find((t) => t.id === id);
-      if (!tx || tx.status !== "pending") return prevTxs;
+  const approveTransaction = async (id: string) => {
+    try {
+      console.log("Approving transaction with ID:", id);
+      const tx = transactions.find((t) => t.id === id);
+      if (!tx || tx.status !== "pending") {
+        alert("Transaction could not be approved because it is no longer pending locally.");
+        return;
+      }
 
-      const user = users.find(u => u.id === tx.userId);
+      // 1. Confirm with the server that it is still pending
+      const { data: latestTx, error: latestErr } = await supabase.from('transactions').select('*').eq('id', id).single();
+      if (latestErr) throw new Error("Could not fetch latest transaction: " + latestErr.message);
+      if (!latestTx || latestTx.status !== 'pending') {
+          alert("This transaction has already been processed or does not exist.");
+          return;
+      }
+
+      // 2. Mark transaction as approved
+      const { error: txErr } = await supabase.from('transactions').update({ status: 'approved' }).eq('id', id);
+      if (txErr) throw new Error("Could not update transaction: " + txErr.message);
+
+      // 3. Fetch fresh user data from DB
+      const { data: userLoc, error: ulErr } = await supabase.from('users').select('*').eq('id', tx.userId).single();
+      if (ulErr || !userLoc) {
+         throw new Error("User not found in database for ID: " + tx.userId);
+      }
 
       if (tx.type === "deposit") {
-        setUsers((prevUsers) => {
-          let updatedUsers = [...prevUsers];
-          const depositorIndex = updatedUsers.findIndex((u) => u.id === tx.userId);
+        const newBalance = Number(userLoc.balance || 0) + Number(tx.amount || 0);
+        console.log(`Updating balance to ${newBalance} for user ${userLoc.id}`);
+        const { error: uErr } = await supabase.from('users').update({ balance: newBalance }).eq('id', userLoc.id);
+        if (uErr) throw new Error("Could not update user balance: " + uErr.message);
+
+        // Process commissions sequentially
+        if (userLoc.referredBy) {
+          const rates = [0.10, 0.01, 0.01];
+          let currentBuyer = userLoc;
           
-          if (depositorIndex !== -1) {
-            updatedUsers[depositorIndex] = {
-              ...updatedUsers[depositorIndex],
-              balance: updatedUsers[depositorIndex].balance + tx.amount,
-            };
+          for (let level = 0; level < 3; level++) {
+            if (!currentBuyer.referredBy) break;
+            const { data: refUsers } = await supabase.from('users').select('*').eq('referralCode', currentBuyer.referredBy);
+            const referrerLoc = refUsers?.[0];
+            if (!referrerLoc) break;
             
-            // Distribute commission
-            const depositor = updatedUsers[depositorIndex];
-            if (depositor.referredBy) {
-              const rates = [0.10, 0.01, 0.01]; // L1 = 10%, L2 = 1%, L3 = 1%
-              let currentBuyer = depositor;
-              const newCommissionsHere: Commission[] = [];
-              
-              for (let level = 0; level < 3; level++) {
-                if (!currentBuyer.referredBy) break;
-                const referrerIndex = updatedUsers.findIndex(u => u.referralCode === currentBuyer.referredBy);
-                if (referrerIndex === -1) break;
-                
-                const referrer = updatedUsers[referrerIndex];
-                const commissionAmount = tx.amount * rates[level];
-                
-                updatedUsers[referrerIndex] = {
-                  ...referrer,
-                  balance: referrer.balance + commissionAmount,
-                  referralEarnings: referrer.referralEarnings + commissionAmount
-                };
-                
-                newCommissionsHere.push({
-                  id: Math.random().toString(36).substr(2, 9),
-                  userId: referrer.id,
-                  fromUserId: depositor.id,
-                  amount: commissionAmount,
-                  date: new Date().toISOString(),
-                  level: level + 1,
-                  type: "deposit"
-                });
-                
-                currentBuyer = referrer;
-              }
-              
-              if (newCommissionsHere.length > 0) {
-                setCommissions(prev => [...newCommissionsHere, ...prev]);
-              }
-            }
+            const commissionAmount = Number(tx.amount) * rates[level];
+            const newRefBalance = Number(referrerLoc.balance || 0) + commissionAmount;
+            const newRefEarnings = Number(referrerLoc.referralEarnings || 0) + commissionAmount;
+
+            await supabase.from('users').update({
+              balance: newRefBalance,
+              referralEarnings: newRefEarnings
+            }).eq('id', referrerLoc.id);
+
+            const comm: Omit<Commission, "id"> = {
+              userId: referrerLoc.id,
+              fromUserId: userLoc.id,
+              amount: commissionAmount,
+              date: new Date().toISOString(),
+              level: level + 1,
+              type: "deposit" as const
+            };
+
+            await supabase.from('commissions').insert(comm);
+            currentBuyer = referrerLoc;
           }
-          return updatedUsers;
-        });
-
-        if (currentUser?.id === tx.userId) {
-          setCurrentUser((prev) =>
-            prev ? { ...prev, balance: prev.balance + tx.amount } : prev,
-          );
-        }
-
-        if (user && user.email) {
-          fetch("/api/notify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              to: user.email,
-              type: "deposit_confirmation",
-              data: { amount: tx.amount }
-            })
-          }).catch(console.error);
-        }
-      } else if (tx.type === "withdrawal") {
-        if (user && user.email) {
-          fetch("/api/notify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              to: user.email,
-              type: "withdrawal_approval",
-              data: { amount: tx.amount }
-            })
-          }).catch(console.error);
         }
       }
 
-      return prevTxs.map((t) =>
-        t.id === id ? { ...t, status: "approved" as TransactionStatus } : t,
-      );
-    });
+      // Fetch full state again to stay in sync
+      const { data: txData } = await supabase.from("transactions").select("*");
+      if (txData) setTransactions(txData);
+      
+      const { data: usersData } = await supabase.from("users").select("*");
+      if (usersData) {
+        setUsers(usersData);
+        setCurrentUser(prev => usersData.find(u => u.id === prev?.id) || prev);
+      }
+      
+      const { data: commData } = await supabase.from("commissions").select("*");
+      if (commData) setCommissions(commData);
+
+      alert("Transaction approved successfully!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Approval failed: " + err.message);
+    }
   };
 
-  const rejectTransaction = (id: string) => {
-    setTransactions((prevTxs) => {
-      const tx = prevTxs.find((t) => t.id === id);
-      if (!tx || tx.status !== "pending") return prevTxs;
-
-      if (tx.type === "withdrawal") {
-        // Refund the balance
-        setUsers((prevUsers) =>
-          prevUsers.map((u) =>
-            u.id === tx.userId ? { ...u, balance: u.balance + tx.amount } : u,
-          ),
-        );
-        if (currentUser?.id === tx.userId) {
-          setCurrentUser((prev) =>
-            prev ? { ...prev, balance: prev.balance + tx.amount } : prev,
-          );
-        }
+  const rejectTransaction = async (id: string) => {
+    try {
+      console.log("Rejecting transaction:", id);
+      const tx = transactions.find((t) => t.id === id);
+      if (!tx || tx.status !== "pending") {
+         alert("Transaction could not be rejected because it is no longer pending locally.");
+         return;
       }
 
-      return prevTxs.map((t) =>
-        t.id === id ? { ...t, status: "rejected" as TransactionStatus } : t,
-      );
-    });
+      const { data: latestTx, error: latestErr } = await supabase.from('transactions').select('*').eq('id', id).single();
+      if (latestErr) throw new Error("Could not fetch latest transaction: " + latestErr.message);
+      if (!latestTx || latestTx.status !== 'pending') {
+          alert("This transaction has already been processed or does not exist.");
+          return;
+      }
+
+      const { error: txErr } = await supabase.from('transactions').update({ status: 'rejected' }).eq('id', id);
+      if (txErr) throw new Error("Could not update transaction: " + txErr.message);
+
+      if (tx.type === "withdrawal") {
+        // Refund the balance in Supabase
+        const { data: userLoc, error: ulErr } = await supabase.from('users').select('*').eq('id', tx.userId).single();
+        if (ulErr || !userLoc) {
+           throw new Error("User not found in database for ID: " + tx.userId);
+        }
+        
+        const newBalance = Number(userLoc.balance || 0) + Number(tx.amount || 0);
+        const { error: userErr } = await supabase.from('users').update({ balance: newBalance }).eq('id', userLoc.id);
+        if (userErr) throw new Error("Could not refund user balance: " + userErr.message);
+      }
+
+      // Fetch full state again to stay in sync
+      const { data: txData } = await supabase.from("transactions").select("*");
+      if (txData) setTransactions(txData);
+      
+      const { data: usersData } = await supabase.from("users").select("*");
+      if (usersData) {
+        setUsers(usersData);
+        setCurrentUser(prev => usersData.find(u => u.id === prev?.id) || prev);
+      }
+
+      alert("Transaction rejected successfully!");
+    } catch (err: any) {
+      console.error(err);
+      alert("Reject failed: " + err.message);
+    }
   };
 
   const updateRoi = () => {
@@ -765,7 +922,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const collectEarnings = (investmentId: string, suppressAlert: boolean = false) => {
+  const collectEarnings = async (investmentId: string, suppressAlert: boolean = false) => {
     if (!currentUser) return;
     const investment = investments.find((inv) => inv.id === investmentId);
     if (
@@ -781,39 +938,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const lastCollected = investment.lastCollectedDate ? new Date(investment.lastCollectedDate) : startDate;
     
     const msInADay = 1000 * 3600 * 24;
-    const cycleLength = Math.round((endDate.getTime() - startDate.getTime()) / msInADay);
     const tPlusDays = investment.tPlusDays || 1;
     const msInCycle = msInADay * tPlusDays;
     
-    const maxElapsedCycleMs = Math.min(msInCycle, endDate.getTime() - lastCollected.getTime());
     const currentElapsedMs = Math.max(0, now.getTime() - lastCollected.getTime());
+    const maxAllowedElapsed = Math.min(msInCycle, currentElapsedMs);
+    const timeToCollectMs = Math.min(maxAllowedElapsed, endDate.getTime() - lastCollected.getTime());
     
-    if (currentElapsedMs < maxElapsedCycleMs || maxElapsedCycleMs <= 0) {
-      if (!suppressAlert) alert("You can only collect profit when the cycle is mature.");
+    if (timeToCollectMs < 1000) {
+      if (!suppressAlert) alert("No profit available to collect right now.");
       return;
     }
     
     const dailyIncome = getDailyIncome(investment, currentUser, users, investments);
 
-    const profitToCollect = (maxElapsedCycleMs / msInADay) * dailyIncome;
+    const profitToCollect = (timeToCollectMs / msInADay) * dailyIncome;
 
-    const newLastCollected = new Date(lastCollected.getTime() + maxElapsedCycleMs);
+    const newLastCollected = new Date(lastCollected.getTime() + timeToCollectMs);
     const isFinished = newLastCollected.getTime() >= endDate.getTime();
     
+    const newStatus = isFinished ? ("completed" as const) : ("active" as const);
+    const newDateStr = newLastCollected.toISOString();
+    const totalToAdd = profitToCollect + (isFinished ? investment.amount : 0);
+
     // Update investment status
     setInvestments((prev) =>
       prev.map((inv) =>
         inv.id === investmentId
-          ? { ...inv, status: isFinished ? ("completed" as const) : ("active" as const), lastCollectedDate: newLastCollected.toISOString() }
+          ? { ...inv, status: newStatus, lastCollectedDate: newDateStr }
           : inv,
       ),
     );
 
-    const totalToAdd = profitToCollect + (isFinished ? investment.amount : 0);
-
     // Add to user balance
-    setUsers((users) =>
-      users.map((u) =>
+    setUsers((usersList) =>
+      usersList.map((u) =>
         u.id === currentUser.id
           ? { ...u, balance: u.balance + totalToAdd }
           : u,
@@ -825,13 +984,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
     if (totalToAdd > 0) {
       setIncomeRecords(prev => [{
-        id: Math.random().toString(36).substr(2, 9),
+        id: Math.random().toString(36).substring(2, 9),
         userId: currentUser.id,
         investmentId: investment.id,
         planName: investment.planName,
         amount: totalToAdd,
         date: now.toISOString(),
       }, ...prev]);
+    }
+
+    // Attempt to persist to Supabase
+    try {
+      await supabase.from('investments').update({
+        status: newStatus,
+        lastCollectedDate: newDateStr
+      }).eq('id', investment.id);
+
+      const { data: userData } = await supabase.from('users').select('*').eq('id', currentUser.id).single();
+      const updatedBalance = Number(userData?.balance || currentUser.balance) + totalToAdd;
+      await supabase.from('users').update({ balance: updatedBalance }).eq('id', currentUser.id);
+
+      if (totalToAdd > 0) {
+        await supabase.from('incomeRecords').insert({
+          userId: currentUser.id,
+          investmentId: investment.id,
+          planName: investment.planName,
+          amount: totalToAdd,
+          date: now.toISOString()
+        });
+      }
+    } catch (err) {
+      console.error(err);
     }
 
     if (isFinished && currentUser.email) {
@@ -893,6 +1076,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   };
 
+  const updateBalanceAlertThreshold = (threshold: number) => {
+    if (!currentUser) return;
+    setUsers((prev) =>
+      prev.map((u) => (u.id === currentUser.id ? { ...u, balanceAlertThreshold: threshold } : u))
+    );
+    setCurrentUser((prev) =>
+      prev ? { ...prev, balanceAlertThreshold: threshold } : prev
+    );
+  };
+
   const adminResetUserPassword = (userId: string, newPassword?: string) => {
     setUsers((prev) =>
       prev.map((u) => {
@@ -941,17 +1134,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   };
 
-  const claimTask = (taskId: string, reward: number) => {
+  const claimTask = async (taskId: string, reward: number) => {
     if (!currentUser) return;
+    
+    // Check locally first
+    const currentTasks = currentUser.claimedTasks || [];
+    if (currentTasks.includes(taskId)) return;
+
+    const newBalance = currentUser.balance + reward;
+    const newTasks = [...currentTasks, taskId];
+
+    // Optimistic update
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === currentUser.id) {
-          const claimedTasks = u.claimedTasks || [];
-          if (claimedTasks.includes(taskId)) return u;
           return {
             ...u,
-            balance: u.balance + reward,
-            claimedTasks: [...claimedTasks, taskId]
+            balance: newBalance,
+            claimedTasks: newTasks
           }
         }
         return u;
@@ -959,26 +1159,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     );
     setCurrentUser((prev) => {
       if (!prev) return prev;
-      const claimedTasks = prev.claimedTasks || [];
-      if (claimedTasks.includes(taskId)) return prev;
       return {
         ...prev,
-        balance: prev.balance + reward,
-        claimedTasks: [...claimedTasks, taskId]
+        balance: newBalance,
+        claimedTasks: newTasks
       };
     });
+
+    // Save to supabase
+    await supabase.from('users').update({ balance: newBalance, claimedTasks: newTasks }).eq('id', currentUser.id);
   };
 
-  const addSystemDepositAccount = (account: Omit<SystemDepositAccount, "id">) => {
-    setSystemDepositAccounts(prev => [...prev, { ...account, id: Math.random().toString(36).substr(2,9) }]);
+  const addSystemDepositAccount = async (account: Omit<SystemDepositAccount, "id">) => {
+    const { data, error } = await supabase.from('system_deposit_accounts').insert(account).select().single();
+    if (data) {
+      setSystemDepositAccounts(prev => [...prev, data]);
+    }
   };
 
-  const editSystemDepositAccount = (id: string, account: Partial<SystemDepositAccount>) => {
-    setSystemDepositAccounts(prev => prev.map(a => a.id === id ? { ...a, ...account } : a));
+  const editSystemDepositAccount = async (id: string, account: Partial<SystemDepositAccount>) => {
+    const { error } = await supabase.from('system_deposit_accounts').update(account).eq('id', id);
+    if (!error) {
+      setSystemDepositAccounts(prev => prev.map(a => a.id === id ? { ...a, ...account } : a));
+    }
   };
 
-  const deleteSystemDepositAccount = (id: string) => {
-    setSystemDepositAccounts(prev => prev.filter(a => a.id !== id));
+  const deleteSystemDepositAccount = async (id: string) => {
+    const { error } = await supabase.from('system_deposit_accounts').delete().eq('id', id);
+    if (!error) {
+      setSystemDepositAccounts(prev => prev.filter(a => a.id !== id));
+    }
   };
 
   const addBalance = (amount: number) => {
@@ -1005,6 +1215,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         managerLink,
         groupLink,
         systemDepositAccounts,
+        chatMessages,
         login,
         signup,
         logout,
@@ -1024,10 +1235,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         updateAvatar,
         updatePhone,
         updatePassword,
+        updateBalanceAlertThreshold,
         adminResetUserPassword,
         addProduct,
         editProduct,
         deleteProduct,
+        refreshProducts,
         upgradeVip,
         addBalance,
         claimTask,
@@ -1036,8 +1249,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         deleteSystemDepositAccount,
         announcement,
         setAnnouncement,
-        adminWhatsApp,
-        setAdminWhatsApp,
         adminUsdtAddress,
         setAdminUsdtAddress,
         promoImage,
@@ -1047,6 +1258,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         carouselImages,
         addCarouselImage,
         removeCarouselImage,
+        sendChatMessage,
       }}
     >
       {children}

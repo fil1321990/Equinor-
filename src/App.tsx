@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
 console.log("App.tsx is loading...");
@@ -53,13 +53,17 @@ import {
   ArrowRightCircle,
   Layers,
   UserCheck,
-  Triangle
+  Triangle,
+  Send,
+  CheckCircle2,
+  Banknote
 } from "lucide-react";
 import { AppProvider, useAppStore } from "./store";
 import { getDailyIncome } from "./lib/earnings";
 import { EquinorStar } from "./components/EquinorStar";
 import { RankBadge } from "./components/RankBadge";
 import { VIP_LEVELS, EQUITY_EXCHANGE_TIERS, VIP_MEMBER_EXCLUSIVE_TIERS } from "./services/vip";
+import Confetti from "react-confetti";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-NG", {
@@ -67,6 +71,12 @@ function formatCurrency(amount: number) {
     currency: "NGN",
   }).format(amount);
 }
+
+const triggerHaptic = () => {
+  if (typeof navigator !== "undefined" && navigator.vibrate) {
+    navigator.vibrate(50);
+  }
+};
 
 const CountdownTimer = ({ targetDate }: { targetDate: string }) => {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
@@ -184,6 +194,7 @@ function MainApp() {
     updatePhone,
     updatePassword,
     addProduct,
+    refreshProducts,
     editProduct,
     deleteProduct,
     upgradeVip,
@@ -194,8 +205,6 @@ function MainApp() {
     rejectTransaction,
     disableUser,
     enableUser,
-    adminWhatsApp,
-    setAdminWhatsApp,
     adminUsdtAddress,
     setAdminUsdtAddress,
     announcement,
@@ -216,23 +225,61 @@ function MainApp() {
     systemDepositAccounts,
     addSystemDepositAccount,
     deleteSystemDepositAccount,
+    chatMessages,
+    sendChatMessage,
+    updateBalanceAlertThreshold,
   } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<
     "home" | "product" | "order" | "mine" | "admin" | "checkin" | "task" | "vip" | "myteam"
-  >("home");
+  >(() => {
+    try {
+      const stored = localStorage.getItem("app_activeTab");
+      return (stored as any) || "home";
+    } catch {
+      return "home";
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("app_activeTab", activeTab);
+  }, [activeTab]);
   const [orderTab, setOrderTab] = useState<"general" | "special" | "expired">("general");
   const [productTab, setProductTab] = useState<"general" | "vip" | "special">("general");
   const [activeTeamTab, setActiveTeamTab] = useState<"A" | "B" | "C">("A");
+
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === "product") {
+      setIsLoadingProducts(true);
+      const timer = setTimeout(() => setIsLoadingProducts(false), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, productTab]);
+
+  useEffect(() => {
+    if (activeTab === "order") {
+      setIsLoadingOrders(true);
+      const timer = setTimeout(() => setIsLoadingOrders(false), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, orderTab]);
+
   const [tick, setTick] = useState(0);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [adminChatUserContext, setAdminChatUserContext] = useState<string | null>(null);
   
   useEffect(() => {
     const interval = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(interval);
   }, []);
-  const [activeModal, setActiveModal] = useState<null | "deposit" | "withdraw" | "bankDetails" | "about" | "convidar" | "levelUp" | "setup" | "setupPhone" | "setupPassword" | "addProduct" | "editProduct" | "fundingDetails" | "commissionRecord" | "incomeRecord" | "redemptionCode" | "redemptionReward" | "purchaseSuccess" | "contact" | "equinorConfirm" | "buyProduct" | "sysAnnouncement" | "download" | "addDepositAccount" | "depositCheckout">(
+  const [activeModal, setActiveModal] = useState<null | "deposit" | "withdraw" | "bankDetails" | "about" | "convidar" | "levelUp" | "setup" | "setupPhone" | "setupPassword" | "setupAlertThreshold" | "addProduct" | "editProduct" | "fundingDetails" | "commissionRecord" | "incomeRecord" | "redemptionCode" | "redemptionReward" | "purchaseSuccess" | "contact" | "equinorConfirm" | "buyProduct" | "sysAnnouncement" | "download" | "addDepositAccount" | "depositCheckout" | "successAnimated">(
     null,
   );
+  const [successAnimMessage, setSuccessAnimMessage] = useState("");
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (activeModal === "depositCheckout") {
@@ -251,6 +298,54 @@ function MainApp() {
     }
     return () => clearInterval(interval);
   }, [activeModal, systemDepositAccounts.length]);
+
+  const [notifications, setNotifications] = useState<{id: string, title: string, message: string, type: 'success' | 'error' | 'info'}[]>([]);
+
+  const addNotification = (title: string, message: string, type: 'success' | 'error' | 'info') => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setNotifications(prev => [...prev, { id, title, message, type }]);
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 5000);
+  };
+
+  const prevTransactions = React.useRef(transactions);
+  const prevBalanceRef = React.useRef<number>();
+
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    // Balance Drop Alert Logic
+    if (prevBalanceRef.current !== undefined && currentUser.balanceAlertThreshold !== undefined) {
+      if (prevBalanceRef.current >= currentUser.balanceAlertThreshold && currentUser.balance < currentUser.balanceAlertThreshold) {
+        // Balance dropped below threshold!
+        setToastMessage(`Alert: Your balance has dropped below ₦${currentUser.balanceAlertThreshold.toLocaleString()}!`);
+        setTimeout(() => setToastMessage(null), 3000);
+      }
+    }
+    prevBalanceRef.current = currentUser.balance;
+
+    // Compare prevTransactions and current transactions
+    const prev = prevTransactions.current;
+    
+    transactions.forEach(newTx => {
+      if (newTx.userId !== currentUser.id) return;
+      
+      const oldTx = prev.find(t => t.id === newTx.id);
+      if (oldTx && oldTx.status === 'pending' && newTx.status !== 'pending') {
+        const typeText = newTx.type === 'deposit' ? 'Deposit' : 'Withdrawal';
+        const statusText = newTx.status === 'approved' ? 'Approved' : 'Rejected';
+        const type = newTx.status === 'approved' ? 'success' : 'error';
+        addNotification(
+          `${typeText} ${statusText}`,
+          `Your ${newTx.type} of ₦${Number(newTx.amount).toLocaleString()} has been ${newTx.status}.`,
+          type
+        );
+      }
+    });
+
+    prevTransactions.current = transactions;
+  }, [transactions, currentUser?.id]);
 
   const [announcementSeen, setAnnouncementSeen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -292,26 +387,50 @@ function MainApp() {
   const [txFilterDate, setTxFilterDate] = useState<"all" | "today" | "week" | "month">("all");
   const [depositAmount, setDepositAmount] = useState("");
   const [depositMethod, setDepositMethod] = useState<"ngn" | "usdt">("ngn");
+  const [depositReference, setDepositReference] = useState("");
   const [equinorInputAmount, setEquinorInputAmount] = useState("");
   const [equinorSelectedPlan, setEquinorSelectedPlan] = useState<any>(null);
   const [setupPhoneValue, setSetupPhoneValue] = useState("");
+  const [setupOldPasswordValue, setSetupOldPasswordValue] = useState("");
   const [setupPasswordValue, setSetupPasswordValue] = useState("");
+  const [language, setLanguage] = useState("English");
+  const [setupAlertThresholdValue, setSetupAlertThresholdValue] = useState("");
   const [redemptionCode, setRedemptionCode] = useState("");
   const [rewardAmount, setRewardAmount] = useState(0);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [bankName, setBankName] = useState("");
   const [accountNum, setAccountNum] = useState("");
-  const [validRedemptionCodes, setValidRedemptionCodes] = useState<{code: string, amount: number, minClaims: number, maxClaims: number, validityMinutes: number, claimedBy: string[], createdAt: number}[]>([]);
+  const validRedemptionCodes = useMemo(() => {
+    return products
+      .filter(p => p.type === 'redemption_code')
+      .map(p => {
+        let claimedBy = [];
+        try { claimedBy = p.title ? JSON.parse(p.title) : []; } catch (e) { }
+        return {
+          code: p.name,
+          amount: p.min,
+          minClaims: p.days,
+          maxClaims: p.maxQuota || 1,
+          validityMinutes: p.tPlusDays || 60,
+          claimedBy,
+          createdAt: p.roi
+        };
+      });
+  }, [products]);
   const [newRedemptionAmount, setNewRedemptionAmount] = useState("");
   const [newRedemptionMin, setNewRedemptionMin] = useState("1");
   const [newRedemptionMax, setNewRedemptionMax] = useState("1");
   const [newRedemptionValidity, setNewRedemptionValidity] = useState("60");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentProcessingState, setPaymentProcessingState] = useState<{ step: number, message: string } | null>(null);
+  const [collectingIds, setCollectingIds] = useState<Record<string, boolean>>({});
   const [showCongratsEffect, setShowCongratsEffect] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
 
   const [bankAccountNumber, setBankAccountNumber] = useState("");
   const [selectedBankCode, setSelectedBankCode] = useState("");
   const [bankAccountName, setBankAccountName] = useState("");
+  const [isEditingBank, setIsEditingBank] = useState(false);
   const [isLoadingBanks, setIsLoadingBanks] = useState(false);
   const [banksList, setBanksList] = useState<{code: string, name: string}[]>([]);
   const [newProductName, setNewProductName] = useState("");
@@ -375,7 +494,7 @@ function MainApp() {
 
   const [registerForm, setRegisterForm] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return { phone: '', code: '', password: '', confirmParams: '', invitationCode: params.get('ref') || '' };
+    return { phone: '', code: '', password: '', confirmParams: '', invitationCode: params.get('ref') || '', agreed: false };
   });
   const referralLink = `${window.location.origin}/register?ref=${currentUser?.referralCode}`;
 
@@ -428,64 +547,83 @@ function MainApp() {
   const firstDayWeekday = new Date(YEAR, MONTH, 1).getDay(); 
   const today = now.getDate();
 
-  const [continuousStreak, setContinuousStreak] = useState(() => Math.max(0, today - 1));
-  const [checkedDays, setCheckedDays] = useState<Set<number>>(() => new Set(Array.from({length: Math.max(0, today - 1)}, (_, i) => i + 1)));
-  const [earnedBonuses, setEarnedBonuses] = useState<number[]>(() => {
-    let b = [];
-    if (today - 1 >= 7) b.push(7);
-    if (today - 1 >= 15) b.push(15);
-    if (today - 1 >= 30) b.push(30);
-    return b;
-  });
-  const [totalEarnings, setTotalEarnings] = useState(() => {
-    let earn = 0;
-    if (today - 1 >= 7) earn += 1400;
-    if (today - 1 >= 15) earn += 4200;
-    if (today - 1 >= 30) earn += 8400;
-    return earn;
-  });
   const BONUSES = {
     7: 1400,
-    15: 4200,
-    30: 8400
+    15: 2800,
+    30: 4200
   };
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  const getCheckinTaskId = (day: number) => `checkin_${YEAR}-${String(MONTH + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const getBonusTaskId = (days: number) => `bonus_${YEAR}-${String(MONTH + 1).padStart(2, '0')}-${days}`;
+
+  const checkedDays = useMemo(() => {
+    const set = new Set<number>();
+    if (!currentUser?.claimedTasks) return set;
+    for (let i = 1; i <= Math.min(today, daysInMonth); i++) {
+      if (currentUser.claimedTasks.includes(getCheckinTaskId(i))) {
+        set.add(i);
+      }
+    }
+    return set;
+  }, [currentUser?.claimedTasks, YEAR, MONTH, today, daysInMonth]);
+
+  const continuousStreak = useMemo(() => {
+    let streak = 0;
+    for (let i = today; i >= 1; i--) {
+      if (checkedDays.has(i)) {
+        streak++;
+      } else if (i === today) {
+        // Not checked in today yet, continue counting from yesterday
+      } else {
+        break; // Gap found before today
+      }
+    }
+    return streak;
+  }, [checkedDays, today]);
+
+  const earnedBonuses = useMemo(() => {
+    const bonuses: number[] = [];
+    if (!currentUser?.claimedTasks) return bonuses;
+    if (currentUser.claimedTasks.includes(getBonusTaskId(7))) bonuses.push(7);
+    if (currentUser.claimedTasks.includes(getBonusTaskId(15))) bonuses.push(15);
+    if (currentUser.claimedTasks.includes(getBonusTaskId(30))) bonuses.push(30);
+    return bonuses;
+  }, [currentUser?.claimedTasks, YEAR, MONTH]);
+
+  const totalEarnings = useMemo(() => {
+    let earn = 0;
+    earnedBonuses.forEach(b => earn += BONUSES[b as keyof typeof BONUSES] || 0);
+    return earn;
+  }, [earnedBonuses]);
+
   const isCheckedInToday = checkedDays.has(today);
 
-  const handleCheckIn = () => {
+  const handleCheckIn = async () => {
     if (isCheckedInToday) return;
 
-    let newStreak = continuousStreak;
-    const yesterday = today - 1;
-    let gapFound = false;
-
-    if (yesterday > 0 && !checkedDays.has(yesterday)) {
-      newStreak = 0;
-      gapFound = true;
-    }
-
-    newStreak += 1;
-    setContinuousStreak(newStreak);
-
-    setCheckedDays(prev => {
-      const next = gapFound ? new Set<number>() : new Set(prev);
-      next.add(today);
-      return next;
-    });
-
-    let extraEarn = 100; // Base daily check-in reward
+    let newStreak = continuousStreak + 1;
+    let extraEarn = 0;
     let bonusMessage = "";
+
+    // Check if we hit a bonus streak
     if (BONUSES[newStreak as keyof typeof BONUSES] && !earnedBonuses.includes(newStreak)) {
       const bonus = BONUSES[newStreak as keyof typeof BONUSES];
       extraEarn += bonus;
-      setEarnedBonuses(prev => [...prev, newStreak]);
       bonusMessage = ` Bonus claimed! +₦${bonus}`;
+      
+      // We will claim the bonus task id as well
+      claimTask(getBonusTaskId(newStreak), bonus);
     }
 
-    setTotalEarnings(prev => prev + extraEarn);
+    // Call store to save the checkin and give the reward
+    claimTask(getCheckinTaskId(today), 0);
 
-    setToastMessage(`Checked in! Earned ₦100.${bonusMessage}`);
+    if (bonusMessage) {
+      setToastMessage(`Checked in!${bonusMessage}`);
+    } else {
+      setToastMessage(`Checked in! Keep your streak going to earn bonuses.`);
+    }
     setTimeout(() => {
       setToastMessage(null);
     }, 3000);
@@ -516,8 +654,10 @@ function MainApp() {
   
   const isViewingCurrentLevel = viewVipIndex === actualVipIndex;
 
-  // They only get credit for verified referrals (for now just using teamSize as this is an MVP without verification)
-  const currentReferrals = teamSize;
+  // They only get credit for verified active referrals who have an active investment
+  const currentReferrals = currentUser
+    ? users.filter((u) => u.referredBy === currentUser.referralCode && investments.some(i => i.userId === u.id && i.status === 'active')).length
+    : 0;
   const requiredReferrals = nextVipLevel ? nextVipLevel.requiredFromPrev : 0;
   
   // Calculate progress relative to the current actual level they are on
@@ -530,6 +670,8 @@ function MainApp() {
     if (canUpgrade) {
       upgradeVip();
       setActiveModal("levelUp");
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 5000);
     }
   };
 
@@ -548,9 +690,10 @@ function MainApp() {
 
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
+    triggerHaptic();
     const amountNum = Number(withdrawAmount);
-    if (amountNum < 3000) {
-      alert("Minimum withdrawal is ₦3,000");
+    if (amountNum < 6000) {
+      alert("Minimum withdrawal is ₦6,000");
       return;
     }
     
@@ -575,19 +718,24 @@ function MainApp() {
   const executeWithdrawal = async () => {
     setShowWithdrawConfirm(false);
     const amountNum = Number(withdrawAmount);
-    const { bankName: userBankName, accountNumber: userAccountNum } = currentUser!.bankDetails!;
+    const { bankName: userBankName, accountNumber: userAccountNum, accountName: userAccountName } = currentUser!.bankDetails!;
     
     setIsProcessing(true);
     try {
       requestWithdrawal(amountNum, {
         bankName: userBankName,
         accountNumber: userAccountNum,
+        accountName: userAccountName,
       });
-      alert("Withdrawal request submitted! Waiting for admin approval.");
+      setIsProcessing(false);
+      setWithdrawAmount("");
+      setSuccessAnimMessage("Withdrawal request submitted! Awaiting CBN/SEC confirmation.");
+      setActiveModal("successAnimated");
+      setShowConfetti(true);
+      setTimeout(() => setShowConfetti(false), 5000);
     } catch (err: any) {
       console.error(err);
       alert("Failed to submit withdrawal request.");
-    } finally {
       setIsProcessing(false);
       setWithdrawAmount("");
       setActiveModal(null);
@@ -646,8 +794,8 @@ function MainApp() {
   if (!currentUser) {
     if (authRoute === 'admin') {
       return (
-        <div className="min-h-screen bg-[#0A0E2E] flex justify-center items-center py-4 relative font-sans overflow-hidden">
-          <div className="w-full max-w-[480px] h-[100dvh] md:h-[95vh] bg-[#0A0E2E] md:rounded-[2.5rem] overflow-hidden shadow-2xl relative border-0 md:border-[6px] border-[#1a1e4e]/50 flex flex-col p-6 items-center justify-center">
+        <div className="h-[100dvh] md:min-h-screen bg-[#0A0E2E] flex justify-center items-center md:py-4 relative font-sans overflow-hidden">
+          <div className="w-full max-w-[480px] h-full md:h-[95vh] bg-[#0A0E2E] md:rounded-[2.5rem] overflow-hidden shadow-2xl relative border-0 md:border-[6px] border-[#1a1e4e]/50 flex flex-col p-6 items-center justify-center">
             <h1 className="text-white text-2xl font-bold mb-8">Admin Portal</h1>
             <div className="w-full flex flex-col space-y-4">
               <input 
@@ -690,8 +838,8 @@ function MainApp() {
 
     if (isRegistering || authRoute === 'register') {
       return (
-        <div className="min-h-screen bg-[#0A0E2E] flex justify-center items-center py-4 relative font-sans overflow-hidden">
-          <div className="w-full max-w-[480px] h-[100dvh] md:h-[95vh] bg-[#0A0E2E] md:rounded-[2.5rem] overflow-hidden shadow-2xl relative border-0 md:border-[6px] border-[#1a1e4e]/50 flex flex-col p-6">
+        <div className="h-[100dvh] md:min-h-screen bg-[#0A0E2E] flex justify-center items-center md:py-4 relative font-sans overflow-hidden">
+          <div className="w-full max-w-[480px] h-full md:h-[95vh] bg-[#0A0E2E] md:rounded-[2.5rem] overflow-hidden shadow-2xl relative border-0 md:border-[6px] border-[#1a1e4e]/50 flex flex-col p-6">
             <div className="flex bg-[#1a1e4e]/50 rounded-full p-1 mb-8">
               <button 
                 onClick={() => {
@@ -711,7 +859,7 @@ function MainApp() {
               <div className="relative">
                 <input 
                   type="text" 
-                  placeholder="Please enter email or phone number"
+                  placeholder="Please enter phone number"
                   value={registerForm.phone}
                   onChange={e => setRegisterForm({...registerForm, phone: e.target.value})}
                   className="w-full bg-[#1a1e4e]/30 border border-white/10 rounded-2xl px-4 py-4 text-white placeholder-white/30 focus:outline-none focus:border-[#6B2EFF]"
@@ -748,22 +896,33 @@ function MainApp() {
                 />
               </div>
 
-              <div className="flex items-center gap-2 mt-4 cursor-pointer">
-                <div className="w-5 h-5 rounded-full border border-[#6B2EFF] bg-[#6B2EFF] flex items-center justify-center">
-                  <Check className="w-3 h-3 text-white" />
+              <div 
+                className="flex items-center gap-2 mt-4 cursor-pointer"
+                onClick={() => setRegisterForm({...registerForm, agreed: !registerForm.agreed})}
+              >
+                <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition-colors ${registerForm.agreed ? 'border-[#6B2EFF] bg-[#6B2EFF]' : 'border-white/30 bg-transparent'}`}>
+                  {registerForm.agreed && <Check className="w-3 h-3 text-white" />}
                 </div>
                 <span className="text-white/60 text-sm">I read and agree</span>
-                <span className="text-[#6B2EFF] text-sm">【Privacy agreement】</span>
+                <span className="text-[#6B2EFF] text-sm" onClick={(e) => { e.stopPropagation(); setActiveModal('privacy'); }}>【Privacy agreement】</span>
               </div>
 
               <button 
                 onClick={() => {
+                  if (!registerForm.agreed) {
+                    alert("Please read and agree to the Privacy agreement.");
+                    return;
+                  }
                   if (!registerForm.phone || !registerForm.password) {
-                    alert("Please fill in email/phone and password.");
+                    alert("Please fill in phone number and password.");
                     return;
                   }
                   if (registerForm.password !== registerForm.confirmParams) {
                     alert("Passwords do not match.");
+                    return;
+                  }
+                  if (!registerForm.invitationCode || registerForm.invitationCode.trim() === '') {
+                    alert("Please enter the invitation code.");
                     return;
                   }
                   signup(registerForm.phone, registerForm.password, registerForm.invitationCode);
@@ -773,14 +932,52 @@ function MainApp() {
                 Sign up
               </button>
             </div>
+            
+            {/* Privacy Modal in Register View */}
+            {activeModal === "privacy" && (
+              <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 rounded-[2.5rem]">
+                <div className="bg-[#141a3a] border border-white/10 p-6 rounded-[2rem] w-full max-w-sm relative shadow-2xl max-h-[90vh] flex flex-col">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setActiveModal(null); }}
+                    className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/10 rounded-full text-white/50 hover:text-white"
+                  >
+                    <X size={18} />
+                  </button>
+                  <h3 className="text-xl font-bold mb-4 text-[#00D4FF]">Privacy Agreement</h3>
+                  
+                  <div className="overflow-y-auto pr-2 scrollbar-hide flex-1 space-y-4 text-white/80 text-sm leading-relaxed">
+                    <p>Welcome to our platform. This Privacy Policy sets out how we use and protect any information that you give us when you use this website.</p>
+                    <p>We are committed to ensuring that your privacy is protected. Should we ask you to provide certain information by which you can be identified when using this website, then you can be assured that it will only be used in accordance with this privacy statement.</p>
+                    <p className="font-bold text-white mt-4">1. Information Collection</p>
+                    <p>We may collect your phone number, registration details, and other information necessary for providing our investment services.</p>
+                    <p className="font-bold text-white mt-4">2. Use of Information</p>
+                    <p>We require this information to understand your needs and provide you with a better service, and in particular for internal record keeping and transactional purposes.</p>
+                    <p className="font-bold text-white mt-4">3. Security</p>
+                    <p>We are committed to ensuring that your information is secure. In order to prevent unauthorized access or disclosure, we have put in place suitable physical, electronic and managerial procedures to safeguard and secure the information we collect online.</p>
+                  </div>
+                  <div className="mt-6 border-t border-white/10 pt-4">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRegisterForm(prev => ({...prev, agreed: true}));
+                        setActiveModal(null);
+                      }}
+                      className="w-full h-12 bg-gradient-to-r from-[#00D4FF] to-[#3B82F6] rounded-full text-white font-bold tracking-wide active:scale-95 transition-transform"
+                    >
+                      Agree & Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       );
     }
 
     return (
-      <div className="min-h-screen bg-[#0A0E2E] flex justify-center items-center py-4 relative font-sans overflow-hidden">
-        <div className="w-full max-w-[480px] h-[100dvh] md:h-[95vh] bg-[#0A0E2E] md:rounded-[2.5rem] overflow-hidden shadow-2xl relative border-0 md:border-[6px] border-[#1a1e4e]/50 flex flex-col p-6">
+      <div className="h-[100dvh] md:min-h-screen bg-[#0A0E2E] flex justify-center items-center md:py-4 relative font-sans overflow-hidden">
+        <div className="w-full max-w-[480px] h-full md:h-[95vh] bg-[#0A0E2E] md:rounded-[2.5rem] overflow-hidden shadow-2xl relative border-0 md:border-[6px] border-[#1a1e4e]/50 flex flex-col p-6">
           <div className="flex bg-[#1a1e4e]/50 rounded-full p-1 mb-8">
             <button className="flex-1 bg-[#6B2EFF] text-white py-3 font-semibold rounded-full shadow-lg">
               Log In
@@ -800,7 +997,7 @@ function MainApp() {
             <div className="relative">
               <input 
                 type="text" 
-                placeholder="Please enter email or phone number"
+                placeholder="Please enter phone number"
                 value={loginIdentifier}
                 onChange={e => setLoginIdentifier(e.target.value)}
                 className="w-full bg-[#1a1e4e]/30 border border-white/10 rounded-2xl px-4 py-4 text-white placeholder-white/30 focus:outline-none focus:border-[#6B2EFF]"
@@ -820,7 +1017,7 @@ function MainApp() {
             <button 
               onClick={() => {
                 if (!loginIdentifier || !loginPassword) {
-                  alert("Please fill in email/phone and password.");
+                  alert("Please fill in phone number and password.");
                   return;
                 }
                 login(loginIdentifier, loginPassword);
@@ -843,8 +1040,8 @@ function MainApp() {
   const displayBalance = currentUser.balance;
 
   return (
-    <div className="min-h-screen bg-[#0A0E2E] flex justify-center items-center py-4 relative overflow-hidden">
-      <div className="w-full max-w-[480px] h-[100dvh] md:h-[95vh] bg-[#0A0E2E] md:rounded-[2.5rem] overflow-hidden shadow-2xl relative border-0 md:border-[6px] border-[#1a1e4e]/50 flex flex-col font-sans">
+    <div className="h-[100dvh] md:min-h-screen bg-[#0A0E2E] flex justify-center items-center md:py-4 relative overflow-hidden">
+      <div className="w-full max-w-[480px] h-full md:h-[95vh] bg-[#0A0E2E] md:rounded-[2.5rem] overflow-hidden shadow-2xl relative border-0 md:border-[6px] border-[#1a1e4e]/50 flex flex-col font-sans">
         
         {/* Gradients used for SVG Icons */}
         <svg width="0" height="0" className="absolute pointer-events-none">
@@ -935,8 +1132,8 @@ function MainApp() {
                 <div className="text-center text-[18px] font-semibold mb-4 text-white">Sign-in rules</div>
                 <div className="text-[#4ade80] text-[14px] leading-[22px] mb-2.5">1. Log in to your account every day and click Log In.</div>
                 <div className="text-[#4ade80] text-[14px] leading-[22px] mb-2.5">2. By logging in for 7 consecutive days, you can earn a ₦1400 bonus.</div>
-                <div className="text-[#4ade80] text-[14px] leading-[22px] mb-2.5">3. By logging in for 15 consecutive days, you can earn a ₦4200 bonus.</div>
-                <div className="text-[#4ade80] text-[14px] leading-[22px] mb-2.5">4. By logging in for 30 consecutive days, you can earn a ₦8400 bonus.</div>
+                <div className="text-[#4ade80] text-[14px] leading-[22px] mb-2.5">3. By logging in for 15 consecutive days, you can earn a ₦2800 bonus.</div>
+                <div className="text-[#4ade80] text-[14px] leading-[22px] mb-2.5">4. By logging in for 30 consecutive days, you can earn a ₦4200 bonus.</div>
                 <div className="text-[#ef4444] text-[14px] leading-[22px] mt-3">
                   Note:<br/>
                   If the continuous login process is interrupted, it will be reset and cleared at the beginning of the month.
@@ -1089,33 +1286,33 @@ function MainApp() {
                 {viewVipIndex < actualVipIndex ? (
                   <button 
                     disabled
-                    className="w-full h-[44px] bg-black/10 text-[#212121] rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 transition-colors">
+                    className="w-full min-h-[44px] py-2 bg-black/10 text-[#212121] rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 transition-colors">
                     <span className="text-[14px]">Level Unlocked</span>
                   </button>
                 ) : viewVipIndex > actualVipIndex ? (
                   <button 
                     disabled
-                    className="w-full h-[44px] bg-black/10 text-[#212121]/50 rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 transition-colors">
+                    className="w-full min-h-[44px] py-2 bg-black/10 text-[#212121]/50 rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 transition-colors">
                     <span className="text-[14px]">Reach {currentVipLevel.name} first</span>
                   </button>
                 ) : nextVipLevel ? (
                   canUpgrade ? (
                     <button 
                       onClick={handleUpgradeVip}
-                      className="w-full h-[44px] bg-gradient-to-r from-[#7B1FA2] to-[#9C27B0] text-white rounded-[12px] font-semibold flex items-center justify-center px-4 active:scale-95 transition-transform shadow-[0_4px_10px_rgba(156,39,176,0.3)] relative z-10">
+                      className="w-full min-h-[44px] py-2 bg-gradient-to-r from-[#7B1FA2] to-[#9C27B0] text-white rounded-[12px] font-semibold flex items-center justify-center px-4 active:scale-95 transition-transform shadow-[0_4px_10px_rgba(156,39,176,0.3)] relative z-10">
                       <span className="text-[14px]">Upgrade to {nextVipLevel.name}</span>
                     </button>
                   ) : (
                     <button 
                       disabled
-                      className="w-full h-[44px] bg-gradient-to-r from-[#7B1FA2] to-[#9C27B0] text-white/90 rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 opacity-70 cursor-not-allowed">
-                      <span className="text-[14px]">Update with {nextVipLevel.requiredTotal} friends to become {nextVipLevel.name} ({currentReferrals}/{nextVipLevel.requiredTotal})</span>
+                      className="w-full min-h-[44px] py-2 bg-gradient-to-r from-[#7B1FA2] to-[#9C27B0] text-white/90 rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 opacity-70 cursor-not-allowed">
+                      <span className="text-[14px] leading-tight text-center">Update with {nextVipLevel.requiredTotal} active friends to become {nextVipLevel.name} ({currentReferrals}/{nextVipLevel.requiredTotal})</span>
                     </button>
                   )
                 ) : (
                   <button 
                     disabled
-                    className="w-full h-[44px] bg-black/10 text-[#212121] rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 transition-colors">
+                    className="w-full min-h-[44px] py-2 bg-black/10 text-[#212121] rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 transition-colors">
                     <span className="text-[14px]">Max Level Reached</span>
                   </button>
                 )}
@@ -1271,6 +1468,22 @@ function MainApp() {
                 </div>
 
                 {/* Slideshow Carousel */}
+                {currentUser?.role === "admin" && (
+                  <div className="px-4 mb-4">
+                    <button
+                      onClick={() => setIsChatOpen(true)}
+                      className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg border border-white/10 hover:from-blue-600 hover:to-indigo-700 active:scale-95 transition-all text-sm tracking-wide relative flex items-center justify-center gap-2"
+                    >
+                      <MessageSquare className="w-5 h-5 text-white" />
+                      View Support Chats
+                      {chatMessages.filter(m => m.receiverId === currentUser?.id || (!m.receiverId && m.senderId !== currentUser?.id)).length > 0 && (
+                        <span className="absolute right-4 bg-red-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full">
+                          {chatMessages.filter(m => !m.receiverId && m.senderId !== currentUser?.id).length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                )}
                 {carouselImages && carouselImages.length > 0 && (
                   <div className="w-full h-[180px] rounded-[20px] overflow-hidden relative mx-0 mx-4" style={{ width: 'calc(100% - 32px)' }}>
                     <div className="absolute inset-0 flex whitespace-nowrap animate-scroll-carousel w-max max-w-none">
@@ -1459,10 +1672,10 @@ function MainApp() {
                     <div className="pt-2 border-t border-white/10">
                       <span className="font-bold text-white mb-1 block">How to upgrade VIP/SVIP</span>
                       <p className="text-white/80">
-                        <span className="text-[#FFD700] font-bold">VIP 1 – VIP 10:</span> Every time you invite 3 subordinates to join, you will be upgraded to the next VIP level. Invite 30 subordinates and you will be upgraded to VIP10.
+                        <span className="text-[#FFD700] font-bold">VIP 1 – VIP 10:</span> Every time you invite 3 active subordinates to join, you will be upgraded to the next VIP level. Invite 30 active subordinates and you will be upgraded to VIP10.
                       </p>
                       <p className="mt-2 text-white/80">
-                        <span className="text-[#4DA8FF] font-bold">SVIP 1 – SVIP 10:</span> After upgrading to VIP10, you can upgrade to SVIP once for every 5 subordinates you invite. Invite 50 subordinates total after VIP10 (80 overall) to reach SVIP10.
+                        <span className="text-[#4DA8FF] font-bold">SVIP 1 – SVIP 10:</span> After upgrading to VIP10, you can upgrade to SVIP once for every 5 active subordinates you invite. Invite 50 active subordinates total after VIP10 (80 overall) to reach SVIP10.
                       </p>
                       <p className="mt-2 text-[#FFB800] font-bold">
                         After reaching Crown level, further invites will immediately promote you to City Agent!
@@ -1535,7 +1748,7 @@ function MainApp() {
                   const teamInvests = investments.filter(i => allTeamUserIds.includes(i.userId));
                   const totalTeamInvestAmount = teamInvests.reduce((sum, i) => sum + i.amount, 0);
 
-                  const activeTeamUsers = allTeamUserIds.filter(id => investments.some(i => i.userId === id));
+                  const activeTeamUsers = allTeamUserIds.filter(id => investments.some(i => i.userId === id && i.status === 'active'));
                   const activePlayerCount = activeTeamUsers.length;
 
                   // Date calculations
@@ -1627,6 +1840,115 @@ function MainApp() {
                               <span className="text-[#8A8A9E] text-[10px] font-bold">Added today</span>
                             </div>
                           </div>
+                          
+                          {/* VIP Progress Bar */}
+                          {(() => {
+                            const currentVipIdx = currentUser?.vipLevelIndex || 0;
+                            const currentVip = VIP_LEVELS[currentVipIdx];
+                            const nextVipIdx = currentVipIdx + 1;
+                            const nextVip = VIP_LEVELS[nextVipIdx];
+                            
+                            if (!nextVip) return null; // Max level reached
+                            
+                            const directReferralCount = levelAReferrals.filter((u) => investments.some((i) => i.userId === u.id && i.status === 'active')).length;
+                            const requiredReferrals = nextVip.requiredTotal;
+                            
+                            const progressPct = Math.min(100, ((directReferralCount / requiredReferrals) * 100));
+                            const remaining = Math.max(0, requiredReferrals - directReferralCount);
+                            
+                            return (
+                              <div className="w-full mt-4 pt-4 border-t border-slate-100 flex flex-col gap-2">
+                                <div className="flex justify-between items-center text-xs">
+                                  <span className="text-[#8A8A9E] font-bold pb-[2px]">Next Level: <span className="text-[#7B2FFF]">{nextVip.name}</span></span>
+                                  <span className="text-[#0A0E2E] font-bold">{directReferralCount} / {requiredReferrals} Active Ref</span>
+                                </div>
+                                <div className="w-full bg-[#F5F7FA] rounded-full h-2.5 overflow-hidden">
+                                  <div 
+                                    className="bg-gradient-to-r from-[#4DA8FF] to-[#7B2FFF] h-full rounded-full transition-all duration-500" 
+                                    style={{ width: `${progressPct}%` }}
+                                  ></div>
+                                </div>
+                                <div className="text-center text-[10px] text-[#8A8A9E] font-bold mt-1">
+                                  {remaining > 0 
+                                    ? `You need ${remaining} more active direct referral${remaining > 1 ? 's' : ''} to reach ${nextVip.name}` 
+                                    : 'You meet the referral requirements for the next VIP level!'}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Detailed Contributors Section */}
+                      <div className="flex flex-col bg-[#1C0F3F] rounded-[20px] border border-white/5 overflow-hidden shadow-[0_8px_24px_rgba(0,0,0,0.3)] mt-2 p-5 relative">
+                        <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-[#4DA8FF] blur-[50px] opacity-20 pointer-events-none rounded-full"></div>
+                        <div className="flex items-center justify-between mb-4 relative z-10">
+                          <h3 className="text-white text-[16px] font-bold">Member Contributions</h3>
+                          <span className="text-white/50 text-[12px] font-medium">Top Team Members</span>
+                        </div>
+                        
+                        <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto pr-1 relative z-10 scrollbar-hide">
+                          {(() => {
+                            const membersWithContributions = allTeamUsers.map(user => {
+                              const generatedComm = commissions
+                                .filter(c => c.userId === currentUser?.id && c.fromUserId === user.id)
+                                .reduce((sum, c) => sum + c.amount, 0);
+                              
+                              const userLevelStr = levelAIds.includes(user.referralCode) 
+                                ? 'A' 
+                                : (levelBIds.includes(user.referralCode) ? 'B' : 'C');
+                                
+                              return { ...user, generatedComm, userLevelStr };
+                            }).sort((a, b) => b.generatedComm - a.generatedComm);
+
+                            if (membersWithContributions.length === 0) {
+                              return <div className="text-center text-white/40 text-[12px] font-medium py-4">No team members yet.</div>
+                            }
+
+                            return membersWithContributions.filter(m => m.generatedComm > 0).map((member, idx) => (
+                              <div key={idx} className="flex items-center justify-between bg-white/5 border border-white/5 p-3 rounded-[12px]">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#7B2FFF] to-[#4DA8FF] p-[2px]">
+                                    <div className="w-full h-full bg-black rounded-full flex items-center justify-center font-bold text-white text-[14px]">
+                                      {member.name.charAt(0).toUpperCase()}
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-white text-[14px] font-bold tracking-wide">{member.referralCode}</span>
+                                      <span className="text-[9px] font-bold bg-[#4DA8FF]/20 text-[#4DA8FF] px-1.5 py-0.5 rounded tracking-wider">LVL {member.userLevelStr}</span>
+                                    </div>
+                                    <span className="text-white/50 text-[11px] font-medium font-mono tracking-wider mt-0.5">{member.phone || "No phone"}</span>
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end">
+                                  <span className="text-[#4DA8FF] text-[14px] font-black tracking-tight">+₦{formatCurrency(member.generatedComm)}</span>
+                                  <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider mt-0.5">Contribution</span>
+                                </div>
+                              </div>
+                            )).concat(membersWithContributions.filter(m => m.generatedComm === 0).map((member, idx) => (
+                              <div key={`z${idx}`} className="flex items-center justify-between bg-white/5 border border-white/5 p-3 rounded-[12px] opacity-60">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-white/10 p-[2px]">
+                                    <div className="w-full h-full bg-black rounded-full flex items-center justify-center font-bold text-white/50 text-[14px]">
+                                      {member.name.charAt(0).toUpperCase()}
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-white text-[14px] font-bold tracking-wide">{member.referralCode}</span>
+                                      <span className="text-[9px] font-bold bg-white/10 text-white/70 px-1.5 py-0.5 rounded tracking-wider">LVL {member.userLevelStr}</span>
+                                    </div>
+                                    <span className="text-white/50 text-[11px] font-medium font-mono tracking-wider mt-0.5">{member.phone || "No phone"}</span>
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end">
+                                  <span className="text-white/50 text-[14px] font-black tracking-tight">₦0</span>
+                                  <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider mt-0.5">Contribution</span>
+                                </div>
+                              </div>
+                            )));
+                          })()}
                         </div>
                       </div>
 
@@ -1669,6 +1991,7 @@ function MainApp() {
                                     <div className="flex flex-col">
                                       <span className="text-white text-[14px] font-bold tracking-wide">{user.referralCode} {active && <span className="ml-1 text-[8px] bg-[#4DA8FF] text-white px-1 py-0.5 rounded uppercase align-middle">Active</span>}</span>
                                       <span className="text-[#8A8A9E] text-[10px] font-medium mt-0.5">Reg: {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</span>
+                                      {user.phone && <span className="text-[#8A8A9E] text-[10px] font-medium mt-[2px]">Phone: {user.phone}</span>}
                                     </div>
                                     <div className="ml-auto flex flex-col items-end gap-1 mr-1">
                                        <div className="flex items-center gap-1 bg-[#FFA500]/10 px-2.5 py-1 rounded-full border border-[#FFA500]/30 w-fit">
@@ -1721,7 +2044,27 @@ function MainApp() {
               </div>
 
               {/* Content Area */}
-              {products.filter(p => p.type === productTab).length === 0 ? (
+              {isLoadingProducts ? (
+                <div className="flex-1 overflow-y-auto px-5 pb-[140px] space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="bg-white rounded-[20px] shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
+                      <div className="w-full h-[180px] sm:h-[220px] bg-slate-200 animate-pulse"></div>
+                      <div className="p-4 flex flex-col gap-3">
+                        <div className="flex justify-between items-center">
+                          <div className="h-6 w-16 bg-slate-200 rounded-full animate-pulse"></div>
+                          <div className="h-6 w-24 bg-slate-200 rounded animate-pulse"></div>
+                        </div>
+                        <div className="h-6 w-3/4 bg-slate-200 rounded animate-pulse leading-none my-2"></div>
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                          <div className="h-16 bg-slate-200 rounded-[14px] animate-pulse"></div>
+                          <div className="h-16 bg-slate-200 rounded-[14px] animate-pulse"></div>
+                        </div>
+                        <div className="mt-2 h-12 bg-slate-200 rounded-[14px] animate-pulse"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : products.filter(p => p.type === productTab).length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center pb-32">
                   <div className="relative w-48 h-48 flex items-center justify-center mb-6">
                     {/* Purple Glow Background */}
@@ -1797,7 +2140,7 @@ function MainApp() {
                           )}
                           
                           {/* Image Header */}
-                          <div className={`relative w-full h-[280px] sm:h-[320px] ${isVipTeam ? 'bg-gradient-to-r from-red-900 to-black' : 'bg-gradient-to-br from-[#1F2937] to-[#111827]'} flex items-center justify-center overflow-hidden`}>
+                          <div className={`relative w-full h-[180px] sm:h-[220px] ${isVipTeam ? 'bg-gradient-to-r from-red-900 to-black' : 'bg-gradient-to-br from-[#1F2937] to-[#111827]'} flex items-center justify-center overflow-hidden`}>
                             {plan.imageUrl ? (
                               <img src={plan.imageUrl} alt={plan.name} className="w-full h-full object-cover" />
                             ) : isVipTeam ? (
@@ -1919,7 +2262,7 @@ function MainApp() {
                           )}
                           
                           {/* Image Header */}
-                          <div className={`relative w-full h-[280px] sm:h-[320px] bg-[#1E1E2D] flex items-center justify-center overflow-hidden`}>
+                          <div className={`relative w-full h-[180px] sm:h-[220px] bg-[#1E1E2D] flex items-center justify-center overflow-hidden`}>
                             {/* Simulated chart background */}
                             <svg viewBox="0 0 100 40" className="absolute bottom-0 w-full h-[80%] opacity-30" preserveAspectRatio="none">
                               <path d="M0,40 L0,20 L10,25 L20,15 L30,22 L40,10 L50,18 L60,5 L70,12 L80,2 L90,10 L100,0 L100,40 Z" fill="#28C76F" opacity="0.3" />
@@ -2038,7 +2381,7 @@ function MainApp() {
                           )}
                         
                         {/* Image Header */}
-                        <div className={`relative w-full h-[280px] sm:h-[320px] bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center overflow-hidden`}>
+                        <div className={`relative w-full h-[180px] sm:h-[220px] bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center overflow-hidden`}>
                           {plan.imageUrl ? (
                             <img src={plan.imageUrl} alt={plan.name} className="w-full h-full object-cover" />
                           ) : (
@@ -2140,15 +2483,14 @@ function MainApp() {
               
               const tPlusDays = inv.tPlusDays || 1;
               const msInCycle = msInADay * tPlusDays;
-              const maxElapsedCycleMs = Math.min(msInCycle, endDate.getTime() - lastCollected.getTime());
               const currentElapsedMs = Math.max(0, now.getTime() - lastCollected.getTime());
+              const timeToCollectMs = Math.min(Math.min(currentElapsedMs, msInCycle), endDate.getTime() - lastCollected.getTime());
               
-              if (currentElapsedMs >= maxElapsedCycleMs && maxElapsedCycleMs > 0) {
-                const readingElapsedMs = maxElapsedCycleMs;
+              if (timeToCollectMs >= 1000) {
                 const dailyIncome = getDailyIncome(inv, currentUser, users, investments);
-                const profitAccrued = (readingElapsedMs / msInADay) * dailyIncome;
+                const profitAccrued = (timeToCollectMs / msInADay) * dailyIncome;
                 
-                const isFinished = now >= endDate;
+                const isFinished = (lastCollected.getTime() + timeToCollectMs) >= endDate.getTime();
                 
                 return sum + profitAccrued + (isFinished ? inv.amount : 0);
               }
@@ -2168,22 +2510,26 @@ function MainApp() {
               return false;
             });
 
-            const handleGetAll = () => {
+            const handleGetAll = async () => {
               let selectedCount = 0;
-              activeInvestments.forEach(inv => {
+              for (const inv of activeInvestments) {
                 const invNow = new Date();
                 const invStart = new Date(inv.startDate);
                 const invEnd = new Date(inv.endDate);
                 const invLastCollected = inv.lastCollectedDate ? new Date(inv.lastCollectedDate) : invStart;
+                
                 const invMsInADay = 1000 * 3600 * 24;
                 const tPlusDays = inv.tPlusDays || 1;
-                const maxElapsedCycleMs = Math.min(tPlusDays * invMsInADay, invEnd.getTime() - invLastCollected.getTime());
+                const msInCycle = invMsInADay * tPlusDays;
+                
                 const currentElapsed = Math.max(0, invNow.getTime() - invLastCollected.getTime());
-                if (currentElapsed >= maxElapsedCycleMs && maxElapsedCycleMs > 0) {
-                  collectEarnings(inv.id, true);
+                const timeToCollectMs = Math.min(Math.min(currentElapsed, msInCycle), invEnd.getTime() - invLastCollected.getTime());
+                
+                if (inv.status === "active" && timeToCollectMs >= 1000) {
+                  await collectEarnings(inv.id, true);
                   selectedCount++;
                 }
-              });
+              }
               if (selectedCount > 0) {
                 alert("All accrued profits collected successfully!");
               } else {
@@ -2224,10 +2570,25 @@ function MainApp() {
 
                   {activeInvestments.length > 0 && (
                     <button 
-                      onClick={handleGetAll} 
-                      className={`w-full py-2.5 rounded-[12px] font-bold text-[14px] mb-3 shrink-0 z-10 shadow-md transition-transform ${totalCanBeCollected > 0 ? 'bg-[#7B2FFF] text-white active:scale-[0.98]' : 'bg-[#7B2FFF]/50 text-white/80 active:scale-[1]'}`}
+                      disabled={isProcessing}
+                      onClick={async () => {
+                        setIsProcessing(true);
+                        await handleGetAll();
+                        setTimeout(() => setIsProcessing(false), 1000);
+                      }}
+                      className={`w-full py-2.5 rounded-[12px] font-bold text-[14px] mb-3 shrink-0 z-10 shadow-md transition-transform flex justify-center items-center ${isProcessing ? 'opacity-80 scale-[0.98]' : ''} ${totalCanBeCollected > 0 ? 'bg-[#7B2FFF] text-white active:scale-[0.98]' : 'bg-[#7B2FFF]/50 text-white/80 active:scale-[1]'}`}
                     >
-                      Get All
+                      {isProcessing ? (
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                          </div>
+                          <span>Collecting...</span>
+                        </div>
+                      ) : (
+                        'Get All'
+                      )}
                     </button>
                   )}
 
@@ -2255,7 +2616,29 @@ function MainApp() {
                   <div className="flex-1 overflow-y-auto w-full relative pb-[140px] flex flex-col custom-scrollbar">
 
                     <div className="flex-1 w-full relative z-10 space-y-4">
-                    {filteredInvestments.length === 0 ? (
+                    {isLoadingOrders ? (
+                      <div className="w-full space-y-4">
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="bg-white rounded-[16px] mb-4 shadow-[0_4px_20px_rgba(0,0,0,0.1)] overflow-hidden">
+                            <div className="w-full h-[140px] sm:h-[160px] bg-slate-200 animate-pulse"></div>
+                            <div className="p-4 flex flex-col gap-3">
+                              <div className="flex justify-between items-center">
+                                <div className="h-5 w-12 bg-slate-200 rounded-full animate-pulse"></div>
+                                <div className="h-5 w-24 bg-slate-200 rounded animate-pulse"></div>
+                              </div>
+                              <div className="h-6 w-3/4 bg-slate-200 rounded animate-pulse my-2"></div>
+                              <div className="grid grid-cols-2 gap-3 mt-1">
+                                <div className="h-16 bg-slate-200 rounded-[12px] animate-pulse"></div>
+                                <div className="h-16 bg-slate-200 rounded-[12px] animate-pulse"></div>
+                                <div className="h-16 bg-slate-200 rounded-[12px] animate-pulse"></div>
+                                <div className="h-16 bg-slate-200 rounded-[12px] animate-pulse"></div>
+                              </div>
+                              <div className="h-12 w-full bg-slate-200 rounded-[12px] animate-pulse mt-2"></div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : filteredInvestments.length === 0 ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center -mt-20">
                         <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-4 relative border border-white/10">
                           <div className="bg-transparent relative z-10 flex flex-col items-center">
@@ -2294,7 +2677,8 @@ function MainApp() {
                         const dailyIncome = getDailyIncome(inv, currentUser, users, investments);
                         const profitAccrued = (readingElapsedMs / invMsInADay) * dailyIncome;
                         
-                        const canCollect = inv.status === "active" && currentElapsedMs >= maxElapsedCycleMs && maxElapsedCycleMs > 0;
+                        const timeToCollectMs = Math.min(Math.min(currentElapsedMs, maxElapsedCycleMs), invEnd.getTime() - invLastCollected.getTime());
+                        const canCollect = inv.status === "active" && timeToCollectMs >= 1000;
                         const product = products.find(p => p.name === inv.planName);
                         
                         return (
@@ -2376,15 +2760,32 @@ function MainApp() {
                               <div className="flex justify-between items-center mt-3 pt-1">
                                 <div className="flex flex-col">
                                   <span className="text-[14px] text-[#6B7280] font-medium mb-0.5">Live generated income</span>
-                                  <span className="text-[#FF3B30] text-[20px] font-bold leading-none">+₦{profitAccrued.toLocaleString(undefined, {minimumFractionDigits: 5, maximumFractionDigits: 5})}</span>
+                                  <span className="text-[#FF3B30] text-[20px] font-bold leading-none">+₦{profitAccrued.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 5})}</span>
                                 </div>
                                 
                                 {canCollect ? (
                                   <button 
-                                    onClick={() => collectEarnings(inv.id)}
-                                    className="bg-gradient-to-r from-[#EC4899] to-[#F43F5E] text-white px-8 md:px-10 h-[48px] rounded-[24px] font-bold text-[16px] shadow-[0_4px_12px_rgba(236,72,153,0.4)] transform transition active:scale-[0.98]"
+                                    disabled={collectingIds[inv.id]}
+                                    onClick={async () => {
+                                      setCollectingIds(prev => ({ ...prev, [inv.id]: true }));
+                                      await collectEarnings(inv.id);
+                                      setTimeout(() => {
+                                        setCollectingIds(prev => ({ ...prev, [inv.id]: false }));
+                                      }, 1000);
+                                    }}
+                                    className={`bg-gradient-to-r from-[#EC4899] to-[#F43F5E] text-white px-8 md:px-10 h-[48px] rounded-[24px] font-bold text-[16px] shadow-[0_4px_12px_rgba(236,72,153,0.4)] transform transition flex flex-col justify-center items-center ${collectingIds[inv.id] ? 'opacity-80 scale-95' : 'active:scale-[0.98]'}`}
                                   >
-                                    Get
+                                    {collectingIds[inv.id] ? (
+                                      <div className="flex items-center gap-2">
+                                        <div className="relative flex h-3 w-3">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                                          <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                                        </div>
+                                        <span>...</span>
+                                      </div>
+                                    ) : (
+                                      'Get'
+                                    )}
                                   </button>
                                 ) : isExpired ? (
                                   <span className="text-[#34C759] font-bold px-6 py-2.5 border border-[#34C759]/20 rounded-[24px] bg-[#34C759]/5 text-[15px]">{inv.status === 'completed' ? 'Completed' : 'Expired'}</span>
@@ -2431,7 +2832,15 @@ function MainApp() {
                     )}
                   </button>
                   <div className="flex flex-col justify-center gap-1">
-                    <div className="text-[13px] font-bold text-white tracking-wide">ID: {currentUser.referralCode}</div>
+                    <div className="text-[13px] font-bold text-white tracking-wide flex items-center gap-2">
+                       Main ID: {currentUser.referralCode}
+                       <button onClick={() => {
+                          navigator.clipboard.writeText(currentUser.referralCode);
+                          alert("ID Copied!");
+                       }} className="text-white/60 active:scale-95">
+                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                       </button>
+                    </div>
                     <div className="flex items-center gap-1.5 shadow-lg">
                       <RankBadge rankName={VIP_LEVELS[currentUser.vipLevelIndex || 0].name} size={32} />
                     </div>
@@ -2498,12 +2907,20 @@ function MainApp() {
                     setBankAccountNumber(currentUser.bankDetails?.accountNumber || "");
                     setSelectedBankCode(currentUser.bankDetails?.bankCode || "");
                     setBankAccountName(currentUser.bankDetails?.accountName || "");
+                    setIsEditingBank(false);
                     setActiveModal("bankDetails");
                   } },
                   { icon: Info, label: "About us", action: () => setActiveModal("about") },
                   { icon: Settings, label: "Set Up", action: () => setActiveModal("setup") },
                   { icon: Download, label: "Download", action: () => handleDownloadApp() },
-                ].map((item, index, arr) => (
+                ].map((item, index, arr) => {
+                  const badgeCount = item.label === "Customer Support" 
+                    ? chatMessages.filter(m => currentUser?.role === 'admin' 
+                        ? !m.receiverId && m.senderId !== currentUser?.id 
+                        : m.receiverId === currentUser?.id).length 
+                    : 0;
+
+                  return (
                   <div
                     key={index}
                     onClick={item.action}
@@ -2515,9 +2932,16 @@ function MainApp() {
                       <item.icon className="w-5 h-5 text-gray-500 opacity-80" />
                       <span className="font-medium">{item.label}</span>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                    <div className="flex items-center gap-3">
+                      {item.label === "Customer Support" && badgeCount > 0 && (
+                        <span className="bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                          {badgeCount}
+                        </span>
+                      )}
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    </div>
                   </div>
-                ))}
+                )})}
                 <div
                   onClick={logout}
                   className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors text-red-500 font-bold border-t border-gray-100 text-[15px]"
@@ -2538,6 +2962,44 @@ function MainApp() {
               </div>
               
               <div className="mx-4 mb-4 flex flex-col gap-3">
+                <button
+                  onClick={() => setIsChatOpen(true)}
+                  className="w-full bg-[#334155] text-white font-bold py-3 rounded-xl shadow-lg border border-white/10 hover:bg-[#475569] active:scale-95 transition-all text-sm tracking-wide relative flex items-center justify-center gap-2"
+                >
+                  <MessageSquare className="w-5 h-5 text-indigo-400" />
+                  View Support Chats
+                  {chatMessages.filter(m => m.receiverId === currentUser?.id || (!m.receiverId && m.senderId !== currentUser?.id)).length > 0 && (
+                    <span className="absolute right-4 bg-red-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full">
+                      {chatMessages.filter(m => !m.receiverId && m.senderId !== currentUser?.id).length}
+                    </span>
+                  )}
+                </button>
+
+                <div className="bg-white/5 border-2 border-dashed border-white/20 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-colors relative overflow-hidden group">
+                  <input 
+                    type="file" 
+                    title="Upload About Us Image" 
+                    className="absolute inset-0 opacity-0 cursor-pointer z-10" 
+                    accept="image/*" 
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        try {
+                          const url = await uploadToCloudinary(file);
+                          setAboutUsImage(url);
+                        } catch (error) {
+                          console.error("Failed to upload about us image", error);
+                        }
+                      }
+                    }}
+                  />
+                  <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                    <ArrowUpCircle className="w-5 h-5 text-[#7B2FFF]" />
+                  </div>
+                  <span className="text-white/90 text-xs font-bold tracking-wide uppercase">Admin: Upload About Us Image</span>
+                  <span className="text-white/50 text-[10px] mt-1 text-center">Click or drag image to update About Us</span>
+                </div>
+
                 <div className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10">
                   <h3 className="text-white text-sm font-bold uppercase mb-2">Set Platform Announcement</h3>
                   <div className="flex gap-2">
@@ -2575,47 +3037,6 @@ function MainApp() {
                   + Add Investment Product
                 </button>
 
-                <div className="bg-white/5 border-2 border-dashed border-white/20 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-colors relative overflow-hidden group">
-                  <input 
-                    type="file" 
-                    title="Upload About Us Image" 
-                    className="absolute inset-0 opacity-0 cursor-pointer z-10" 
-                    accept="image/*" 
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        try {
-                          const url = await uploadToCloudinary(file);
-                          setAboutUsImage(url);
-                        } catch (error) {
-                          console.error("Failed to upload about us image", error);
-                        }
-                      }
-                    }}
-                  />
-                  <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                    <ArrowUpCircle className="w-5 h-5 text-[#7B2FFF]" />
-                  </div>
-                  <span className="text-white/90 text-xs font-bold tracking-wide uppercase">Admin: Upload About Us Image</span>
-                  <span className="text-white/50 text-[10px] mt-1 text-center">Click or drag image to update About Us</span>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 overflow-hidden shrink-0 mt-2">
-                  <div className="p-4 border-b border-white/10 text-sm font-bold text-white tracking-wide uppercase">
-                    Admin WhatsApp Settings
-                  </div>
-                  <div className="p-4 flex flex-col gap-3">
-                    <span className="text-white/70 text-xs">Users will be directed to this WhatsApp number when they request a withdrawal. Include country code (e.g. +234...)</span>
-                    <input 
-                      type="text" 
-                      placeholder="e.g. +2348000000000" 
-                      value={adminWhatsApp || ''} 
-                      onChange={(e) => setAdminWhatsApp(e.target.value)}
-                      className="bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30"
-                    />
-                  </div>
-                </div>
-                
                 <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 overflow-hidden shrink-0 mt-2">
                   <div className="p-4 border-b border-white/10 text-sm font-bold text-white tracking-wide uppercase">
                     USDT Deposit Settings
@@ -2676,7 +3097,7 @@ function MainApp() {
                     <h3 className="text-white font-bold uppercase tracking-wider">Manage Products</h3>
                   </div>
                   <div className="p-2 space-y-2 max-h-[300px] overflow-y-auto scrollbar-hide">
-                    {products.map(p => (
+                    {products.filter(p => p.type !== 'redemption_code').map(p => (
                       <div key={p.id} className="flex flex-col bg-white/5 p-3 rounded-xl border border-white/5 gap-2">
                         <div className="flex justify-between items-start">
                           <div>
@@ -2772,7 +3193,10 @@ function MainApp() {
                         <div>
                           <div className="text-white font-bold text-sm">{u.name || (u.phone ? `User ${u.phone.slice(-4)}` : "Unknown")}</div>
                           <div className="text-white/60 text-xs mt-0.5 font-mono">{u.id} {u.phone && `| ${u.phone}`}</div>
-                          <div className="flex gap-2 mt-1">
+                          <div className="flex flex-wrap gap-2 mt-2 border-b border-white/5 pb-2">
+                            <span className="text-[10px] bg-[#7B2FF7]/20 text-[#D8B4FE] px-2 py-0.5 rounded font-bold">Balance: {formatCurrency(u.balance || 0)}</span>
+                            <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-bold">Referrals: {users.filter(x => x.referredBy === u.referralCode).length}</span>
+                            <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded font-bold">Products: {investments.filter(x => x.userId === u.id).length}</span>
                             <span className="text-[10px] bg-white/10 text-white px-2 py-0.5 rounded font-bold">VIP {u.vipLevelIndex || 0}</span>
                             <span className={`text-[10px] ${u.disabled ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'} px-2 py-0.5 rounded font-bold uppercase`}>
                               {u.disabled ? 'Disabled' : 'Active'}
@@ -2861,15 +3285,16 @@ function MainApp() {
                             for (let i = 0; i < 6; i++) {
                               code += chars.charAt(Math.floor(Math.random() * chars.length));
                             }
-                            setValidRedemptionCodes(prev => [...prev, { 
-                              code, 
-                              amount: amt,
-                              minClaims: min,
-                              maxClaims: max,
-                              validityMinutes: valid,
-                              claimedBy: [],
-                              createdAt: Date.now()
-                            }]);
+                            addProduct({
+                              name: code,
+                              title: '[]',
+                              type: 'redemption_code',
+                              roi: Date.now(), // Store createdAt in roi
+                              min: amt, // Store amount in min
+                              days: min, // Store minClaims in days
+                              tPlusDays: valid, // validityMinutes
+                              maxQuota: max
+                            });
                             setNewRedemptionAmount("");
                             alert(`Code generated: ${code}`);
                           } else {
@@ -2926,12 +3351,43 @@ function MainApp() {
                     
                     <div className="flex flex-col gap-1 text-black">
                       <div className="text-2xl font-bold">{formatCurrency(tx.amount)}</div>
-                      <div className="text-sm text-slate-500">User ID: <span className="font-mono text-slate-800">{tx.userId}</span></div>
-                      {tx.type === "withdrawal" && tx.bankDetails && (
+                      <div className="text-sm text-slate-500">
+                        Main ID: <span className="font-bold text-[#7B2FF7]">{users.find(u => u.id === tx.userId)?.referralCode || 'N/A'}</span>
+                        <span className="mx-2">|</span>
+                        Phone: <span className="font-bold text-slate-700">{users.find(u => u.id === tx.userId)?.phone || 'N/A'}</span>
+                      </div>
+                      {tx.type === "withdrawal" && (
                         <div className="mt-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
-                          <div className="text-xs text-slate-400 font-bold uppercase mb-1">Bank Info</div>
-                          <div className="text-sm font-semibold">{tx.bankDetails.bankName}</div>
-                          <div className="text-sm font-mono tracking-widest">{tx.bankDetails.accountNumber}</div>
+                          <div className="text-xs text-slate-400 font-bold uppercase mb-1 flex justify-between items-center">
+                            <span>Bank Info</span>
+                          </div>
+                          <div className="text-sm font-semibold">{tx.bankDetails?.bankName || users.find(u => u.id === tx.userId)?.bankDetails?.bankName || 'N/A'}</div>
+                          <div className="flex justify-between items-center mt-1">
+                            <div className="text-sm font-bold text-slate-800">{tx.bankDetails?.accountName || users.find(u => u.id === tx.userId)?.bankDetails?.accountName || 'No Name Provided'}</div>
+                            <div className="text-xs text-[#7B2FF7] font-bold">ID: {users.find(u => u.id === tx.userId)?.referralCode || 'N/A'}</div>
+                          </div>
+                          <div className="text-sm font-mono tracking-widest flex items-center justify-between mt-1 bg-slate-200/50 p-2 rounded-lg">
+                            <span>{tx.bankDetails?.accountNumber || users.find(u => u.id === tx.userId)?.bankDetails?.accountNumber || 'N/A'}</span>
+                            <button 
+                              onClick={() => {
+                                const accNum = tx.bankDetails?.accountNumber || users.find(u => u.id === tx.userId)?.bankDetails?.accountNumber;
+                                if (accNum) {
+                                  navigator.clipboard.writeText(accNum);
+                                  addNotification("Copied", "Account number copied to clipboard", "success");
+                                }
+                              }}
+                              className="text-blue-600 hover:text-blue-700 p-1.5 bg-blue-100 rounded-md active:scale-95 transition-all"
+                              title="Copy Account Number"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {tx.type === "deposit" && tx.bankDetails?.reference && (
+                        <div className="mt-2 bg-blue-50 p-3 rounded-xl border border-blue-100">
+                          <div className="text-xs text-blue-400 font-bold uppercase mb-1">Payment Reference</div>
+                          <div className="text-sm font-semibold text-blue-900">{tx.bankDetails.reference}</div>
                         </div>
                       )}
                     </div>
@@ -2967,17 +3423,37 @@ function MainApp() {
                     <h3 className="text-slate-200 font-bold text-sm mb-3 uppercase tracking-wider pl-1">Recent History</h3>
                     <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 overflow-hidden text-white/80 shrink-0">
                       {transactions.filter(t => t.status !== "pending").slice(0, 10).map((tx, idx) => (
-                        <div key={tx.id || idx} className="p-4 border-b border-white/5 last:border-b-0 flex justify-between items-center text-sm">
-                          <div>
-                            <div className="font-bold">{tx.type}</div>
-                            <div className="text-xs text-white/50">{new Date(tx.date).toLocaleDateString()}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-medium">{formatCurrency(tx.amount)}</div>
-                            <div className={`text-xs font-bold ${tx.status === "approved" ? "text-emerald-400" : "text-red-400"}`}>
-                              {tx.status}
+                        <div key={tx.id || idx} className="p-4 border-b border-white/5 last:border-b-0 flex flex-col gap-2 text-sm">
+                          <div className="flex justify-between items-start text-sm">
+                            <div>
+                              <div className="font-bold flex items-center gap-1">
+                                {tx.type === 'deposit' ? <ArrowDownCircle className="w-4 h-4 text-[#00D4FF]" /> : <ArrowUpCircle className="w-4 h-4 text-[#F472B6]" />}
+                                <span className="capitalize">{tx.type}</span>
+                              </div>
+                              <div className="text-xs text-white/50">{new Date(tx.date).toLocaleDateString()}</div>
+                              <div className="text-[10px] text-white/40 font-mono mt-0.5">
+                                Main ID: <span className="text-[#D8B4FE] font-bold">{users.find(u => u.id === tx.userId)?.referralCode || 'N/A'}</span>
+                                <span className="mx-1">|</span>
+                                Phone: <span className="text-white/80">{users.find(u => u.id === tx.userId)?.phone || 'N/A'}</span>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0 ml-4">
+                              <div className="font-medium text-[15px]">{formatCurrency(tx.amount)}</div>
+                              <div className={`text-xs font-bold ${tx.status === "approved" ? "text-emerald-400" : "text-red-400"}`}>
+                                {tx.status}
+                              </div>
                             </div>
                           </div>
+                          {tx.type === "withdrawal" && (
+                            <div className="bg-white/5 p-2 rounded-lg text-xs flex flex-col gap-0.5 mt-1 border border-white/5">
+                               <div className="font-semibold text-white/80">{tx.bankDetails?.bankName || users.find(u => u.id === tx.userId)?.bankDetails?.bankName || 'N/A'}</div>
+                               <div className="flex justify-between items-center w-full mt-0.5">
+                                 <div className="font-bold text-white/90">{tx.bankDetails?.accountName || users.find(u => u.id === tx.userId)?.bankDetails?.accountName || 'No Name Provided'}</div>
+                                 <div className="text-[10px] text-[#00D4FF] font-bold tracking-wider">ID: {users.find(u => u.id === tx.userId)?.referralCode || 'N/A'}</div>
+                               </div>
+                               <div className="font-mono text-[10px] text-emerald-300 mt-1 tracking-wider bg-black/20 py-1 px-1.5 rounded">{tx.bankDetails?.accountNumber || users.find(u => u.id === tx.userId)?.bankDetails?.accountNumber || 'N/A'}</div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -3050,7 +3526,7 @@ function MainApp() {
         </div>
 
         {/* Modals */}
-        {activeModal && !["convidar", "levelUp", "about", "setup", "setupPhone", "setupPassword", "bankDetails", "prizeDraw", "fundingDetails", "addProduct", "editProduct", "commissionRecord", "incomeRecord", "redemptionCode", "redemptionReward", "withdraw", "deposit", "purchaseSuccess", "contact", "equinorConfirm", "sysAnnouncement", "download"].includes(activeModal) && (
+        {activeModal && !["convidar", "levelUp", "about", "setup", "setupPhone", "setupPassword", "setupAlertThreshold", "bankDetails", "prizeDraw", "fundingDetails", "addProduct", "editProduct", "commissionRecord", "incomeRecord", "redemptionCode", "redemptionReward", "withdraw", "deposit", "purchaseSuccess", "contact", "equinorConfirm", "sysAnnouncement", "download"].includes(activeModal) && (
           <div className="absolute inset-0 z-50 bg-[#0A0E2E]/80 backdrop-blur-md flex flex-col justify-end">
             <div className="bg-white rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom flex flex-col max-h-[80%] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
@@ -3273,7 +3749,7 @@ function MainApp() {
                 </button>
                 <div className="flex flex-col items-center mt-2 opacity-80 pb-2">
                   <span className="text-white text-[12px] text-center">
-                    Earn <span className="font-bold text-[#FFD700]">₦50,000</span> for every new VIP level your invitee unlocks!
+                    Earn <span className="font-bold text-[#FFD700]">₦10,000</span> for every new VIP level your invitee unlocks!
                   </span>
                 </div>
               </div>
@@ -3322,43 +3798,64 @@ function MainApp() {
                 </div>
 
                 <button
-                  disabled={redemptionCode.length !== 6}
-                  onClick={() => {
-                    const found = validRedemptionCodes.find(c => c.code === redemptionCode);
+                  disabled={redemptionCode.length !== 6 || isProcessing}
+                  onClick={async () => {
+                    setIsProcessing(true);
+                    const freshProducts = await refreshProducts() || products;
+                    const freshValidCodes = freshProducts.filter(p => p.type === 'redemption_code').map(p => {
+                      let claimedBy = [];
+                      try { claimedBy = p.title ? JSON.parse(p.title) : []; } catch (e) { }
+                      return {
+                        code: p.name,
+                        amount: p.min,
+                        minClaims: p.days,
+                        maxClaims: p.maxQuota || 1,
+                        validityMinutes: p.tPlusDays || 60,
+                        claimedBy,
+                        createdAt: p.roi
+                      };
+                    });
+                    
+                    const found = freshValidCodes.find(c => c.code === redemptionCode);
                     if (found) {
                       const isExpired = Date.now() > found.createdAt + (found.validityMinutes * 60 * 1000);
                       const isMaxedOut = found.claimedBy.length >= found.maxClaims;
                       const hasClaimed = currentUser ? found.claimedBy.includes(currentUser.id) : false;
                       
                       if (isExpired) {
-                        alert("This redemption code has expired.");
+                        setToastMessage("This redemption code has expired.");
+                        setTimeout(() => setToastMessage(null), 2000);
                       } else if (isMaxedOut) {
-                        alert("This redemption code has reached its maximum claims limit.");
+                        setToastMessage("This redemption code has reached its maximum claims limit.");
+                        setTimeout(() => setToastMessage(null), 2000);
                       } else if (hasClaimed) {
-                        alert("You have already claimed this redemption code.");
+                        setToastMessage("You have already claimed this redemption code.");
+                        setTimeout(() => setToastMessage(null), 2000);
                       } else {
                         setRewardAmount(found.amount);
                         setActiveModal("redemptionReward");
                         setShowCongratsEffect(true);
                         setTimeout(() => setShowCongratsEffect(false), 2500);
-                        setValidRedemptionCodes(prev => prev.map(c => 
-                          c.code === redemptionCode 
-                            ? { ...c, claimedBy: [...c.claimedBy, currentUser?.id || `guest-${Date.now()}`] } 
-                            : c
-                        ));
+                        const prodToUpdate = freshProducts.find(p => p.type === 'redemption_code' && p.name === redemptionCode);
+                        if (prodToUpdate) {
+                          const newClaimedBy = [...found.claimedBy, currentUser?.id || `guest-${Date.now()}`];
+                          editProduct(prodToUpdate.id, { title: JSON.stringify(newClaimedBy) });
+                        }
                         setRedemptionCode("");
                       }
                     } else {
-                      alert("Invalid redemption code");
+                      setToastMessage("Invalid redemption code");
+                      setTimeout(() => setToastMessage(null), 2000);
                     }
+                    setIsProcessing(false);
                   }}
                   className={`w-full h-12 rounded-full font-bold text-[16px] transition-all shadow-md flex items-center justify-center ${
-                    redemptionCode.length === 6 
+                    redemptionCode.length === 6 && !isProcessing
                       ? 'bg-white text-[#E53935] active:scale-95 hover:bg-gray-50' 
                       : 'bg-[#E0E0E0] text-[#757575] cursor-not-allowed'
                   }`}
                 >
-                  Confirm
+                  {isProcessing ? "Processing..." : "Confirm"}
                 </button>
               </div>
             </div>
@@ -3509,7 +4006,7 @@ function MainApp() {
                 <p className="text-[#FF3B30] font-bold text-lg mb-2">You're now {currentVipLevel.name}</p>
                 {nextVipLevel && (
                   <p className="text-gray-500 text-[14px] leading-snug">
-                    Invite {nextVipLevel.requiredFromPrev} more {nextVipLevel.requiredFromPrev === 1 ? 'person' : 'people'} to reach {nextVipLevel.name}
+                    Invite {nextVipLevel.requiredFromPrev} more {nextVipLevel.requiredFromPrev === 1 ? 'active person' : 'active people'} to reach {nextVipLevel.name}
                   </p>
                 )}
               </div>
@@ -3634,6 +4131,28 @@ function MainApp() {
                 <div className="pt-4 mt-4 border-t border-white/10">
                   <p className="italic font-medium text-[#00D4FF] mb-2 text-base text-center leading-snug">"Energy for people.<br/>Progress for society.<br/>Searching for better."</p>
                   <p className="text-xs text-white/60 text-center">To supply energy for people, contribute to societal development, and search for better energy solutions.</p>
+                </div>
+
+                {/* FAQ Section */}
+                <div className="pt-6 mt-6 border-t border-white/10">
+                  <h4 className="text-white font-bold text-lg mb-4 flex items-center gap-2">
+                    <Info className="w-5 h-5 text-[#3B82F6]" />
+                    FAQ - Payments
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                      <h5 className="font-semibold text-white text-sm mb-1.5">How fast are withdrawals processed?</h5>
+                      <p className="text-white/60 text-xs leading-relaxed">Withdrawals are generally processed within 24 hours. Once approved, the funds are immediately routed to your designated bank account or USDT wallet.</p>
+                    </div>
+                    <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                      <h5 className="font-semibold text-white text-sm mb-1.5">Are there any deposit fees?</h5>
+                      <p className="text-white/60 text-xs leading-relaxed">We do not charge any internal fees for deposits. Please ensure you transfer the exact amount displayed during the recharge process.</p>
+                    </div>
+                    <div className="bg-white/5 rounded-xl p-4 border border-white/5">
+                      <h5 className="font-semibold text-white text-sm mb-1.5">What is the minimum withdrawal amount?</h5>
+                      <p className="text-white/60 text-xs leading-relaxed">The minimum withdrawal amount is ₦6,000 to ensure efficient processing and coverage of standard network operations.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="mt-6">
@@ -3894,6 +4413,17 @@ function MainApp() {
 
             <div className="flex-1 px-5 py-6 z-10 space-y-6">
               <div className="flex flex-col gap-2">
+                <label className="text-[14px] text-white/80 font-medium ml-1">Old Password</label>
+                <input
+                  type="password"
+                  value={setupOldPasswordValue}
+                  onChange={(e) => setSetupOldPasswordValue(e.target.value)}
+                  placeholder="Enter current password"
+                  className="w-full h-14 bg-[#141A46] border border-white/10 rounded-full px-5 text-white placeholder-white/30 font-medium focus:outline-none focus:border-[#7B2FF7]/50 transition-colors"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
                 <label className="text-[14px] text-white/80 font-medium ml-1">New Password</label>
                 <input
                   type="password"
@@ -3907,12 +4437,102 @@ function MainApp() {
               <div className="pt-4">
                 <button
                   onClick={() => {
+                    if (currentUser?.password && setupOldPasswordValue !== currentUser.password) {
+                      alert("Incorrect old password.");
+                      return;
+                    }
                     if (!setupPasswordValue) {
-                      alert("Please enter a valid password.");
+                      alert("Please enter a valid new password.");
                       return;
                     }
                     updatePassword(setupPasswordValue);
                     alert("Password updated successfully.");
+                    setSetupOldPasswordValue("");
+                    setSetupPasswordValue("");
+                    setActiveModal("setup");
+                  }}
+                  className="w-full h-[56px] rounded-full bg-[#A855F7] text-white font-bold text-[16px] shadow-[0_4px_14px_rgba(168,85,247,0.4)] active:scale-95 transition-transform"
+                >
+                  Confirm Setup
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeModal === "setupLanguage" && (
+          <div className="absolute inset-0 z-50 flex flex-col bg-[#0A0E27] overflow-y-auto">
+            {/* Top Glow */}
+            <div className="absolute top-0 left-0 right-0 h-[200px] bg-gradient-to-b from-[#6C5CE7]/20 to-transparent pointer-events-none z-0"></div>
+            
+            {/* Header */}
+            <div className="flex items-center px-4 h-14 relative shrink-0 pt-safe z-10 border-b border-white/5">
+              <button onClick={() => setActiveModal("setup")} className="absolute left-4 p-2 text-white/80 active:scale-95 transition-transform">
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <h2 className="flex-1 text-center text-white text-[17px] font-semibold tracking-wide">Language</h2>
+            </div>
+
+            <div className="flex-1 px-5 py-6 z-10 space-y-4">
+              {['English', 'Spanish', 'French', 'Portuguese'].map((lang) => (
+                <div 
+                  key={lang}
+                  onClick={() => {
+                    setLanguage(lang);
+                    setActiveModal("setup");
+                  }}
+                  className={`flex justify-between items-center py-4 px-5 rounded-2xl cursor-pointer transition-colors border ${
+                    language === lang ? 'bg-[#7B2FF7]/20 border-[#7B2FF7]/50' : 'bg-white/5 border-white/5 active:bg-white/10'
+                  }`}
+                >
+                  <span className="text-[15px] font-medium text-white/90">{lang}</span>
+                  {language === lang && (
+                    <div className="w-5 h-5 rounded-full bg-[#7B2FF7] flex items-center justify-center">
+                      <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeModal === "setupAlertThreshold" && (
+          <div className="absolute inset-0 z-50 flex flex-col bg-[#0A0E27] overflow-y-auto">
+            {/* Top Glow */}
+            <div className="absolute top-0 left-0 right-0 h-[200px] bg-gradient-to-b from-[#6C5CE7]/20 to-transparent pointer-events-none z-0"></div>
+            
+            {/* Header */}
+            <div className="flex items-center px-4 h-14 relative shrink-0 pt-safe z-10 border-b border-white/5">
+              <button onClick={() => setActiveModal("setup")} className="absolute left-4 p-2 text-white/80 active:scale-95 transition-transform">
+                <ChevronLeft className="w-6 h-6" />
+              </button>
+              <h2 className="flex-1 text-center text-white text-[17px] font-semibold tracking-wide">Set Balance Alert</h2>
+            </div>
+
+            <div className="flex-1 px-5 py-6 z-10 space-y-6">
+              <div className="flex flex-col gap-2">
+                <label className="text-[14px] text-white/80 font-medium ml-1">Alert Threshold (₦)</label>
+                <input
+                  type="number"
+                  value={setupAlertThresholdValue}
+                  onChange={(e) => setSetupAlertThresholdValue(e.target.value)}
+                  placeholder="e.g. 5000"
+                  className="w-full h-14 bg-[#141A46] border border-white/10 rounded-full px-5 text-white placeholder-white/30 font-medium focus:outline-none focus:border-[#7B2FF7]/50 transition-colors"
+                />
+              </div>
+
+              <div className="pt-4">
+                <button
+                  onClick={() => {
+                    const thresholdNum = Number(setupAlertThresholdValue);
+                    if (isNaN(thresholdNum) || thresholdNum < 0) {
+                      alert("Please enter a valid threshold greater than 0.");
+                      return;
+                    }
+                    updateBalanceAlertThreshold(thresholdNum);
+                    setToastMessage("Balance alert threshold updated!");
+                    setTimeout(() => setToastMessage(null), 2000);
                     setActiveModal("setup");
                   }}
                   className="w-full h-[56px] rounded-full bg-[#A855F7] text-white font-bold text-[16px] shadow-[0_4px_14px_rgba(168,85,247,0.4)] active:scale-95 transition-transform"
@@ -3944,7 +4564,7 @@ function MainApp() {
             </div>
 
             {/* Filters Area */}
-            <div className="flex flex-col px-4 mt-2 z-10 shrink-0 gap-3">
+            <div className="flex flex-col px-4 mt-6 z-10 shrink-0 gap-3">
                {/* Search */}
                <div className="w-full bg-[#1C0F3F] rounded-xl px-4 py-2 flex items-center border border-white/5">
                  <svg className="w-5 h-5 text-white/40 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -4077,19 +4697,48 @@ function MainApp() {
                 return (
                   <div className="flex flex-col gap-3">
                     {myTransactions.map(t => (
-                      <div key={t.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex justify-between items-center">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-white font-semibold text-[15px]">{t.type === 'deposit' ? 'Recharge' : 'Withdrawal'}</span>
-                          <span className="text-white/40 text-[11px] font-mono">{new Date(t.date).toLocaleString()}</span>
+                      <div key={t.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col gap-4">
+                        <div className="flex justify-between items-center">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-white font-semibold text-[15px]">{t.type === 'deposit' ? 'Recharge' : 'Withdrawal'}</span>
+                            <span className="text-white/40 text-[11px] font-mono">{new Date(t.date).toLocaleString()}</span>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className={`font-bold text-[16px] ${t.type === 'deposit' ? 'text-[#00D4FF]' : 'text-[#FF4DA8]'}`}>
+                              {t.type === 'deposit' ? '+' : '-'}₦{formatCurrency(t.amount)}
+                            </span>
+                            <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1.5 ${t.status === 'completed' ? 'bg-green-500/20 text-green-400' : t.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
+                              {t.status === 'completed' && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shadow-[0_0_5px_rgba(74,222,128,0.8)]"></span>}
+                              {t.status.charAt(0).toUpperCase() + t.status.slice(1)}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <span className={`font-bold text-[16px] ${t.type === 'deposit' ? 'text-[#00D4FF]' : 'text-[#FF4DA8]'}`}>
-                            {t.type === 'deposit' ? '+' : '-'}₦{formatCurrency(t.amount)}
-                          </span>
-                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${t.status === 'completed' ? 'bg-green-500/20 text-green-400' : t.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
-                            {t.status.charAt(0).toUpperCase() + t.status.slice(1)}
-                          </span>
-                        </div>
+                        {t.type === 'withdrawal' && t.status === 'pending' && (
+                          <div className="pt-2 border-t border-white/5">
+                            <div className="flex justify-between items-center text-[10px] text-white/50 mb-2 font-medium px-1">
+                              <span className="text-yellow-400">Submitted</span>
+                              <span className="text-yellow-400">Processing (2-24h)</span>
+                              <span>Completed</span>
+                            </div>
+                            <div className="relative w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                              <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-500 to-yellow-400 rounded-full w-[50%] relative overflow-hidden">
+                                <div className="absolute inset-0 bg-white/20 w-full animate-pulse"></div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {t.type === 'withdrawal' && t.status === 'completed' && (
+                          <div className="pt-2 border-t border-white/5">
+                            <div className="flex justify-between items-center text-[10px] text-white/50 mb-2 font-medium px-1">
+                              <span className="text-green-400">Submitted</span>
+                              <span className="text-green-400">Processing</span>
+                              <span className="text-green-400">Completed</span>
+                            </div>
+                            <div className="relative w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                              <div className="absolute top-0 left-0 h-full bg-green-500 rounded-full w-full"></div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -4157,10 +4806,13 @@ function MainApp() {
 
                 {/* Amount Grid */}
                 <div className="grid grid-cols-3 gap-3 mb-4">
-                  {[10000, 50000, 100000, 500000, 1000000, 2000000].map(amount => (
+                  {[12000, 50000, 100000, 500000, 1000000, 2000000].map(amount => (
                     <button
                       key={amount}
-                      onClick={() => setDepositAmount(amount.toString())}
+                      onClick={() => {
+                        triggerHaptic();
+                        setDepositAmount(amount.toString());
+                      }}
                       className={`h-[48px] rounded-xl flex items-center justify-center border ${
                         Number(depositAmount) === amount ? 'bg-[#7B2FF7] border-[#7B2FF7]' : 'bg-[#F5F5F5] border-transparent'
                       } active:scale-95 transition-transform`}
@@ -4211,6 +4863,20 @@ function MainApp() {
                       Copy
                     </button>
                   </div>
+                  
+                  <div className="mt-4 flex flex-col gap-2">
+                    <span className="text-[#212121] font-bold text-[13px]">Transaction Hash / Narration</span>
+                    <p className="text-xs text-slate-500">
+                      Please enter the transaction hash. You may also include your Main ID <span className="font-bold text-[#7B2FF7]">({currentUser?.referralCode})</span> for reference.
+                    </p>
+                    <input
+                      type="text"
+                      placeholder={`e.g. TX Hash or ID: ${currentUser?.referralCode}`}
+                      value={depositReference}
+                      onChange={e => setDepositReference(e.target.value)}
+                      className="w-full bg-[#F5F5F5] border-transparent rounded-xl px-4 py-3 text-[14px] text-[#212121] placeholder:text-[#9e9e9e] focus:outline-none focus:ring-1 focus:ring-[#7B2FF7] focus:border-[#7B2FF7] transition-colors"
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -4226,18 +4892,31 @@ function MainApp() {
                 depositMethod === "usdt" ? (
                   <button
                     onClick={() => {
-                      requestDeposit(Number(depositAmount));
-                      setDepositAmount("");
-                      setActiveModal(null);
-                      alert("Deposit request submitted! Awaiting admin confirmation.");
+                      triggerHaptic();
+                      setPaymentProcessingState({ step: 1, message: "Verifying transaction on the blockchain..." });
+                      setTimeout(() => {
+                        setPaymentProcessingState({ step: 2, message: "Confirming payment details..." });
+                        setTimeout(() => {
+                          setPaymentProcessingState({ step: 3, message: "Finalizing deposit..." });
+                          setTimeout(() => {
+                            setPaymentProcessingState(null);
+                            requestDeposit(Number(depositAmount), depositReference);
+                            setDepositAmount("");
+                            setDepositReference("");
+                            setSuccessAnimMessage("Deposit request submitted! Awaiting CBN/SEC confirmation.");
+                            setActiveModal("successAnimated");
+                          }, 1500)
+                        }, 1500)
+                      }, 1500)
                     }}
-                    className="h-[48px] rounded-xl px-8 font-bold text-[15px] bg-[#7B2FF7] text-white active:scale-95 transition-transform shadow-lg shadow-[#7B2FF7]/30"
+                    className="h-[48px] rounded-xl px-8 font-bold text-[15px] bg-[#16A34A] text-white active:scale-95 transition-transform shadow-lg shadow-[#16A34A]/30"
                   >
                     I Have Paid
                   </button>
                 ) : (
                   <button
                     onClick={() => {
+                      triggerHaptic();
                       if (systemDepositAccounts.length === 0) {
                         alert("No deposit accounts available. Please try again later or use USDT.");
                         return;
@@ -4321,14 +5000,40 @@ function MainApp() {
                 </div>
               )}
 
+              <div className="mt-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-3">
+                <span className="text-slate-600 font-bold text-sm uppercase tracking-wide">Bank Transaction Note / Narration</span>
+                <p className="text-xs text-slate-500">
+                  Please paste your bank transaction note below. Include your Main ID <span className="font-bold text-blue-600">({currentUser?.referralCode})</span> so the admin can quickly confirm your deposit.
+                </p>
+                <input
+                  type="text"
+                  placeholder={`e.g. Deposit for ID: ${currentUser?.referralCode}`}
+                  value={depositReference}
+                  onChange={e => setDepositReference(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                />
+              </div>
+
               <button
                 onClick={() => {
-                  requestDeposit(Number(depositAmount));
-                  setDepositAmount("");
-                  setActiveModal(null);
-                  alert("Deposit request submitted! Awaiting admin confirmation.");
+                  triggerHaptic();
+                  setPaymentProcessingState({ step: 1, message: "Verifying transaction with the bank..." });
+                  setTimeout(() => {
+                    setPaymentProcessingState({ step: 2, message: "Confirming account details..." });
+                    setTimeout(() => {
+                      setPaymentProcessingState({ step: 3, message: "Finalizing deposit..." });
+                      setTimeout(() => {
+                        setPaymentProcessingState(null);
+                        requestDeposit(Number(depositAmount), depositReference);
+                        setDepositAmount("");
+                        setDepositReference("");
+                        setSuccessAnimMessage("Deposit request submitted! Awaiting CBN/SEC confirmation.");
+                        setActiveModal("successAnimated");
+                      }, 1500)
+                    }, 1500)
+                  }, 1500)
                 }}
-                className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl mt-4 active:scale-95 transition-transform shadow-lg shadow-blue-600/30 text-[15px]"
+                className="w-full bg-[#16A34A] text-white font-bold py-4 rounded-xl mt-4 active:scale-95 transition-transform shadow-lg shadow-[#16A34A]/30 text-[15px]"
               >
                 I Have Paid
               </button>
@@ -4356,11 +5061,57 @@ function MainApp() {
               <div className="w-[44px]"></div>
             </div>
 
+            {/* Bank Card Details */}
+            {currentUser?.bankDetails && (
+              <div className="w-full bg-gradient-to-br from-[#1C0F3F] to-[#2D1B69] rounded-2xl p-6 border border-white/10 shadow-xl relative overflow-hidden mb-6 z-10">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-[40px] -mr-10 -mt-10 pointer-events-none"></div>
+                
+                {/* User ID Section at the top of card surface */}
+                <div className="mb-6 flex justify-between items-center relative z-10 pb-4 border-b border-white/10">
+                  <div className="text-white/60 text-[11px] font-bold uppercase tracking-wider">User ID</div>
+                  <div className="text-[#00D4FF] font-mono font-bold tracking-wider text-base">{currentUser.referralCode}</div>
+                </div>
+
+                <div className="mb-6 flex justify-between items-start relative z-10">
+                  <div>
+                    <div className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-1">Bank Name</div>
+                    <div className="text-white font-bold text-lg">{currentUser.bankDetails.bankName}</div>
+                  </div>
+                  <Landmark className="text-white/20 w-8 h-8" />
+                </div>
+                <div 
+                  className="mb-6 relative z-10 cursor-pointer active:opacity-70 transition-opacity group flex justify-between items-center"
+                  onClick={() => {
+                    navigator.clipboard.writeText(currentUser.bankDetails!.accountNumber);
+                    setToastMessage("Copied to clipboard!");
+                    setTimeout(() => setToastMessage(null), 2000);
+                  }}
+                >
+                  <div>
+                    <div className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-1">Account Number</div>
+                    <div className="text-white font-mono text-xl tracking-widest">{currentUser.bankDetails.accountNumber}</div>
+                  </div>
+                  <Copy className="w-5 h-5 text-white/30 group-hover:text-white/80 transition-colors" />
+                </div>
+                <div className="relative z-10">
+                  <div className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-1">Account Name</div>
+                  <div className="text-white font-bold text-[15px]">{currentUser.bankDetails.accountName}</div>
+                </div>
+              </div>
+            )}
+
             {/* Withdrawal Input Section */}
             <div className="flex flex-col relative z-10 w-full mb-4">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-sm font-medium text-white/80">Withdrawal amount</span>
-                <button role="button" aria-hint="Go to Rules" className="text-sm font-medium text-white/80 active:opacity-70 transition-opacity">Rules</button>
+                <button 
+                  role="button" 
+                  aria-label="Go to Rules" 
+                  onClick={() => setActiveModal("withdrawRules")}
+                  className="text-sm font-medium text-white/80 active:opacity-70 transition-opacity"
+                >
+                  Rules
+                </button>
               </div>
 
               <div className="flex items-center">
@@ -4376,10 +5127,13 @@ function MainApp() {
               <div className="mt-1">
                 <button 
                    role="button" 
-                   onClick={() => setWithdrawAmount("0")} 
+                   onClick={() => {
+                     triggerHaptic();
+                     setWithdrawAmount("6000");
+                   }} 
                    className="text-base font-medium text-white/80 active:opacity-70 transition-opacity"
                  >
-                   Minimum withdrawal ₦0
+                   Minimum withdrawal ₦6,000
                  </button>
               </div>
 
@@ -4389,8 +5143,11 @@ function MainApp() {
                  <span className="text-sm font-medium text-white/80">Total balance: ₦{formatCurrency(currentUser?.balance || 0)}</span>
                  <button 
                    role="button" 
-                   onClick={() => setWithdrawAmount((currentUser?.balance || 0).toString())}
-                   aria-hint="Withdraw full balance"
+                   onClick={() => {
+                     triggerHaptic();
+                     setWithdrawAmount((currentUser?.balance || 0).toString());
+                   }}
+                   aria-label="Withdraw full balance"
                    className="text-[#7B2FF7] text-sm font-medium active:opacity-70 transition-opacity"
                  >
                    ALL
@@ -4472,12 +5229,48 @@ function MainApp() {
               ) : (
                 <button
                   role="button"
-                  onClick={() => setActiveModal("bankDetails")}
+                  onClick={() => {
+                    setBankAccountNumber("");
+                    setBankAccountName("");
+                    setSelectedBankCode("");
+                    setIsEditingBank(true);
+                    setActiveModal("bankDetails");
+                  }}
                   className="w-full h-[48px] rounded-[16px] bg-[#7B2FF7] text-white text-base font-medium flex items-center justify-center shadow-[0_4px_16px_rgba(123,47,255,0.4)] active:scale-95 transition-transform"
                 >
                   Add bank card
                 </button>
               )}
+            </div>
+          </div>
+        )}
+
+        {activeModal === "withdrawRules" && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="bg-[#141a3a] border border-white/10 p-6 rounded-[2rem] w-full max-w-sm relative shadow-2xl flex flex-col">
+              <button
+                onClick={() => setActiveModal("withdraw")}
+                className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/10 rounded-full text-white/50 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+              <h3 className="text-xl font-bold mb-4 text-[#00D4FF]">Withdrawal Rules</h3>
+              
+              <div className="overflow-y-auto pr-2 scrollbar-hide flex-1 space-y-4 text-white/80 text-sm leading-relaxed">
+                <p>1. Ensure your bank details are correct before requesting a withdrawal.</p>
+                <p>2. The minimum withdrawal amount is ₦6,000.</p>
+                <p>3. Withdrawals typically arrive between 2 to 24 hours after submitting the withdrawal request. Delays may occur during weekends or public holidays.</p>
+                <p>4. Please wait for the current withdrawal request to be completed before submitting a new one.</p>
+              </div>
+              
+              <div className="mt-6 border-t border-white/10 pt-4">
+                <button
+                  onClick={() => setActiveModal("withdraw")}
+                  className="w-full h-12 bg-gradient-to-r from-[#00D4FF] to-[#3B82F6] rounded-full text-white font-bold tracking-wide active:scale-95 transition-transform"
+                >
+                  I Understand
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -4519,33 +5312,6 @@ function MainApp() {
                 if (myCommissions.length === 0) {
                   return (
                     <div className="h-full flex flex-col items-center justify-center -mt-20">
-                      {/* Illustration (Bookmark with star, clouds, dots) */}
-                      <div className="relative w-40 h-40 flex items-center justify-center mb-4">
-                        {/* Glow behind */}
-                        <div className="absolute inset-0 bg-[#3B82F6] blur-[60px] opacity-20 rounded-full w-32 h-32 m-auto"></div>
-                        
-                        {/* Bookmark Shape */}
-                        <svg width="80" height="100" viewBox="0 0 80 100" fill="none" className="relative z-10 drop-shadow-[0_10px_20px_rgba(123,47,255,0.4)]">
-                          <linearGradient id="commBookmarkGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-                            <stop stopColor="#4DA8FF" />
-                            <stop offset="1" stopColor="#7B2FFF" />
-                          </linearGradient>
-                          <path d="M10,0 C4.5,0 0,4.5 0,10 L0,100 L40,80 L80,100 L80,10 C80,4.5 75.5,0 70,0 L10,0 Z" fill="url(#commBookmarkGrad)"/>
-                          <path d="M40,20 L45,35 L60,35 L48,45 L52,60 L40,50 L28,60 L32,45 L20,35 L35,35 Z" fill="#FFD700" className="drop-shadow-[0_0_8px_rgba(255,215,0,0.6)]" />
-                        </svg>
-                        
-                        {/* Decorative elements */}
-                        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 160 160">
-                          <circle cx="20" cy="40" r="4" fill="#4DA8FF" opacity="0.6" />
-                          <circle cx="140" cy="60" r="3" fill="#A855F7" opacity="0.8" />
-                          <circle cx="30" cy="120" r="5" fill="#FFD700" opacity="0.4" />
-                          <circle cx="130" cy="110" r="4" fill="#3B82F6" opacity="0.5" />
-                          {/* Clouds */}
-                          <path d="M 40 100 C 35 100 30 105 30 110 C 30 115 35 120 40 120 L 120 120 C 125 120 130 115 130 110 C 130 105 125 100 120 100 Z" fill="rgba(80,80,200,0.15)" />
-                          <path d="M 45 105 C 45 95 55 90 65 95 C 70 85 85 85 90 95 C 100 90 110 95 110 105 Z" fill="rgba(80,80,200,0.2)" />
-                        </svg>
-                      </div>
-
                       {/* Status Message */}
                       <h3 className="text-white/80 text-base font-medium">No data</h3>
                     </div>
@@ -4617,33 +5383,6 @@ function MainApp() {
                 if (myIncomes.length === 0) {
                   return (
                     <div className="h-full flex flex-col items-center justify-center -mt-20">
-                      {/* Illustration (Bookmark with star, clouds, dots) */}
-                      <div className="relative w-40 h-40 flex items-center justify-center mb-4">
-                        {/* Glow behind */}
-                        <div className="absolute inset-0 bg-[#3B82F6] blur-[60px] opacity-20 rounded-full w-32 h-32 m-auto"></div>
-                        
-                        {/* Bookmark Shape */}
-                        <svg width="80" height="100" viewBox="0 0 80 100" fill="none" className="relative z-10 drop-shadow-[0_10px_20px_rgba(123,47,255,0.4)]">
-                          <linearGradient id="incomeBookmarkGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-                            <stop stopColor="#4DA8FF" />
-                            <stop offset="1" stopColor="#7B2FFF" />
-                          </linearGradient>
-                          <path d="M10,0 C4.5,0 0,4.5 0,10 L0,100 L40,80 L80,100 L80,10 C80,4.5 75.5,0 70,0 L10,0 Z" fill="url(#incomeBookmarkGrad)"/>
-                          <path d="M40,20 L45,35 L60,35 L48,45 L52,60 L40,50 L28,60 L32,45 L20,35 L35,35 Z" fill="#FFD700" className="drop-shadow-[0_0_8px_rgba(255,215,0,0.6)]" />
-                        </svg>
-                        
-                        {/* Decorative elements */}
-                        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 160 160">
-                          <circle cx="20" cy="40" r="4" fill="#4DA8FF" opacity="0.6" />
-                          <circle cx="140" cy="60" r="3" fill="#A855F7" opacity="0.8" />
-                          <circle cx="30" cy="120" r="5" fill="#FFD700" opacity="0.4" />
-                          <circle cx="130" cy="110" r="4" fill="#3B82F6" opacity="0.5" />
-                          {/* Clouds */}
-                          <path d="M 40 100 C 35 100 30 105 30 110 C 30 115 35 120 40 120 L 120 120 C 125 120 130 115 130 110 C 130 105 125 100 120 100 Z" fill="rgba(80,80,200,0.15)" />
-                          <path d="M 45 105 C 45 95 55 90 65 95 C 70 85 85 85 90 95 C 100 90 110 95 110 105 Z" fill="rgba(80,80,200,0.2)" />
-                        </svg>
-                      </div>
-
                       {/* Status Message */}
                       <h3 className="text-white/80 text-base font-medium">No data</h3>
                     </div>
@@ -5174,73 +5913,132 @@ function MainApp() {
               <button onClick={() => setActiveModal(null)} className="absolute left-4 p-2 text-white/90 active:scale-95 transition-transform z-10">
                 <ChevronLeft className="w-6 h-6" />
               </button>
-              <h2 className="text-lg font-bold text-white w-full text-center">Add bank card</h2>
+              <h2 className="text-lg font-bold text-white w-full text-center">
+                {!isEditingBank && currentUser?.bankDetails ? "My Bank Card" : "Add bank card"}
+              </h2>
             </div>
 
-            {/* Form */}
+            {/* Content */}
             <div className="flex-1 overflow-y-auto px-5 py-6 z-10 flex flex-col space-y-5">
-              <div className="flex flex-col gap-2">
-                <label className="text-[14px] text-white/80 font-medium ml-1">Name</label>
-                <input
-                  type="text"
-                  value={bankAccountName}
-                  onChange={(e) => setBankAccountName(e.target.value)}
-                  placeholder="Please enter real name"
-                  className="w-full h-14 bg-[#141A46] border border-white/10 rounded-full px-5 text-white placeholder-white/30 font-medium focus:outline-none focus:border-[#7B2FF7]/50 transition-colors"
-                />
-              </div>
+              {!isEditingBank && currentUser?.bankDetails ? (
+                <>
+                  {/* Saved Card View */}
+                  <div className="w-full bg-gradient-to-br from-[#1C0F3F] to-[#2D1B69] rounded-2xl p-6 border border-white/10 shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-[40px] -mr-10 -mt-10 pointer-events-none"></div>
+                    
+                    {/* User ID Section at the top of card surface */}
+                    <div className="mb-6 flex justify-between items-center relative z-10 pb-4 border-b border-white/10">
+                      <div className="text-white/60 text-[11px] font-bold uppercase tracking-wider">User ID</div>
+                      <div className="text-[#00D4FF] font-mono font-bold tracking-wider text-base">{currentUser.referralCode}</div>
+                    </div>
 
-              <div className="flex flex-col gap-2">
-                <label className="text-[14px] text-white/80 font-medium ml-1">Bank Account</label>
-                <input
-                  type="text"
-                  value={bankAccountNumber}
-                  onChange={(e) => setBankAccountNumber(e.target.value.replace(/\D/g, ''))}
-                  placeholder="Please enter your Bank Account"
-                  className="w-full h-14 bg-[#141A46] border border-white/10 rounded-full px-5 text-white placeholder-white/30 font-medium focus:outline-none focus:border-[#7B2FF7]/50 transition-colors tracking-wide"
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-[14px] text-white/80 font-medium ml-1">Select Bank</label>
-                <div className="relative">
-                  <select
-                    value={selectedBankCode}
-                    onChange={(e) => setSelectedBankCode(e.target.value)}
-                    className="w-full h-14 bg-[#141A46] border border-white/10 rounded-full px-5 text-white font-medium focus:outline-none focus:border-[#7B2FF7]/50 transition-colors appearance-none"
-                  >
-                    <option value="" className="text-white/30">Select</option>
-                    {banksList.map((b) => (
-                      <option key={b.code} value={b.code}>{b.name}</option>
-                    ))}
-                  </select>
-                  <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-white/50">
-                    <ChevronDown className="w-5 h-5" />
+                    <div className="mb-6 flex justify-between items-start relative z-10">
+                      <div>
+                        <div className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-1">Bank Name</div>
+                        <div className="text-white font-bold text-lg">{currentUser.bankDetails.bankName}</div>
+                      </div>
+                      <Landmark className="text-white/20 w-8 h-8" />
+                    </div>
+                    <div 
+                      className="mb-6 relative z-10 cursor-pointer active:opacity-70 transition-opacity group flex justify-between items-center"
+                      onClick={() => {
+                        navigator.clipboard.writeText(currentUser.bankDetails!.accountNumber);
+                        setToastMessage("Copied to clipboard!");
+                        setTimeout(() => setToastMessage(null), 2000);
+                      }}
+                    >
+                      <div>
+                        <div className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-1">Account Number</div>
+                        <div className="text-white font-mono text-xl tracking-widest">{currentUser.bankDetails.accountNumber}</div>
+                      </div>
+                      <Copy className="w-5 h-5 text-white/30 group-hover:text-white/80 transition-colors" />
+                    </div>
+                    <div className="relative z-10">
+                      <div className="text-white/60 text-[11px] font-bold uppercase tracking-wider mb-1">Account Name</div>
+                      <div className="text-white font-bold text-[15px]">{currentUser.bankDetails.accountName}</div>
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              <div className="pt-8">
-                <button
-                  onClick={() => {
-                    if (!bankAccountName || !bankAccountNumber || !selectedBankCode) {
-                      alert("Please fill out all fields.");
-                      return;
-                    }
-                    const bankNameStr = banksList.find((b) => b.code === selectedBankCode)?.name || "";
-                    updateBankDetails({
-                      accountName: bankAccountName,
-                      accountNumber: bankAccountNumber,
-                      bankCode: selectedBankCode,
-                      bankName: bankNameStr,
-                    });
-                    setActiveModal(null);
-                  }}
-                  className="w-full h-[56px] rounded-full bg-[#A855F7] text-white font-bold text-[16px] shadow-[0_4px_14px_rgba(168,85,247,0.4)] active:scale-95 transition-transform"
-                >
-                  Save
-                </button>
-              </div>
+                  <div className="pt-8 mt-auto">
+                    <button
+                      onClick={() => {
+                        setBankAccountNumber("");
+                        setBankAccountName("");
+                        setSelectedBankCode("");
+                        setIsEditingBank(true);
+                      }}
+                      className="w-full h-[56px] rounded-full bg-white/10 border border-white/20 text-white font-bold text-[16px] active:scale-95 transition-transform"
+                    >
+                      Change Bank Account
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[14px] text-white/80 font-medium ml-1">Name</label>
+                    <input
+                      type="text"
+                      value={bankAccountName}
+                      onChange={(e) => setBankAccountName(e.target.value)}
+                      placeholder="Please enter real name"
+                      className="w-full h-14 bg-[#141A46] border border-white/10 rounded-full px-5 text-white placeholder-white/30 font-medium focus:outline-none focus:border-[#7B2FF7]/50 transition-colors"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[14px] text-white/80 font-medium ml-1">Bank Account</label>
+                    <input
+                      type="text"
+                      value={bankAccountNumber}
+                      onChange={(e) => setBankAccountNumber(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Please enter your Bank Account"
+                      className="w-full h-14 bg-[#141A46] border border-white/10 rounded-full px-5 text-white placeholder-white/30 font-medium focus:outline-none focus:border-[#7B2FF7]/50 transition-colors tracking-wide"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[14px] text-white/80 font-medium ml-1">Select Bank</label>
+                    <div className="relative">
+                      <select
+                        value={selectedBankCode}
+                        onChange={(e) => setSelectedBankCode(e.target.value)}
+                        className="w-full h-14 bg-[#141A46] border border-white/10 rounded-full px-5 text-white font-medium focus:outline-none focus:border-[#7B2FF7]/50 transition-colors appearance-none"
+                      >
+                        <option value="" className="text-white/30">Select</option>
+                        {banksList.map((b) => (
+                          <option key={b.code} value={b.code}>{b.name}</option>
+                        ))}
+                      </select>
+                      <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-white/50">
+                        <ChevronDown className="w-5 h-5" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-8">
+                    <button
+                      onClick={() => {
+                        if (!bankAccountName || !bankAccountNumber || !selectedBankCode) {
+                          alert("Please fill out all fields.");
+                          return;
+                        }
+                        const bankNameStr = banksList.find((b) => b.code === selectedBankCode)?.name || "";
+                        updateBankDetails({
+                          accountName: bankAccountName,
+                          accountNumber: bankAccountNumber,
+                          bankCode: selectedBankCode,
+                          bankName: bankNameStr,
+                        });
+                        setActiveModal(null);
+                      }}
+                      className="w-full h-[56px] rounded-full bg-[#A855F7] text-white font-bold text-[16px] shadow-[0_4px_14px_rgba(168,85,247,0.4)] active:scale-95 transition-transform"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Loading Overlay */}
@@ -5297,7 +6095,7 @@ function MainApp() {
               </div>
               
               <div className="p-6 flex flex-col items-center">
-                <p className="text-white/80 text-[14px] leading-relaxed mb-6 text-left w-full space-y-3">
+                <div className="text-white/80 text-[14px] leading-relaxed mb-6 text-left w-full space-y-3">
                   <div className="flex flex-col gap-1">
                     <span className="font-bold text-white">📱 iOS (Safari):</span> 
                     <span>Tap the <span className="font-mono bg-white/10 px-1 py-0.5 rounded text-xs text-white">Share</span> icon, then select <span className="font-mono bg-white/10 px-1 py-0.5 rounded text-xs text-white">Add to Home Screen</span>.</span>
@@ -5306,7 +6104,7 @@ function MainApp() {
                     <span className="font-bold text-white">🤖 Android (Chrome):</span> 
                     <span>Tap the <span className="font-mono bg-white/10 px-1 py-0.5 rounded text-xs text-white">Menu</span> (⋮) icon, then select <span className="font-mono bg-white/10 px-1 py-0.5 rounded text-xs text-white">Install app</span> or <span className="font-mono bg-white/10 px-1 py-0.5 rounded text-xs text-white">Add to Home Screen</span>.</span>
                   </div>
-                </p>
+                </div>
                 
                 <button 
                   onClick={() => setActiveModal(null)}
@@ -5334,9 +6132,38 @@ function MainApp() {
               
               {/* Content */}
               <div className="p-6 flex flex-col items-center text-center">
-                <p className="text-slate-600 text-[15px] font-medium leading-relaxed mb-6">
+                <p className="text-slate-600 text-[15px] font-medium leading-relaxed mb-4">
                   Are you sure you want to withdraw <br/><span className="text-black font-bold text-xl block mt-2">₦{Number(withdrawAmount).toLocaleString()}</span>
                 </p>
+
+                {/* Status Timeline Graphic */}
+                <div className="w-full bg-slate-50 rounded-xl p-4 mb-6 border border-slate-100 relative shadow-sm">
+                  <div className="text-[11px] text-slate-400 font-bold uppercase tracking-wider text-left mb-4">Expected Timeline</div>
+                  <div className="flex justify-between items-center relative px-2">
+                    <div className="absolute top-[12px] left-[20px] right-[20px] h-[2px] bg-slate-200 z-0"></div>
+                    
+                    <div className="flex flex-col items-center z-10 gap-2 w-[60px]">
+                      <div className="w-6 h-6 rounded-full bg-[#FFB020] text-white flex items-center justify-center text-[12px] shadow-md ring-4 ring-slate-50">
+                        <Clock className="w-3 h-3" />
+                      </div>
+                      <span className="text-[9px] font-bold text-[#FFB020] uppercase tracking-wider text-center">Pending</span>
+                    </div>
+                    
+                    <div className="flex flex-col items-center z-10 gap-2 w-[60px]">
+                      <div className="w-6 h-6 rounded-full bg-slate-300 text-slate-500 flex items-center justify-center text-[12px] shadow-sm ring-4 ring-slate-50">
+                        <CheckCircle2 className="w-3 h-3" />
+                      </div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider text-center">Approved</span>
+                    </div>
+                    
+                    <div className="flex flex-col items-center z-10 gap-2 w-[60px]">
+                      <div className="w-6 h-6 rounded-full bg-slate-300 text-slate-500 flex items-center justify-center text-[12px] shadow-sm ring-4 ring-slate-50">
+                        <Banknote className="w-3 h-3" />
+                      </div>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider text-center">Processed</span>
+                    </div>
+                  </div>
+                </div>
                 
                 <div className="flex gap-3 w-full">
                   <button 
@@ -5357,7 +6184,299 @@ function MainApp() {
           </div>
         )}
 
+        {activeModal === "successAnimated" && (
+          <div className="absolute inset-0 z-[999] bg-white/90 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.8, opacity: 0 }}
+              className="bg-white border border-slate-200 rounded-3xl p-8 max-w-[320px] w-full flex flex-col items-center shadow-[0_20px_50px_rgba(34,197,94,0.15)] relative overflow-hidden"
+            >
+              {/* Animated Glow */}
+              <motion.div 
+                animate={{ 
+                  background: ["radial-gradient(circle, rgba(34,197,94,0.15) 0%, rgba(255,255,255,0) 70%)", "radial-gradient(circle, rgba(34,197,94,0.1) 0%, rgba(255,255,255,0) 70%)", "radial-gradient(circle, rgba(34,197,94,0.15) 0%, rgba(255,255,255,0) 70%)"] 
+                }}
+                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                className="absolute inset-0 z-0"
+              />
+              
+              {/* Lottie-style Drawing Checkmark */}
+              <div className="relative z-10 w-24 h-24 mb-6">
+                <motion.svg viewBox="0 0 50 50" className="w-full h-full drop-shadow-[0_0_12px_rgba(34,197,94,0.4)]">
+                  <motion.circle 
+                    cx="25" cy="25" r="23" 
+                    fill="none" 
+                    stroke="url(#successGrad)" 
+                    strokeWidth="4" 
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                  />
+                  <motion.path 
+                    d="M15,25 L22,32 L35,17" 
+                    fill="none" 
+                    stroke="#16a34a" 
+                    strokeWidth="4" 
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 0.4, delay: 0.5, ease: "easeOut" }}
+                  />
+                  <defs>
+                    <linearGradient id="successGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#4ade80" />
+                      <stop offset="100%" stopColor="#16a34a" />
+                    </linearGradient>
+                  </defs>
+                </motion.svg>
+              </div>
+
+              <motion.h3 
+                initial={{ y: 10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.8 }}
+                className="text-xl font-black text-black mb-2 z-10 relative text-center tracking-wide"
+              >
+                Success!
+              </motion.h3>
+              <motion.p 
+                initial={{ y: 10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.9 }}
+                className="text-black text-center text-sm font-bold z-10 relative mb-6"
+              >
+                {successAnimMessage}
+              </motion.p>
+              
+              <motion.button
+                initial={{ y: 10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 1 }}
+                onClick={() => setActiveModal(null)}
+                className="w-full py-4 rounded-xl bg-[#16a34a] text-black font-black uppercase tracking-wider active:scale-95 transition-transform z-10 relative shadow-lg shadow-green-500/30"
+              >
+                Continue
+              </motion.button>
+            </motion.div>
+          </div>
+        )}
+
+        {paymentProcessingState && (
+          <div className="absolute inset-0 z-[9999] bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center p-6">
+            <div className="relative flex flex-col items-center max-w-[300px] w-full text-center">
+              {/* Spinning loading indicator */}
+              <div className="w-24 h-24 mb-6 relative flex items-center justify-center">
+                <svg className="animate-spin text-[#16A34A] w-full h-full" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center text-2xl font-black text-slate-800">
+                  {paymentProcessingState.step}
+                  <span className="text-slate-400 text-lg">/3</span>
+                </div>
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 mb-2">Processing...</h3>
+              <p className="text-slate-500 font-medium text-[15px] max-w-[250px]">
+                {paymentProcessingState.message}
+              </p>
+              
+              <div className="flex gap-3 mt-8">
+                {[1, 2, 3].map(step => (
+                  <div key={step} className={`w-3 h-3 rounded-full transition-colors duration-500 ${paymentProcessingState.step >= step ? 'bg-[#16A34A] scale-110' : 'bg-slate-200'}`} />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
+
+      {showConfetti && (
+        <Confetti 
+          width={window.innerWidth} 
+          height={window.innerHeight} 
+          style={{ position: 'fixed', top: 0, left: 0, zIndex: 99999, pointerEvents: 'none' }}
+          recycle={false}
+          numberOfPieces={500}
+        />
+      )}
+
+      {/* Toast Notifications */}
+      <div className="fixed top-4 left-0 right-0 z-[9999] flex flex-col items-center gap-2 pointer-events-none px-4">
+        <AnimatePresence>
+          {notifications.map(notif => (
+            <motion.div
+              key={notif.id}
+              initial={{ opacity: 0, scale: 0.9, y: -20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className={`w-full max-w-sm p-4 rounded-xl shadow-2xl flex items-start gap-3 pointer-events-auto backdrop-blur-md border ${
+                notif.type === 'success' ? 'bg-emerald-500/90 border-emerald-400' : 
+                notif.type === 'error' ? 'bg-rose-500/90 border-rose-400' : 
+                'bg-blue-500/90 border-blue-400'
+              } text-white`}
+            >
+              <div className="shrink-0 mt-0.5">
+                {notif.type === 'success' && <CheckSquare className="w-5 h-5" />}
+                {notif.type === 'error' && <Info className="w-5 h-5" />}
+                {notif.type === 'info' && <Info className="w-5 h-5" />}
+              </div>
+              <div className="flex-1">
+                <h4 className="font-bold text-sm tracking-wide">{notif.title}</h4>
+                <p className="text-white/90 text-xs mt-0.5 leading-relaxed">{notif.message}</p>
+              </div>
+              <button onClick={() => setNotifications(prev => prev.filter(n => n.id !== notif.id))} className="shrink-0 text-white/70 hover:text-white active:scale-95 transition-all">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {/* Support Chat Floating Button */}
+      {currentUser && !isChatOpen && (
+        <button
+          onClick={() => setIsChatOpen(true)}
+          className="absolute bottom-24 right-4 w-14 h-14 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full shadow-lg flex items-center justify-center z-40 transform transition hover:scale-105 active:scale-95"
+        >
+          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+          {currentUser.role === 'admin' && chatMessages.filter(m => !m.receiverId && m.senderId !== currentUser?.id).length > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
+              {chatMessages.filter(m => !m.receiverId && m.senderId !== currentUser?.id).length}
+            </span>
+          )}
+        </button>
+      )}
+
+      {/* Support Chat Modal */}
+      <AnimatePresence>
+        {isChatOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: "100%" }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: "100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="absolute inset-0 z-[60] flex flex-col bg-slate-50"
+          >
+            {/* Header */}
+            <div className="bg-[#0A0E2E] text-white p-4 flex items-center justify-between shadow-md shrink-0 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center shrink-0 border-2 border-slate-700">
+                  <span className="font-bold text-sm">CS</span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-[16px] leading-tight">Customer Support</h3>
+                  <p className="text-[12px] text-white/70">We typically reply in a few minutes</p>
+                </div>
+              </div>
+              <button onClick={() => setIsChatOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Message Area */}
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
+              <div className="flex flex-col gap-1 items-start max-w-[85%]">
+                <div className="bg-white text-slate-800 p-3 rounded-2xl rounded-tl-sm shadow-sm border border-slate-100 text-[14px]">
+                  Hello! How can I help you today?
+                </div>
+                <span className="text-[10px] text-slate-400 ml-1">Current Session</span>
+              </div>
+              
+              {chatMessages.filter(m => {
+                if (currentUser?.role === 'admin') {
+                   if (adminChatUserContext) {
+                     return m.senderId === adminChatUserContext || m.receiverId === adminChatUserContext;
+                   }
+                   return true;
+                }
+                return m.senderId === currentUser?.id || m.receiverId === currentUser?.id;
+              }).map((msg) => {
+                const isMine = msg.senderId === currentUser?.id;
+                return (
+                  <div key={msg.id} className={`flex flex-col gap-1 max-w-[85%] ${isMine ? 'self-end items-end' : 'self-start items-start'}`}>
+                    <div className={`p-3 rounded-2xl shadow-sm text-[14px] leading-snug ${isMine ? 'bg-[#7B2FFF] text-white rounded-tr-sm' : 'bg-white text-slate-800 border border-slate-100 rounded-tl-sm'}`}>
+                      {msg.text}
+                    </div>
+                    <div className="flex items-center gap-2 mx-1">
+                      <span className="text-[10px] text-slate-400">
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 
+                        {currentUser?.role === 'admin' && !isMine ? ` (from ${users.find(u=>u.id === msg.senderId)?.email || msg.senderId})` : ''}
+                      </span>
+                      {currentUser?.role === 'admin' && !isMine && !adminChatUserContext && (
+                        <button 
+                          onClick={() => setAdminChatUserContext(msg.senderId)}
+                          className="text-[10px] text-blue-500 hover:underline font-bold"
+                        >
+                          Reply
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Input Area */}
+            <div className="bg-white p-3 shrink-0 border-t border-slate-200 safe-bottom">
+              {currentUser?.role === 'admin' && (
+                <div className="mb-2 flex items-center gap-2">
+                  <select 
+                    className="flex-1 bg-slate-100 border border-slate-200 rounded-lg p-2 text-sm text-slate-700 outline-none"
+                    value={adminChatUserContext || ""}
+                    onChange={(e) => setAdminChatUserContext(e.target.value)}
+                  >
+                    <option value="" disabled>Select user to reply to...</option>
+                    {Array.from(new Set(chatMessages.filter(m => m.senderId !== currentUser.id).map(m => m.senderId))).map(uid => {
+                      const u = users.find(x => x.id === uid);
+                      return <option key={uid} value={uid}>{u?.name || u?.email || u?.phone || uid}</option>;
+                    })}
+                  </select>
+                  {adminChatUserContext && (
+                    <button 
+                      onClick={() => setAdminChatUserContext(null)}
+                      className="px-3 py-2 bg-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-300"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="flex gap-2 items-center">
+                <input 
+                  type="text" 
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && chatInput.trim()) {
+                      if (currentUser?.role === 'admin' && !adminChatUserContext) return alert("Select a user to reply to!");
+                      sendChatMessage(chatInput.trim(), adminChatUserContext || undefined);
+                      setChatInput("");
+                    }
+                  }}
+                  className="flex-1 h-[48px] bg-slate-100/80 border border-slate-200 rounded-[24px] px-5 text-[14px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#7B2FFF]/50 focus:border-[#7B2FFF] transition-all"
+                  placeholder="Type a message..."
+                />
+                <button
+                  onClick={() => {
+                    if (chatInput.trim()) {
+                      if (currentUser?.role === 'admin' && !adminChatUserContext) return alert("Select a user to reply to!");
+                      sendChatMessage(chatInput.trim(), adminChatUserContext || undefined);
+                      setChatInput("");
+                    }
+                  }}
+                  className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors shadow-sm ${chatInput.trim() ? 'bg-[#7B2FFF] text-white' : 'bg-slate-100 text-slate-400'}`}
+                >
+                  <Send className="w-5 h-5 ml-0.5" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

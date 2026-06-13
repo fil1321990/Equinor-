@@ -1,0 +1,96 @@
+266:  const [activeModal, setActiveModal] = useState<null | "deposit" | "withdraw" | "bankDetails" | "about" | "convidar" | "levelUp" | "setup" | "setupPhone" | "setupPassword" | "setupAlertThreshold" | "addProduct" | "editProduct" | "fundingDetails" | "commissionRecord" | "incomeRecord" | "redemptionCode" | "redemptionReward" | "purchaseSuccess" | "contact" | "equinorConfirm" | "buyProduct" | "sysAnnouncement" | "download" | "addDepositAccount" | "depositCheckout" | "successAnimated">(
+357:      setActiveModal("download");
+363:      setActiveModal("sysAnnouncement");
+634:      setActiveModal("levelUp");
+646:        setActiveModal(null);
+691:      setActiveModal("successAnimated");
+698:      setActiveModal(null);
+743:    setActiveModal("purchaseSuccess");
+864:                <span className="text-[#6B2EFF] text-sm" onClick={(e) => { e.stopPropagation(); setActiveModal('privacy'); }}>【Privacy agreement】</span>
+898:                    onClick={(e) => { e.stopPropagation(); setActiveModal(null); }}
+920:                        setActiveModal(null);
+1355:                onClick={() => setActiveModal("prizeDraw")}
+1393:                  onClick={() => setActiveModal("contact")}
+1565:                  <button onClick={() => setActiveModal("deposit")} className="bg-[#F3F0FF] rounded-[20px] h-[72px] basis-[48%] flex-grow max-w-[49%] flex flex-col items-center justify-center active:opacity-80 transition-opacity">
+1571:                  <button onClick={() => setActiveModal("withdraw")} className="bg-[#F3F0FF] rounded-[20px] h-[72px] basis-[48%] flex-grow max-w-[49%] flex flex-col items-center justify-center active:opacity-80 transition-opacity">
+2121:                                  setActiveModal("equinorConfirm");
+2232:                                  setActiveModal("equinorConfirm");
+2339:                                setActiveModal("equinorConfirm");
+2702:                  onClick={() => setActiveModal("convidar")}
+2717:                    onClick={() => setActiveModal("deposit")}
+2723:                    onClick={() => setActiveModal("withdraw")}
+2741:                    onClick={() => setActiveModal("redemptionCode")}
+2755:                  { icon: FileText, label: "Funding details", action: () => setActiveModal("fundingDetails") },
+2756:                  { icon: ClipboardList, label: "Commission Record", action: () => setActiveModal("commissionRecord") },
+2757:                  { icon: BarChart2, label: "Income Record", action: () => setActiveModal("incomeRecord") },
+2763:                    setActiveModal("bankDetails");
+2765:                  { icon: Info, label: "About us", action: () => setActiveModal("about") },
+2766:                  { icon: Settings, label: "Set Up", action: () => setActiveModal("setup") },
+2885:                    setActiveModal("addProduct");
+2912:                      onClick={() => setActiveModal("addDepositAccount")}
+2981:                              setActiveModal("editProduct");
+3321:                setActiveModal(null);
+3332:                  setActiveModal(null);
+3342:                setActiveModal(null);
+3352:                  setActiveModal(null);
+3363:                setActiveModal(null);
+3381:                  onClick={() => setActiveModal(null)}
+3404:              <button onClick={() => setActiveModal(null)} className="absolute left-4 p-2 text-white active:scale-95 transition-transform z-10 bg-white/10 rounded-full hover:bg-white/20">
+3500:              <button onClick={() => setActiveModal(null)} className="absolute left-4 p-2 text-white active:scale-95 transition-transform z-10">
+3606:            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={() => setActiveModal(null)} />
+3622:                onClick={() => setActiveModal(null)}
+3664:                        setActiveModal("redemptionReward");
+3694:            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={() => !showCongratsEffect && setActiveModal(null)} />
+3815:                    setActiveModal(null);
+3827:          <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 transition-opacity duration-200" onClick={() => setActiveModal(null)}>
+3843:                  onClick={() => setActiveModal(null)}
+3854:          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 transition-opacity duration-200" onClick={() => setActiveModal(null)}>
+3859:                  onClick={() => setActiveModal(null)}
+3918:                        setActiveModal(null);
+3935:                onClick={() => setActiveModal(null)}
+3987:                  onClick={() => setActiveModal(null)}
+3998:          <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 transition-opacity duration-200" onClick={() => setActiveModal(null)}>
+4002:                <button onClick={() => setActiveModal(null)} className="text-white/60 hover:text-white p-1">
+4072:                  onClick={() => setActiveModal(null)}
+4093:          <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 transition-opacity duration-200" onClick={() => setActiveModal(null)}>
+4108:                     setActiveModal(null);
+4128:              <button onClick={() => setActiveModal(null)} className="absolute left-4 p-2 text-white/80 active:scale-95 transition-transform">
+4140:                  setActiveModal("setupPhone");
+4157:                  setActiveModal("setupPassword");
+4173:                  setActiveModal(null);
+4190:              <button onClick={() => setActiveModal("setup")} className="absolute left-4 p-2 text-white/80 active:scale-95 transition-transform">
+4217:                    setActiveModal("setup");
+4235:              <button onClick={() => setActiveModal("setup")} className="absolute left-4 p-2 text-white/80 active:scale-95 transition-transform">
+4279:                    setActiveModal("setup");
+4297:              <button onClick={() => setActiveModal("setup")} className="absolute left-4 p-2 text-white/80 active:scale-95 transition-transform">
+4309:                    setActiveModal("setup");
+4334:              <button onClick={() => setActiveModal("setup")} className="absolute left-4 p-2 text-white/80 active:scale-95 transition-transform">
+4363:                    setActiveModal("setup");
+4385:              <button onClick={() => setActiveModal(null)} className="absolute left-4 p-2 text-white active:scale-95 transition-transform z-10">
+4585:                onClick={() => setActiveModal(null)} 
+4621:                        setActiveModal("fundingDetails");
+4727:                      setActiveModal("successAnimated");
+4743:                      setActiveModal("depositCheckout");
+4763:              <button onClick={() => setActiveModal("deposit")} className="text-slate-900">
+4841:                  setActiveModal("successAnimated");
+4858:                onClick={() => setActiveModal(null)} 
+4917:                  onClick={() => setActiveModal("withdrawRules")}
+4969:                  setActiveModal("fundingDetails");
+5044:                    setActiveModal("bankDetails");
+5059:                onClick={() => setActiveModal("withdraw")}
+5075:                  onClick={() => setActiveModal("withdraw")}
+5094:                onClick={() => setActiveModal(null)} 
+5190:                onClick={() => setActiveModal(null)} 
+5281:                  onClick={() => setActiveModal(null)}
+5331:                    setActiveModal(null);
+5348:                  onClick={() => setActiveModal(null)}
+5383:                      setActiveModal(null);
+5560:                    setActiveModal(null);
+5597:                      setActiveModal(null);
+5774:              <button onClick={() => setActiveModal(null)} className="absolute left-4 p-2 text-white/90 active:scale-95 transition-transform z-10">
+5894:                        setActiveModal(null);
+5917:            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={() => setActiveModal(null)} />
+5936:                  onClick={() => setActiveModal(null)}
+5948:            <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" onClick={() => setActiveModal(null)} />
+5971:                  onClick={() => setActiveModal(null)}
+6118:                onClick={() => setActiveModal(null)}

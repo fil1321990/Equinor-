@@ -8,6 +8,8 @@ DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS app_settings CASCADE;
 DROP TABLE IF EXISTS system_deposit_accounts CASCADE;
 
+DROP TABLE IF EXISTS "chat_messages" CASCADE;
+
 -- 1. Create Tables
 CREATE TABLE IF NOT EXISTS users (
   id text DEFAULT gen_random_uuid()::text PRIMARY KEY,
@@ -26,7 +28,8 @@ CREATE TABLE IF NOT EXISTS users (
   avatar text,
   disabled boolean DEFAULT false,
   "createdAt" timestamp with time zone DEFAULT now(),
-  "claimedTasks" jsonb DEFAULT '[]'::jsonb
+  "claimedTasks" jsonb DEFAULT '[]'::jsonb,
+  "balanceAlertThreshold" numeric
 );
 
 CREATE TABLE IF NOT EXISTS transactions (
@@ -110,6 +113,14 @@ CREATE TABLE IF NOT EXISTS system_deposit_accounts (
 );
 
 
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id text DEFAULT gen_random_uuid()::text PRIMARY KEY,
+  "senderId" text REFERENCES users(id),
+  "receiverId" text REFERENCES users(id),
+  text text,
+  timestamp timestamp with time zone DEFAULT now()
+);
+
 -- 2. Disable Row-Level Security (RLS) entirely so the public React frontend can read/write directly
 ALTER TABLE users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE transactions DISABLE ROW LEVEL SECURITY;
@@ -119,6 +130,7 @@ ALTER TABLE commissions DISABLE ROW LEVEL SECURITY;
 ALTER TABLE "incomeRecords" DISABLE ROW LEVEL SECURITY;
 ALTER TABLE app_settings DISABLE ROW LEVEL SECURITY;
 ALTER TABLE system_deposit_accounts DISABLE ROW LEVEL SECURITY;
+ALTER TABLE chat_messages DISABLE ROW LEVEL SECURITY;
 
 -- 3. Insert Initial System Settings & Configuration Data
 INSERT INTO app_settings (id) VALUES (1) ON CONFLICT (id) DO NOTHING;
