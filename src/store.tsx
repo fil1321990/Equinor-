@@ -255,15 +255,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const sendChatMessage = async (text: string, toUserId?: string) => {
     if (!currentUser) return;
     
-    function uuidv4() {
-      return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
-        (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> +c / 4).toString(16)
-      );
-    }
-    
     // Fallback if crypto.randomUUID is not available
     let randomId = "";
-    try { randomId = crypto.randomUUID(); } catch (e) { randomId = uuidv4(); }
+    try { 
+      randomId = crypto.randomUUID(); 
+    } catch (e) { 
+      try {
+        randomId = "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
+          (+c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> +c / 4).toString(16)
+        );
+      } catch (err) {
+        randomId = 'user-msg-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+      }
+    }
 
     const newMessage: ChatMessage = {
       id: randomId,
@@ -286,10 +290,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       senderId: newMessage.senderId,
       receiverId: newMessage.receiverId,
       text: newMessage.text,
-      timestamp: newMessage.timestamp,
-      read: false
+      timestamp: newMessage.timestamp
     }]);
-    if (error) console.error("Error inserting chat message:", error);
+    if (error) {
+      console.error("Error inserting chat message:", error);
+      alert("Error sending message: " + error.message);
+    }
   };
 
   const [announcement, setAnnouncement] = useState<string | null>(null);
