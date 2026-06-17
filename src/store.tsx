@@ -333,8 +333,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           { data: chatData }
         ] = await Promise.all([
           supabase.from("users").select("*"),
-          supabase.from("transactions").select("*"),
-          supabase.from("investments").select("*"),
+          supabase.from("transactions").select("*").order("date", { ascending: false }),
+          supabase.from("investments").select("*").order("startDate", { ascending: false }),
           supabase.from("products").select("*"),
           supabase.from("commissions").select("*"),
           supabase.from("incomeRecords").select("*"),
@@ -386,13 +386,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsLoadingStore(true);
     fetchData();
 
-    // Poll every 15 seconds to keep devices in sync
+    // Poll every 5 seconds to keep devices in sync
     const interval = setInterval(() => {
       fetchData();
-    }, 15000);
+    }, 5000);
 
     const subscription = supabase
-      .channel('chat_messages_changes')
+      .channel('public_changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
         setChatMessages(prev => {
           if (prev.find(m => m.id === payload.new.id)) return prev;
@@ -400,6 +400,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           localStorage.setItem("chatMessages", JSON.stringify(updated));
           return updated;
         });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, (payload) => {
+         fetchData();
       })
       .subscribe();
 
@@ -489,7 +492,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setCarouselImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const login = async (identifier: string, password?: string) => {
+  const login = async (rawIdentifier: string, password?: string) => {
+    const identifier = rawIdentifier.trim().replace(/\s+/g, '');
     let user = users.find((u) => u.phone === identifier || u.email === identifier);
     
     // Fallback: try fetching from Supabase if not found locally
@@ -518,7 +522,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     window.location.hash = '';
   };
 
-  const signup = async (identifier: string, password?: string, referralCode?: string) => {
+  const signup = async (rawIdentifier: string, password?: string, referralCode?: string) => {
+    const identifier = rawIdentifier.trim().replace(/\s+/g, '');
     if (!referralCode || referralCode.trim() === '') {
       alert("Please enter the invitation code.");
       return;
