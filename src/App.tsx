@@ -3336,6 +3336,15 @@ function MainApp() {
               </div>
 
               <div className="mx-4 mb-5 space-y-4">
+                <div className="flex justify-between items-center px-1">
+                  <h3 className="text-white/80 font-bold uppercase text-sm tracking-wider">Pending Requests</h3>
+                  <button 
+                    onClick={() => window.dispatchEvent(new Event('storage')) || window.location.reload()} 
+                    className="bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full text-xs font-bold border border-indigo-500/30 hover:bg-indigo-500/40 active:scale-95 transition-all"
+                  >
+                    REFRESH
+                  </button>
+                </div>
                 {transactions.filter(t => t.status === "pending").length === 0 && (
                   <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 text-center text-white/50 border border-white/10">
                     No pending transactions to review.
@@ -4904,7 +4913,12 @@ function MainApp() {
                           setPaymentProcessingState({ step: 3, message: "Finalizing deposit..." });
                           setTimeout(() => {
                             setPaymentProcessingState(null);
-                            requestDeposit(Number(depositAmount), depositReference);
+                            const amt = Number(depositAmount);
+                            if (amt > 0) {
+                              requestDeposit(amt, depositReference);
+                            } else {
+                              alert("Please enter a valid deposit amount.");
+                            }
                             setDepositAmount("");
                             setDepositReference("");
                             setSuccessAnimMessage("Deposit request submitted! Awaiting CBN/SEC confirmation.");
@@ -5028,7 +5042,12 @@ function MainApp() {
                       setPaymentProcessingState({ step: 3, message: "Finalizing deposit..." });
                       setTimeout(() => {
                         setPaymentProcessingState(null);
-                        requestDeposit(Number(depositAmount), depositReference);
+                        const amt = Number(depositAmount);
+                        if (amt > 0) {
+                          requestDeposit(amt, depositReference);
+                        } else {
+                          alert("Please enter a valid deposit amount.");
+                        }
                         setDepositAmount("");
                         setDepositReference("");
                         setSuccessAnimMessage("Deposit request submitted! Awaiting CBN/SEC confirmation.");

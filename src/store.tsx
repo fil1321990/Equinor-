@@ -578,6 +578,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const requestDeposit = async (amount: number, reference: string) => {
     if (!currentUser) return;
+    
+    const localTxId = Math.random().toString();
+    const tempTx = {
+      id: localTxId,
+      userId: currentUser.id,
+      type: "deposit" as TransactionType,
+      amount,
+      status: "pending" as TransactionStatus,
+      date: new Date().toISOString(),
+      bankDetails: { reference },
+    };
+    
+    // Optimistic insert to ensure it reflects instantly locally
+    setTransactions((prev) => [tempTx, ...prev]);
+
     const newTx = {
       userId: currentUser.id,
       type: "deposit" as TransactionType,
@@ -589,10 +604,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (error) {
       console.error(error);
       alert("Failed to submit deposit: " + error.message);
+      // Rollback
+      setTransactions((prev) => prev.filter(t => t.id !== localTxId));
       return;
     }
     if (data) {
-      setTransactions((prev) => [data, ...prev]);
+      setTransactions((prev) => prev.map(t => t.id === localTxId ? data : t));
     }
   };
 
@@ -622,6 +639,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       prev ? { ...prev, balance: prev.balance - amount } : prev,
     );
 
+    const localTxId = Math.random().toString();
+    const tempTx = {
+      id: localTxId,
+      userId: currentUser.id,
+      type: "withdrawal" as TransactionType,
+      amount,
+      status: "pending" as TransactionStatus,
+      date: new Date().toISOString(),
+      bankDetails,
+    };
+    setTransactions((prev) => [tempTx, ...prev]);
+
     const newTx = {
       userId: currentUser.id,
       type: "withdrawal" as TransactionType,
@@ -630,7 +659,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       bankDetails,
     };
     const { data } = await supabase.from('transactions').insert(newTx).select().single();
-    if (data) setTransactions((prev) => [data, ...prev]);
+    if (data) {
+      setTransactions((prev) => prev.map(t => t.id === localTxId ? data : t));
+    }
     alert("Withdrawal request submitted and is pending admin approval.");
   };
 
