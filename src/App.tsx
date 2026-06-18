@@ -861,7 +861,7 @@ function MainApp() {
                   type="text" 
                   placeholder="Please enter phone number"
                   value={registerForm.phone}
-                  onChange={e => setRegisterForm({...registerForm, phone: e.target.value})}
+                  onChange={e => setRegisterForm({...registerForm, phone: e.target.value.replace(/\s/g, '')})}
                   className="w-full bg-[#1a1e4e]/30 border border-white/10 rounded-2xl px-4 py-4 text-white placeholder-white/30 focus:outline-none focus:border-[#6B2EFF]"
                 />
               </div>
@@ -999,7 +999,7 @@ function MainApp() {
                 type="text" 
                 placeholder="Please enter phone number"
                 value={loginIdentifier}
-                onChange={e => setLoginIdentifier(e.target.value)}
+                onChange={e => setLoginIdentifier(e.target.value.replace(/\s/g, ''))}
                 className="w-full bg-[#1a1e4e]/30 border border-white/10 rounded-2xl px-4 py-4 text-white placeholder-white/30 focus:outline-none focus:border-[#6B2EFF]"
               />
             </div>
@@ -2486,7 +2486,9 @@ function MainApp() {
               const currentElapsedMs = Math.max(0, now.getTime() - lastCollected.getTime());
               const timeToCollectMs = Math.min(Math.min(currentElapsedMs, msInCycle), endDate.getTime() - lastCollected.getTime());
               
-              if (timeToCollectMs >= 1000) {
+              const isCycleComplete = currentElapsedMs >= msInCycle || now.getTime() >= endDate.getTime();
+              
+              if (isCycleComplete) {
                 const dailyIncome = getDailyIncome(inv, currentUser, users, investments);
                 const profitAccrued = (timeToCollectMs / msInADay) * dailyIncome;
                 
@@ -2525,7 +2527,8 @@ function MainApp() {
                 const currentElapsed = Math.max(0, invNow.getTime() - invLastCollected.getTime());
                 const timeToCollectMs = Math.min(Math.min(currentElapsed, msInCycle), invEnd.getTime() - invLastCollected.getTime());
                 
-                if (inv.status === "active" && timeToCollectMs >= 1000) {
+                const isCycleComplete = currentElapsed >= msInCycle || invNow >= invEnd;
+                if (inv.status === "active" && isCycleComplete) {
                   await collectEarnings(inv.id, true);
                   selectedCount++;
                 }
@@ -2678,7 +2681,8 @@ function MainApp() {
                         const profitAccrued = (readingElapsedMs / invMsInADay) * dailyIncome;
                         
                         const timeToCollectMs = Math.min(Math.min(currentElapsedMs, maxElapsedCycleMs), invEnd.getTime() - invLastCollected.getTime());
-                        const canCollect = inv.status === "active" && timeToCollectMs >= 1000;
+                        const isCycleComplete = currentElapsedMs >= maxElapsedCycleMs;
+                        const canCollect = inv.status === "active" && isCycleComplete;
                         const product = products.find(p => p.name === inv.planName);
                         
                         return (

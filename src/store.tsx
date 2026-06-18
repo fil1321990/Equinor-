@@ -233,6 +233,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       return null;
     }
   });
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('app_currentUser', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('app_currentUser');
+    }
+  }, [currentUser]);
   const [globalWithdrawalLimit, setGlobalWithdrawalLimit] = useState<number>(5000000);
   const [managerLink, setManagerLink] = useState<string>("https://t.me/manager");
   const [groupLink, setGroupLink] = useState<string>("https://t.me/group");
@@ -956,8 +964,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const maxAllowedElapsed = Math.min(msInCycle, currentElapsedMs);
     const timeToCollectMs = Math.min(maxAllowedElapsed, endDate.getTime() - lastCollected.getTime());
     
-    if (timeToCollectMs < 1000) {
-      if (!suppressAlert) alert("No profit available to collect right now.");
+    const isCycleComplete = currentElapsedMs >= msInCycle || now.getTime() >= endDate.getTime();
+    if (!isCycleComplete) {
+      if (!suppressAlert) alert(`Profit can only be collected after the full ${tPlusDays * 24} hours cycle.`);
       return;
     }
     
