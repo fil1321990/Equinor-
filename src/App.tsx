@@ -3184,14 +3184,22 @@ function MainApp() {
                 <div className="p-4 border-b border-white/10">
                   <input
                     type="text"
-                    placeholder="Search user by ID..."
+                    placeholder="Search by ID, Phone, or Name..."
                     onChange={(e) => setUserSearchQuery(e.target.value)}
                     value={userSearchQuery}
                     className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-[#7B2FFF]"
                   />
                 </div>
                 <div className="p-2 space-y-2 max-h-[300px] overflow-y-auto scrollbar-hide">
-                  {users.filter(u => u.role !== "admin" && u.id.toLowerCase().includes(userSearchQuery.toLowerCase())).map(u => (
+                  {users.filter(u => {
+                    if (u.role === "admin") return false;
+                    const q = userSearchQuery.toLowerCase();
+                    return u.id.toLowerCase().includes(q) || 
+                           (u.referralCode && u.referralCode.toLowerCase().includes(q)) ||
+                           (u.phone && u.phone.toLowerCase().includes(q)) ||
+                           (u.email && u.email.toLowerCase().includes(q)) ||
+                           (u.name && u.name.toLowerCase().includes(q));
+                  }).map(u => (
                     <div key={u.id} className="flex flex-col bg-white/5 p-3 rounded-xl border border-white/5 gap-2">
                       <div className="flex justify-between items-start">
                         <div>
