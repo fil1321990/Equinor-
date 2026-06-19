@@ -132,48 +132,13 @@ const OrderCountdown = ({ endTime }: { endTime: string }) => {
   );
 };
 
-const uploadToCloudinary = async (file: File): Promise<string> => {
-  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-
-  const toBase64 = (f: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(f);
-    });
-  };
-
-  if (!cloudName || !uploadPreset) {
-    console.warn("Cloudinary not configured. Falling back to base64 encoding.");
-    return toBase64(file);
-  }
-
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("upload_preset", uploadPreset);
-
-  try {
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-
-    if (!response.ok) {
-      console.warn("Cloudinary credentials invalid, falling back to local base64 storage.");
-      return toBase64(file);
-    }
-
-    const data = await response.json();
-    return data.secure_url;
-  } catch (error) {
-    console.warn("Cloudinary upload failed, falling back to local base64 storage.");
-    return toBase64(file);
-  }
+const processImageUpload = async (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 };
 
 function MainApp() {
@@ -1382,7 +1347,7 @@ function MainApp() {
               const file = e.target.files?.[0];
               if (file) {
                 try {
-                  const url = await uploadToCloudinary(file);
+                  const url = await processImageUpload(file);
                   updateAvatar(url);
                 } catch (error) {
                   console.error("Failed to upload avatar", error);
@@ -1513,7 +1478,7 @@ function MainApp() {
                           const file = e.target.files?.[0];
                           if (file) {
                             try {
-                              const url = await uploadToCloudinary(file);
+                              const url = await processImageUpload(file);
                               addCarouselImage(url);
                             } catch (error) {
                               console.error("Failed to upload carousel image", error);
@@ -1573,7 +1538,7 @@ function MainApp() {
                         const file = e.target.files?.[0];
                         if (file) {
                           try {
-                            const url = await uploadToCloudinary(file);
+                            const url = await processImageUpload(file);
                             setPromoImage(url);
                           } catch (error) {
                             console.error("Failed to upload promo image", error);
@@ -2989,7 +2954,7 @@ function MainApp() {
                       const file = e.target.files?.[0];
                       if (file) {
                         try {
-                          const url = await uploadToCloudinary(file);
+                          const url = await processImageUpload(file);
                           setAboutUsImage(url);
                         } catch (error) {
                           console.error("Failed to upload about us image", error);
@@ -5667,7 +5632,7 @@ function MainApp() {
                         const file = e.target.files?.[0];
                         if (file) {
                           try {
-                            const url = await uploadToCloudinary(file);
+                            const url = await processImageUpload(file);
                             setNewProductImageUrl(url);
                           } catch (error) {
                             console.error("Failed to upload product image", error);
@@ -5881,7 +5846,7 @@ function MainApp() {
                         const file = e.target.files?.[0];
                         if (file) {
                           try {
-                            const url = await uploadToCloudinary(file);
+                            const url = await processImageUpload(file);
                             setNewProductImageUrl(url);
                           } catch (error) {
                             console.error("Failed to upload product image", error);
