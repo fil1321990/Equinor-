@@ -56,7 +56,8 @@ import {
   Triangle,
   Send,
   CheckCircle2,
-  Banknote
+  Banknote,
+  ImagePlus
 } from "lucide-react";
 import { AppProvider, useAppStore } from "./store";
 import { getDailyIncome } from "./lib/earnings";
@@ -135,7 +136,35 @@ const OrderCountdown = ({ endTime }: { endTime: string }) => {
 const processImageUpload = async (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const max = 400; // REDUCED MAX SCALING FOR SMALLER STRINGS!
+
+        if (width > height && width > max) {
+          height = Math.round((height *= max / width));
+          width = max;
+        } else if (height > max) {
+          width = Math.round((width *= max / height));
+          height = max;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        } else {
+          resolve(event.target?.result as string);
+        }
+      };
+      img.onerror = reject;
+      img.src = event.target?.result as string;
+    };
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -235,7 +264,9 @@ function MainApp() {
   const [tick, setTick] = useState(0);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
+  const [isUploadingChatImg, setIsUploadingChatImg] = useState(false);
   const [adminChatUserContext, setAdminChatUserContext] = useState<string | null>(null);
+  const [viewImage, setViewImage] = useState<string | null>(null);
   
   useEffect(() => {
     const interval = setInterval(() => setTick(t => t + 1), 1000);
@@ -6373,7 +6404,7 @@ function MainApp() {
             </div>
 
             {/* Message Area */}
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]">
+            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" ref={(el) => { if (el) { el.scrollTop = el.scrollHeight; } }}>
               <div className="flex flex-col gap-1 items-start max-w-[85%]">
                 <div className="bg-white text-slate-800 p-3 rounded-2xl rounded-tl-sm shadow-sm border border-slate-100 text-[14px]">
                   Hello! How can I help you today?
@@ -6393,8 +6424,14 @@ function MainApp() {
                 const isMine = msg.senderId === currentUser?.id;
                 return (
                   <div key={msg.id} className={`flex flex-col gap-1 max-w-[85%] ${isMine ? 'self-end items-end' : 'self-start items-start'}`}>
-                    <div className={`p-3 rounded-2xl shadow-sm text-[14px] leading-snug ${isMine ? 'bg-[#7B2FFF] text-white rounded-tr-sm' : 'bg-white text-slate-800 border border-slate-100 rounded-tl-sm'}`}>
-                      {msg.text}
+                    <div className={`p-3 rounded-2xl shadow-sm text-[14px] leading-snug overflow-hidden break-words ${(msg.text || '').startsWith('IMAGE:::') ? 'bg-transparent !p-0 shadow-none border-none' : isMine ? 'bg-[#7B2FFF] text-white rounded-tr-sm' : 'bg-white text-slate-800 border border-slate-100 rounded-tl-sm'}`}>
+                      {(msg.text || '').startsWith('IMAGE:::') ? (
+                        <div onClick={() => setViewImage((msg.text || '').replace('IMAGE:::', ''))} className="cursor-pointer">
+                          <img src={(msg.text || '').replace('IMAGE:::', '')} alt="Attachment" className="max-w-[220px] sm:max-w-[260px] max-h-[300px] object-cover rounded-xl border-2 border-white/20 bg-black/5" />
+                        </div>
+                      ) : (
+                        msg.text
+                      )}
                     </div>
                     <div className="flex items-center gap-2 mx-1">
                       <span className="text-[10px] text-slate-400">
@@ -6441,9 +6478,41 @@ function MainApp() {
                 </div>
               )}
               <div className="flex gap-2 items-center">
+                <label className="w-12 h-12 rounded-full flex flex-col items-center justify-center shrink-0 transition-colors bg-slate-100/80 text-slate-500 hover:text-slate-700 hover:bg-slate-200 cursor-pointer relative overflow-hidden shadow-sm">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        try {
+                          setIsUploadingChatImg(true);
+                          const b64 = await processImageUpload(file);
+                          if (currentUser?.role === 'admin' && !adminChatUserContext) {
+                            alert("Select a user to reply to!");
+                            return;
+                          }
+                          sendChatMessage('IMAGE:::' + b64, adminChatUserContext || undefined);
+                        } catch (err) {
+                          alert("Failed to upload image.");
+                        } finally {
+                          setIsUploadingChatImg(false);
+                          e.target.value = '';
+                        }
+                      }
+                    }}
+                  />
+                  {isUploadingChatImg ? (
+                    <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <ImagePlus className="w-5 h-5" />
+                  )}
+                </label>
                 <input 
                   type="text" 
                   value={chatInput}
+                  disabled={isUploadingChatImg}
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && chatInput.trim()) {
@@ -6469,6 +6538,33 @@ function MainApp() {
                 </button>
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {viewImage && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={() => setViewImage(null)}
+          >
+            <motion.img 
+              initial={{ scale: 0.9 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.9 }}
+              src={viewImage} 
+              alt="Full screen preview" 
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" 
+            />
+            <button 
+              onClick={() => setViewImage(null)}
+              className="absolute top-6 right-6 w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center text-white transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

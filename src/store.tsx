@@ -288,7 +288,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     // Optimistic UI update
     setChatMessages((prev) => {
       const updated = [...prev, newMessage];
-      localStorage.setItem("chatMessages", JSON.stringify(updated));
+      try {
+        localStorage.setItem("chatMessages", JSON.stringify(updated));
+      } catch (err) {
+        console.warn("Could not save to localStorage, it might be full.");
+      }
       return updated;
     });
 
