@@ -20,22 +20,26 @@ async function startServer() {
         return res.status(400).json({ status: "error", message: "Image data is required" });
       }
 
-      let cloudUrl = "cloudinary://328312675945336:Wrq4h4VIArva2N2-f-RmnJ-rKFg@dbwllvhax";
-      
-      process.env.CLOUDINARY_URL = cloudUrl;
-
+      delete process.env.CLOUDINARY_URL;
       const cloudinary = (await import("cloudinary")).v2;
+
+      cloudinary.config({
+        cloud_name: 'dbwllvhax',
+        api_key: '328312675945336',
+        api_secret: 'Wrq4h4VIArva2N2-f-RmnJ-rKFg'
+      });
 
       // Upload base64 image to cloudinary
       const uploadResult = await cloudinary.uploader.upload(image, {
-        folder: "chat_uploads",
+        upload_preset: "ml_default",
         resource_type: "auto",
       });
 
       res.json({ status: "success", url: uploadResult.secure_url });
     } catch (error: any) {
-      console.error("Cloudinary upload error:", error);
-      res.status(500).json({ status: "error", message: error.message || "Failed to upload image" });
+      console.error("Cloudinary upload error:", JSON.stringify(error, null, 2));
+      const errMsg = error?.error?.message || error?.message || "Failed to upload image";
+      res.status(500).json({ status: "error", message: errMsg });
     }
   });
 
