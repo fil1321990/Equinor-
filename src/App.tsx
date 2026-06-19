@@ -2467,7 +2467,7 @@ function MainApp() {
             const filteredInvestments = investments.filter(inv => {
               if (inv.userId !== currentUser?.id) return false;
               const now = new Date();
-              const isExpired = inv.status === "completed";
+              const isExpired = inv.status === "completed" || now.getTime() >= new Date(inv.endDate).getTime();
               const product = products.find(p => p.name === inv.planName);
               const pType = product ? product.type : "general";
               
@@ -2562,7 +2562,7 @@ function MainApp() {
 
                   {/* Tab Navigation */}
                   <div className="flex w-full gap-2 mb-4 shrink-0 z-10">
-                    {(["general", "vip", "special"] as const).map(tab => {
+                    {(["general", "vip", "special", "expired"] as const).map(tab => {
                       const isActive = orderTab === tab;
                       return (
                         <button
