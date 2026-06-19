@@ -138,11 +138,11 @@ const processImageUpload = async (file: File): Promise<string> => {
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = new Image();
-      img.onload = () => {
+      img.onload = async () => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const max = 400; // REDUCED MAX SCALING FOR SMALLER STRINGS!
+        const max = 1200; // Cloudinary will handle it, but resize locally to save bandwidth
 
         if (width > height && width > max) {
           height = Math.round((height *= max / width));
@@ -155,11 +155,28 @@ const processImageUpload = async (file: File): Promise<string> => {
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
+        let base64ImageString = event.target?.result as string;
         if (ctx) {
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.6));
-        } else {
-          resolve(event.target?.result as string);
+          base64ImageString = canvas.toDataURL('image/jpeg', 0.8);
+        }
+
+        try {
+          const response = await fetch('/api/upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ image: base64ImageString }),
+          });
+          const data = await response.json();
+          if (data.status === 'success' && data.url) {
+            resolve(data.url);
+          } else {
+            reject(new Error(data.message || 'Upload failed'));
+          }
+        } catch (error) {
+          reject(error);
         }
       };
       img.onerror = reject;
