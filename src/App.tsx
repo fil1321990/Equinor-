@@ -6483,9 +6483,9 @@ function MainApp() {
             {/* Input Area */}
             <div className="bg-white p-3 shrink-0 border-t border-slate-200 safe-bottom">
               {currentUser?.role === 'admin' && (
-                <div className="mb-2 flex items-center gap-2">
+                <div className="mb-2 flex flex-col gap-2">
                   <select 
-                    className="flex-1 bg-slate-100 border border-slate-200 rounded-lg p-2 text-sm text-slate-700 outline-none"
+                    className="w-full bg-slate-100 border border-slate-200 rounded-lg p-2 text-sm text-slate-700 outline-none"
                     value={adminChatUserContext || ""}
                     onChange={(e) => setAdminChatUserContext(e.target.value)}
                   >
@@ -6498,9 +6498,9 @@ function MainApp() {
                   {adminChatUserContext && (
                     <button 
                       onClick={() => setAdminChatUserContext(null)}
-                      className="px-3 py-2 bg-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-300"
+                      className="w-full px-3 py-2 bg-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-300"
                     >
-                      Clear
+                      Clear Target User
                     </button>
                   )}
                 </div>
