@@ -6448,13 +6448,7 @@ function MainApp() {
                 const isMine = msg.senderId === currentUser?.id;
                 const txt = (msg.text || '').trim();
                 const isImageMsg = txt.includes('IMAGE:::') || (txt.startsWith('http') && txt.includes('cloudinary.com'));
-                let imgUrl = '';
-                if (isImageMsg) {
-                  const match = txt.match(/IMAGE:::(http[^\s]+)/);
-                  if (match) imgUrl = match[1];
-                  else if (txt.startsWith('http')) imgUrl = txt;
-                  else imgUrl = txt.replace('IMAGE:::', '').trim();
-                }
+                let imgUrl = txt.replace('IMAGE:::', '').trim();
                 
                 return (
                   <div key={msg.id} className={`flex flex-col gap-1 max-w-[85%] ${isMine ? 'self-end items-end' : 'self-start items-start'}`}>
@@ -6488,17 +6482,27 @@ function MainApp() {
 
             {/* Input Area */}
             <div className="bg-white p-3 shrink-0 border-t border-slate-200 safe-bottom">
-              {currentUser?.role === 'admin' && adminChatUserContext && (
-                <div className="mb-2 flex items-center justify-between bg-blue-50 text-blue-600 px-3 py-1.5 rounded-lg text-xs font-medium">
-                  <span>
-                    Replying to: {users.find(u => u.id === adminChatUserContext)?.name || users.find(u => u.id === adminChatUserContext)?.email || adminChatUserContext}
-                  </span>
-                  <button 
-                    onClick={() => setAdminChatUserContext(null)}
-                    className="text-blue-500 hover:text-blue-700 font-bold ml-2"
+              {currentUser?.role === 'admin' && (
+                <div className="mb-2 flex items-center gap-2">
+                  <select 
+                    className="flex-1 bg-slate-100 border border-slate-200 rounded-lg p-2 text-sm text-slate-700 outline-none"
+                    value={adminChatUserContext || ""}
+                    onChange={(e) => setAdminChatUserContext(e.target.value)}
                   >
-                    Cancel
-                  </button>
+                    <option value="" disabled>Select user to reply to...</option>
+                    {Array.from(new Set(chatMessages.filter(m => m.senderId !== currentUser.id).map(m => m.senderId))).map(uid => {
+                      const u = users.find(x => x.id === uid);
+                      return <option key={uid} value={uid}>{u?.name || u?.email || u?.phone || uid}</option>;
+                    })}
+                  </select>
+                  {adminChatUserContext && (
+                    <button 
+                      onClick={() => setAdminChatUserContext(null)}
+                      className="px-3 py-2 bg-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-300"
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
               )}
               <div className="flex gap-2 items-center">
