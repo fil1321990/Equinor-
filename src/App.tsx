@@ -214,6 +214,7 @@ function MainApp() {
     incomeRecords,
     approveTransaction,
     rejectTransaction,
+    updateTransactionAdminInfo,
     disableUser,
     enableUser,
     adminUsdtAddress,
@@ -233,6 +234,7 @@ function MainApp() {
     managerLink,
     groupLink,
     updateContactLinks,
+    restrictUserWithdrawals,
     systemDepositAccounts,
     addSystemDepositAccount,
     deleteSystemDepositAccount,
@@ -284,6 +286,11 @@ function MainApp() {
   const [isUploadingChatImg, setIsUploadingChatImg] = useState(false);
   const [adminChatUserContext, setAdminChatUserContext] = useState<string | null>(null);
   const [viewImage, setViewImage] = useState<string | null>(null);
+  const [adminSubTab, setAdminSubTab] = useState<"general" | "top" | "transactions">("general");
+  const [txPeriod, setTxPeriod] = useState<"all" | "weekly" | "monthly">("all");
+  const [editingTxId, setEditingTxId] = useState<string | null>(null);
+  const [editingTxNotes, setEditingTxNotes] = useState("");
+  const [editingTxTags, setEditingTxTags] = useState("");
   
   useEffect(() => {
     const interval = setInterval(() => setTick(t => t + 1), 1000);
@@ -1377,7 +1384,8 @@ function MainApp() {
         )}
         {/* Top Navigation */}
         {activeTab !== "order" && activeTab !== "home" && (
-          <div className="flex items-center justify-center h-[48px] relative z-10 shrink-0 bg-[#0A0E2E]/80 backdrop-blur-xl">
+          <div className="flex items-center justify-center h-[48px] relative z-10 shrink-0 bg-[#0A0E2E]/80 backdrop-blur-xl gap-2">
+            <EquinorStar className="w-5 h-5 text-white" />
             <h1
               className="text-[18px] font-semibold tracking-widest uppercase text-white"
             >
@@ -1445,8 +1453,11 @@ function MainApp() {
                   )}
                 </button>
                 {/* Center text */}
-                <div className="text-center font-semibold tracking-widest text-[18px] text-white">
-                  EQUINOR
+                <div className="flex items-center justify-center gap-2">
+                  <EquinorStar className="w-5 h-5 text-white" />
+                  <div className="text-center font-semibold tracking-widest text-[18px] text-white">
+                    EQUINOR
+                  </div>
                 </div>
                 {/* Right Headphones */}
                 <div 
@@ -2572,7 +2583,8 @@ function MainApp() {
                 </div>
                 <div className="relative z-10 p-4 pt-0 flex flex-col h-full overflow-hidden w-full max-w-md mx-auto">
                   {/* Logo Center */}
-                  <div className="text-center h-[48px] flex justify-center items-center">
+                  <div className="text-center h-[48px] flex justify-center items-center gap-2">
+                    <EquinorStar className="w-5 h-5 text-white" />
                     <span className="text-[18px] font-semibold tracking-widest uppercase text-white">
                       EQUINOR
                     </span>
@@ -2996,11 +3008,25 @@ function MainApp() {
 
           {activeTab === "admin" && currentUser?.role === "admin" && (
             <div className="pb-6 relative z-10 w-full max-w-md mx-auto">
-              <div className="text-center py-3 pb-5 text-xl font-bold text-white tracking-widest flex items-center justify-center gap-2">
+              <div className="text-center py-3 pb-2 text-xl font-bold text-white tracking-widest flex items-center justify-center gap-2">
                 ADMINISTRATION
               </div>
               
-              <div className="mx-4 mb-4 flex flex-col gap-3">
+              <div className="mx-4 mb-5 flex p-1 bg-white/10 backdrop-blur-md rounded-xl">
+                {(["general", "top", "transactions"] as const).map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setAdminSubTab(tab)}
+                    className={`flex-1 py-2 text-xs font-bold uppercase tracking-wider rounded-lg transition-all ${adminSubTab === tab ? "bg-white text-[#7B2FFF] shadow-md" : "text-white/70 hover:text-white hover:bg-white/5"}`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              {adminSubTab === "general" && (
+                <>
+                  <div className="mx-4 mb-4 flex flex-col gap-3">
                 <button
                   onClick={() => setIsChatOpen(true)}
                   className="w-full bg-[#334155] text-white font-bold py-3 rounded-xl shadow-lg border border-white/10 hover:bg-[#475569] active:scale-95 transition-all text-sm tracking-wide relative flex items-center justify-center gap-2"
@@ -3242,8 +3268,11 @@ function MainApp() {
                           <div className="text-white/60 text-xs mt-0.5 font-mono">{u.id} {u.phone && `| ${u.phone}`}</div>
                           <div className="flex flex-wrap gap-2 mt-2 border-b border-white/5 pb-2">
                             <span className="text-[10px] bg-[#7B2FF7]/20 text-[#D8B4FE] px-2 py-0.5 rounded font-bold">Balance: {formatCurrency(u.balance || 0)}</span>
+                            <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded font-bold">Deposits: {formatCurrency(transactions.filter(t => t.userId === u.id && t.type === 'deposit' && t.status === 'approved').reduce((sum, tx) => sum + tx.amount, 0))}</span>
+                            <span className="text-[10px] bg-pink-500/20 text-pink-300 px-2 py-0.5 rounded font-bold">Withdrawn: {formatCurrency(transactions.filter(t => t.userId === u.id && t.type === 'withdrawal' && t.status === 'approved').reduce((sum, tx) => sum + tx.amount, 0))}</span>
                             <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded font-bold">Referrals: {users.filter(x => x.referredBy === u.referralCode).length}</span>
-                            <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded font-bold">Products: {investments.filter(x => x.userId === u.id).length}</span>
+                            <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded font-bold">Products: {investments.filter(x => x.userId === u.id && x.status === 'active').length}</span>
+                            <span className="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded font-bold">Expired: {investments.filter(x => x.userId === u.id && x.status === 'completed').length}</span>
                             <span className="text-[10px] bg-white/10 text-white px-2 py-0.5 rounded font-bold">VIP {u.vipLevelIndex || 0}</span>
                             <span className={`text-[10px] ${u.disabled ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'} px-2 py-0.5 rounded font-bold uppercase`}>
                               {u.disabled ? 'Disabled' : 'Active'}
@@ -3275,6 +3304,20 @@ function MainApp() {
                           className={`flex-1 ${u.disabled ? 'bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400' : 'bg-red-500/20 hover:bg-red-500/40 text-red-400'} py-1.5 rounded-lg text-xs font-bold transition-colors`}
                         >
                           {u.disabled ? 'Enable User' : 'Disable User'}
+                        </button>
+                      </div>
+                      <div className="flex gap-2 mt-1">
+                        <button
+                          onClick={() => {
+                                if (u.withdrawalRestricted) {
+                                   restrictUserWithdrawals(u.id, false);
+                                } else {
+                                   restrictUserWithdrawals(u.id, true);
+                                }
+                          }}
+                          className={`flex-1 ${u.withdrawalRestricted ? 'bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-400' : 'bg-orange-500/20 hover:bg-orange-500/40 text-orange-400'} py-1.5 rounded-lg text-[10px] font-bold transition-colors uppercase`}
+                        >
+                          {u.withdrawalRestricted ? 'Allow Wthd' : 'Restrict Wthd'}
                         </button>
                       </div>
                     </div>
@@ -3446,6 +3489,50 @@ function MainApp() {
                           <div className="text-sm font-semibold text-blue-900">{tx.bankDetails.reference}</div>
                         </div>
                       )}
+                      
+                      {/* Admin Info (Tags & Notes) */}
+                      <div className="mt-2 text-sm bg-slate-100 p-3 rounded-xl border border-slate-200">
+                        {editingTxId === tx.id ? (
+                          <div className="flex flex-col gap-2">
+                             <div>
+                               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Tags (comma separated)</label>
+                               <input type="text" value={editingTxTags} onChange={(e) => setEditingTxTags(e.target.value)} className="w-full bg-white border border-slate-300 rounded-lg p-2 focus:border-[#7B2FFF] outline-none text-slate-800" placeholder="e.g. High Priority, Flagged" />
+                             </div>
+                             <div>
+                               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Internal Notes</label>
+                               <textarea value={editingTxNotes} onChange={(e) => setEditingTxNotes(e.target.value)} className="w-full bg-white border border-slate-300 rounded-lg p-2 focus:border-[#7B2FFF] outline-none min-h-[60px] text-slate-800" placeholder="Add context..."></textarea>
+                             </div>
+                             <div className="flex gap-2 justify-end mt-1">
+                               <button onClick={() => setEditingTxId(null)} className="px-3 py-1.5 bg-slate-300 hover:bg-slate-400 text-slate-800 rounded-lg font-bold text-xs transition-colors">Cancel</button>
+                               <button onClick={() => {
+                                  const tags = editingTxTags.split(",").map(t => t.trim()).filter(Boolean);
+                                  updateTransactionAdminInfo(tx.id, editingTxNotes, tags);
+                                  setEditingTxId(null);
+                               }} className="px-4 py-1.5 bg-[#7B2FFF] hover:opacity-90 text-white rounded-lg font-bold text-xs transition-colors shadow">Save</button>
+                             </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-1.5 cursor-pointer relative group" onClick={() => {
+                                setEditingTxId(tx.id);
+                                setEditingTxNotes(tx.internalNotes || "");
+                                setEditingTxTags((tx.adminTags || []).join(", "));
+                          }}>
+                             <div className="absolute top-0 right-0 p-0.5 text-slate-300 group-hover:text-[#7B2FFF] transition-colors"><Settings className="w-4 h-4"/></div>
+                             {(!tx.adminTags?.length && !tx.internalNotes) && (
+                                <div className="text-slate-400 italic text-xs">+ Add admin notes or tags ...</div>
+                             )}
+                             {(tx.adminTags && tx.adminTags.length > 0) && (
+                               <div className="flex flex-wrap gap-1 pr-6">
+                                 {tx.adminTags.map((tag, i) => <span key={i} className="bg-amber-100 text-amber-800 border border-amber-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">{tag}</span>)}
+                               </div>
+                             )}
+                             {tx.internalNotes && (
+                               <div className="text-slate-600 text-xs font-medium pr-6 mt-1 line-clamp-3"><span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Note:</span> {tx.internalNotes}</div>
+                             )}
+                          </div>
+                        )}
+                      </div>
+
                     </div>
                     
                     <div className="flex flex-wrap gap-2 mt-2">
@@ -3516,6 +3603,149 @@ function MainApp() {
                   </div>
                 )}
               </div>
+                </>
+              )}
+
+              {adminSubTab === "top" && (
+                <div className="mx-4 mb-5 space-y-4">
+                  <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 overflow-hidden shrink-0">
+                    <div className="p-4 border-b border-white/10 flex justify-between items-center text-sm">
+                      <h3 className="text-white font-bold uppercase tracking-wider">Top by Deposits</h3>
+                    </div>
+                    <div className="p-2 space-y-2 max-h-[400px] overflow-y-auto">
+                       {[...users]
+                         .sort((a, b) => {
+                            const aDep = transactions.filter(t => t.userId === a.id && t.type === "deposit" && t.status === "approved").reduce((sum, tx) => sum + tx.amount, 0);
+                            const bDep = transactions.filter(t => t.userId === b.id && t.type === "deposit" && t.status === "approved").reduce((sum, tx) => sum + tx.amount, 0);
+                            return bDep - aDep;
+                         })
+                         .slice(0, 50)
+                         .map((u, i) => {
+                            const dep = transactions.filter(t => t.userId === u.id && t.type === "deposit" && t.status === "approved").reduce((sum, tx) => sum + tx.amount, 0);
+                            if (dep === 0) return null;
+                            return (
+                              <div key={u.id} className="flex flex-col bg-white/5 p-3 rounded-xl border border-white/5 gap-2">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2 text-white">
+                                    <span className="font-bold text-[#00D4FF] w-6">#{i+1}</span>
+                                    <div>
+                                      <div className="font-bold text-sm">{u.name || (u.phone ? `User ${u.phone.slice(-4)}` : "Unknown")}</div>
+                                      <div className="text-[10px] text-white/50">{u.id} {u.phone ? `| ${u.phone}` : ''}</div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-[#34C759] font-bold text-sm tracking-tight">{formatCurrency(dep)}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                       })}
+                    </div>
+                  </div>
+
+                  <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 overflow-hidden shrink-0 mt-4">
+                    <div className="p-4 border-b border-white/10 flex justify-between items-center text-sm">
+                      <h3 className="text-white font-bold uppercase tracking-wider">Top by Referrals</h3>
+                    </div>
+                    <div className="p-2 space-y-2 max-h-[400px] overflow-y-auto">
+                       {[...users]
+                         .sort((a, b) => {
+                            const aRef = users.filter(x => x.referredBy === a.referralCode).length;
+                            const bRef = users.filter(x => x.referredBy === b.referralCode).length;
+                            return bRef - aRef;
+                         })
+                         .slice(0, 50)
+                         .map((u, i) => {
+                            const refCount = users.filter(x => x.referredBy === u.referralCode).length;
+                            if (refCount === 0) return null;
+                            return (
+                              <div key={u.id} className="flex flex-col bg-white/5 p-3 rounded-xl border border-white/5 gap-2">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2 text-white">
+                                    <span className="font-bold text-[#F472B6] w-6">#{i+1}</span>
+                                    <div>
+                                      <div className="font-bold text-sm">{u.name || (u.phone ? `User ${u.phone.slice(-4)}` : "Unknown")}</div>
+                                      <div className="text-[10px] text-white/50">{u.id} {u.phone ? `| ${u.phone}` : ''}</div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-white font-bold text-sm">{refCount} Referrals</div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                       })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {adminSubTab === "transactions" && (
+                <div className="mx-4 mb-5 space-y-4">
+                  <div className="flex justify-center gap-2 bg-white/10 p-1 rounded-lg backdrop-blur-sm mx-auto max-w-fit">
+                     <button onClick={() => setTxPeriod("all")} className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase ${txPeriod === "all" ? "bg-[#7B2FFF] text-white" : "text-white/60 hover:text-white"}`}>All Time</button>
+                     <button onClick={() => setTxPeriod("weekly")} className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase ${txPeriod === "weekly" ? "bg-[#7B2FFF] text-white" : "text-white/60 hover:text-white"}`}>Weekly</button>
+                     <button onClick={() => setTxPeriod("monthly")} className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase ${txPeriod === "monthly" ? "bg-[#7B2FFF] text-white" : "text-white/60 hover:text-white"}`}>Monthly</button>
+                  </div>
+                  
+                  {(() => {
+                     const now = new Date();
+                     let filteredTx = transactions.filter(t => t.status === "approved");
+                     if (txPeriod === "weekly") {
+                        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                        filteredTx = filteredTx.filter(t => new Date(t.date) >= weekAgo);
+                     } else if (txPeriod === "monthly") {
+                        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                        filteredTx = filteredTx.filter(t => new Date(t.date) >= monthAgo);
+                     }
+
+                     const totalDep = filteredTx.filter(t => t.type === "deposit").reduce((s,t) => s+t.amount, 0);
+                     const totalWith = filteredTx.filter(t => t.type === "withdrawal").reduce((s,t) => s+t.amount, 0);
+
+                     return (
+                       <>
+                         <div className="flex gap-3">
+                           <div className="flex-1 bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10 shadow-lg relative overflow-hidden flex flex-col justify-between">
+                             <div className="absolute top-0 right-0 p-2 opacity-20"><ArrowDownCircle className="w-8 h-8 text-[#00D4FF]" /></div>
+                             <div className="text-[10px] text-[#00D4FF] font-bold uppercase mb-1 z-10 w-full line-clamp-1">Deposits</div>
+                             <div className="text-white font-bold text-base sm:text-lg tracking-tight z-10">{formatCurrency(totalDep)}</div>
+                           </div>
+                           <div className="flex-1 bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/10 shadow-lg relative overflow-hidden flex flex-col justify-between">
+                             <div className="absolute top-0 right-0 p-2 opacity-20"><ArrowUpCircle className="w-8 h-8 text-[#F472B6]" /></div>
+                             <div className="text-[10px] text-[#F472B6] font-bold uppercase mb-1 z-10 w-full line-clamp-1">Withdrawals</div>
+                             <div className="text-white font-bold text-base sm:text-lg tracking-tight z-10">{formatCurrency(totalWith)}</div>
+                           </div>
+                         </div>
+                         
+                         <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden text-white/80 shrink-0">
+                           <div className="p-3 border-b border-white/10 font-bold text-xs uppercase tracking-wider text-white">Verified Records</div>
+                           <div className="max-h-[400px] overflow-y-auto">
+                              {filteredTx.length === 0 ? (
+                                <div className="p-4 text-center text-white/50 text-xs">No records found.</div>
+                              ) : (
+                                filteredTx.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 100).map(tx => (
+                                  <div key={tx.id} className="p-3 border-b border-white/5 flex justify-between items-center text-sm hover:bg-white/5 transition-colors">
+                                    <div>
+                                      <div className={`font-bold capitalize flex gap-1 items-center ${tx.type === 'deposit' ? 'text-[#00D4FF]' : 'text-[#F472B6]'}`}>
+                                        {tx.type} 
+                                      </div>
+                                      <div className="text-white/40 text-[10px]">{new Date(tx.date).toLocaleString()}</div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="font-bold text-white text-[15px]">{formatCurrency(tx.amount)}</div>
+                                      <div className="text-[10px] text-[#D8B4FE] font-mono tracking-wider">{users.find(u => u.id === tx.userId)?.phone || 'Unknown'}</div>
+                                    </div>
+                                  </div>
+                                ))
+                              )}
+                           </div>
+                         </div>
+                       </>
+                     )
+                  })()}
+                </div>
+              )}
+
             </div>
           )}
         </div>
