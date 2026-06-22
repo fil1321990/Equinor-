@@ -162,7 +162,7 @@ interface AppContextType extends AppState {
   updateContactLinks: (manager: string, group: string) => void;
   disableUser: (userId: string) => void;
   enableUser: (userId: string) => void;
-  collectEarnings: (investmentId: string, suppressAlert?: boolean) => void;
+  collectEarnings: (investmentId: string, suppressAlert?: boolean) => Promise<{ success: boolean; amount?: number; message?: string }>;
   updateBankDetails: (details: BankDetails) => void;
   updateAvatar: (avatarBase64: string) => void;
   updatePhone: (phone: string) => void;
@@ -976,15 +976,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const collectEarnings = async (investmentId: string, suppressAlert: boolean = false) => {
-    if (!currentUser) return;
+  const collectEarnings = async (investmentId: string, suppressAlert: boolean = false): Promise<{ success: boolean; amount?: number; message?: string }> => {
+    if (!currentUser) return { success: false };
     const investment = investments.find((inv) => inv.id === investmentId);
     if (
       !investment ||
       investment.userId !== currentUser.id ||
       investment.status !== "active"
     )
-      return;
+      return { success: false };
 
     const now = new Date();
     const startDate = new Date(investment.startDate);
@@ -1002,7 +1002,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const isCycleComplete = currentElapsedMs >= msInCycle || now.getTime() >= endDate.getTime();
     if (!isCycleComplete) {
       if (!suppressAlert) alert(`Profit can only be collected after the full ${tPlusDays * 24} hours cycle.`);
-      return;
+      return { success: false, message: "Not ready" };
     }
     
     const dailyIncome = getDailyIncome(investment, currentUser, users, investments);
@@ -1085,8 +1085,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     if (totalToAdd > 0 && !suppressAlert) {
-      alert(`Collection successful! Added ₦${totalToAdd.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} to your balance.`);
+      // The UI will handle the success alert via the return value
     }
+    
+    return { success: true, amount: totalToAdd };
   };
 
   const updateBankDetails = (details: BankDetails) => {

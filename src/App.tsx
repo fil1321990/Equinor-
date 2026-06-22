@@ -293,6 +293,8 @@ function MainApp() {
     null,
   );
   const [successAnimMessage, setSuccessAnimMessage] = useState("");
+  const [successAnimTitle, setSuccessAnimTitle] = useState("Success!");
+  const [successAnimAmount, setSuccessAnimAmount] = useState<number | null>(null);
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (activeModal === "depositCheckout") {
@@ -742,7 +744,9 @@ function MainApp() {
       });
       setIsProcessing(false);
       setWithdrawAmount("");
+      setSuccessAnimTitle("Withdrawal Requested");
       setSuccessAnimMessage("Withdrawal request submitted! Awaiting CBN/SEC confirmation.");
+      setSuccessAnimAmount(amountNum);
       setActiveModal("successAnimated");
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 5000);
@@ -2528,6 +2532,7 @@ function MainApp() {
 
             const handleGetAll = async () => {
               let selectedCount = 0;
+              let totalAmountCollected = 0;
               for (const inv of activeInvestments) {
                 const invNow = new Date();
                 const invStart = new Date(inv.startDate);
@@ -2543,14 +2548,20 @@ function MainApp() {
                 
                 const isCycleComplete = currentElapsed >= msInCycle || invNow >= invEnd;
                 if (inv.status === "active" && isCycleComplete) {
-                  await collectEarnings(inv.id, true);
+                  const res = await collectEarnings(inv.id, true);
+                  if (res && res.success && res.amount) {
+                    totalAmountCollected += res.amount;
+                  }
                   selectedCount++;
                 }
               }
               if (selectedCount > 0) {
-                alert("All accrued profits collected successfully!");
+                setSuccessAnimTitle("Income Collected!");
+                setSuccessAnimMessage("All accrued profits collected successfully into your balance.");
+                setSuccessAnimAmount(totalAmountCollected);
+                setActiveModal("successAnimated");
               } else {
-                alert("No new profits to collect.");
+                addNotification("Info", "No new profits to collect.", "info");
               }
             };
 
@@ -2786,7 +2797,17 @@ function MainApp() {
                                     disabled={collectingIds[inv.id]}
                                     onClick={async () => {
                                       setCollectingIds(prev => ({ ...prev, [inv.id]: true }));
-                                      await collectEarnings(inv.id);
+                                      const res = await collectEarnings(inv.id, true);
+                                      if (res && res.success) {
+                                        setSuccessAnimTitle("Income Collected!");
+                                        setSuccessAnimMessage(`Profits for ${inv.planName} collected successfully.`);
+                                        setSuccessAnimAmount(res.amount || null);
+                                        setActiveModal("successAnimated");
+                                      } else {
+                                        if (res && res.message) {
+                                          addNotification("Info", res.message, "info");
+                                        }
+                                      }
                                       setTimeout(() => {
                                         setCollectingIds(prev => ({ ...prev, [inv.id]: false }));
                                       }, 1000);
@@ -4943,7 +4964,9 @@ function MainApp() {
                             }
                             setDepositAmount("");
                             setDepositReference("");
+                            setSuccessAnimTitle("Deposit Requested");
                             setSuccessAnimMessage("Deposit request submitted! Awaiting CBN/SEC confirmation.");
+                            setSuccessAnimAmount(amt);
                             setActiveModal("successAnimated");
                           }, 1500)
                         }, 1500)
@@ -5072,7 +5095,9 @@ function MainApp() {
                         }
                         setDepositAmount("");
                         setDepositReference("");
+                        setSuccessAnimTitle("Deposit Requested");
                         setSuccessAnimMessage("Deposit request submitted! Awaiting CBN/SEC confirmation.");
+                        setSuccessAnimAmount(amt);
                         setActiveModal("successAnimated");
                       }, 1500)
                     }, 1500)
@@ -6230,25 +6255,27 @@ function MainApp() {
         )}
 
         {activeModal === "successAnimated" && (
-          <div className="absolute inset-0 z-[999] bg-white/90 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="absolute inset-0 z-[999] bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
             <motion.div 
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              className="bg-white border border-slate-200 rounded-3xl p-8 max-w-[320px] w-full flex flex-col items-center shadow-[0_20px_50px_rgba(34,197,94,0.15)] relative overflow-hidden"
+              initial={{ scale: 0.8, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0, y: 30 }}
+              transition={{ type: "spring", damping: 25, stiffness: 300 }}
+              className="bg-white border border-slate-200 rounded-3xl p-8 max-w-[340px] w-full flex flex-col items-center shadow-[0_20px_60px_rgba(34,197,94,0.3)] relative overflow-hidden"
             >
+              <div className="absolute top-0 w-full h-2 bg-gradient-to-r from-[#34C759] to-[#34C759]/50" />
               {/* Animated Glow */}
               <motion.div 
                 animate={{ 
-                  background: ["radial-gradient(circle, rgba(34,197,94,0.15) 0%, rgba(255,255,255,0) 70%)", "radial-gradient(circle, rgba(34,197,94,0.1) 0%, rgba(255,255,255,0) 70%)", "radial-gradient(circle, rgba(34,197,94,0.15) 0%, rgba(255,255,255,0) 70%)"] 
+                  background: ["radial-gradient(circle, rgba(52,199,89,0.15) 0%, rgba(255,255,255,0) 70%)", "radial-gradient(circle, rgba(52,199,89,0.1) 0%, rgba(255,255,255,0) 70%)", "radial-gradient(circle, rgba(52,199,89,0.15) 0%, rgba(255,255,255,0) 70%)"] 
                 }}
                 transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-0 z-0"
+                className="absolute inset-0 z-0 pointer-events-none"
               />
               
               {/* Lottie-style Drawing Checkmark */}
-              <div className="relative z-10 w-24 h-24 mb-6">
-                <motion.svg viewBox="0 0 50 50" className="w-full h-full drop-shadow-[0_0_12px_rgba(34,197,94,0.4)]">
+              <div className="relative z-10 w-24 h-24 mb-5">
+                <motion.svg viewBox="0 0 50 50" className="w-full h-full drop-shadow-[0_4px_12px_rgba(52,199,89,0.4)]">
                   <motion.circle 
                     cx="25" cy="25" r="23" 
                     fill="none" 
@@ -6281,16 +6308,28 @@ function MainApp() {
               <motion.h3 
                 initial={{ y: 10, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.8 }}
-                className="text-xl font-black text-black mb-2 z-10 relative text-center tracking-wide"
+                transition={{ delay: 0.7 }}
+                className="text-2xl font-black text-slate-800 mb-1 z-10 relative text-center tracking-tight"
               >
-                Success!
+                {successAnimTitle}
               </motion.h3>
+
+              {successAnimAmount !== null && (
+                <motion.div
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", delay: 0.9, bounce: 0.5 }}
+                  className="bg-green-50 text-green-700 px-4 py-2 rounded-xl border border-green-200 font-black text-xl mb-3 shadow-[0_2px_10px_rgba(34,197,94,0.1)] z-10"
+                >
+                  +₦{successAnimAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </motion.div>
+              )}
+
               <motion.p 
                 initial={{ y: 10, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.9 }}
-                className="text-black text-center text-sm font-bold z-10 relative mb-6"
+                className="text-slate-500 text-center text-[15px] font-medium z-10 relative mb-8 leading-relaxed"
               >
                 {successAnimMessage}
               </motion.p>
@@ -6300,7 +6339,7 @@ function MainApp() {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 1 }}
                 onClick={() => setActiveModal(null)}
-                className="w-full py-4 rounded-xl bg-[#16a34a] text-black font-black uppercase tracking-wider active:scale-95 transition-transform z-10 relative shadow-lg shadow-green-500/30"
+                className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#34C759] to-[#28A745] text-white font-black uppercase tracking-wider active:scale-95 transition-transform z-10 relative shadow-lg shadow-green-500/30 text-[15px]"
               >
                 Continue
               </motion.button>
