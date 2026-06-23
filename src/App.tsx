@@ -66,6 +66,13 @@ import { RankBadge } from "./components/RankBadge";
 import { VIP_LEVELS, EQUITY_EXCHANGE_TIERS, VIP_MEMBER_EXCLUSIVE_TIERS } from "./services/vip";
 import Confetti from "react-confetti";
 
+import { playNotificationSound } from "./utils/audio";
+import imgPurchaseSuccess from './assets/images/equinor_purchase_success_1782199177262.jpg';
+import imgRewardUnlocked from './assets/images/equinor_reward_unlocked_1782199192098.jpg';
+import imgYouWon from './assets/images/equinor_you_won_1782199202549.jpg';
+import imgTryAgain from './assets/images/equinor_try_again_1782199215072.jpg';
+import imgInsufficientBalance from './assets/images/equinor_insufficient_balance_1782199228967.jpg';
+
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-NG", {
     style: "currency",
@@ -243,6 +250,13 @@ function MainApp() {
     updateBalanceAlertThreshold,
   } = useAppStore();
 
+  useEffect(() => {
+    if (currentUser?.disabled || currentUser?.role === 'disabled') {
+      alert("Your account has been disabled. Please contact support.");
+      logout();
+    }
+  }, [currentUser?.disabled, currentUser?.role, logout]);
+
   const [activeTab, setActiveTab] = useState<
     "home" | "product" | "order" | "mine" | "admin" | "checkin" | "task" | "vip" | "myteam"
   >(() => {
@@ -296,9 +310,23 @@ function MainApp() {
     const interval = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(interval);
   }, []);
-  const [activeModal, setActiveModal] = useState<null | "deposit" | "withdraw" | "bankDetails" | "about" | "convidar" | "levelUp" | "setup" | "setupPhone" | "setupPassword" | "setupAlertThreshold" | "addProduct" | "editProduct" | "fundingDetails" | "commissionRecord" | "incomeRecord" | "redemptionCode" | "redemptionReward" | "purchaseSuccess" | "contact" | "equinorConfirm" | "buyProduct" | "sysAnnouncement" | "download" | "addDepositAccount" | "depositCheckout" | "successAnimated">(
+  const [activeModal, setActiveModal] = useState<null | "deposit" | "withdraw" | "bankDetails" | "about" | "convidar" | "levelUp" | "setup" | "setupPhone" | "setupPassword" | "setupAlertThreshold" | "addProduct" | "editProduct" | "fundingDetails" | "commissionRecord" | "incomeRecord" | "redemptionCode" | "redemptionReward" | "purchaseSuccess" | "contact" | "equinorConfirm" | "buyProduct" | "sysAnnouncement" | "download" | "addDepositAccount" | "depositCheckout" | "successAnimated" | "visualNotification">(
     null,
   );
+  
+  type VisualNotificationType = 'purchase_success' | 'reward_unlocked' | 'you_won' | 'try_again' | 'insufficient_balance';
+  const [notificationData, setNotificationData] = useState<{type: VisualNotificationType, title: string, subtitle: string}>({ type: 'purchase_success', title: '', subtitle: '' });
+
+  const triggerVisualNotification = (type: VisualNotificationType, title: string, subtitle: string) => {
+    setNotificationData({ type, title, subtitle });
+    setActiveModal("visualNotification");
+    if (type === 'purchase_success' || type === 'reward_unlocked' || type === 'you_won') {
+       playNotificationSound('success');
+    } else {
+       playNotificationSound('error');
+    }
+  };
+
   const [successAnimMessage, setSuccessAnimMessage] = useState("");
   const [successAnimTitle, setSuccessAnimTitle] = useState("Success!");
   const [successAnimAmount, setSuccessAnimAmount] = useState<number | null>(null);
@@ -730,7 +758,7 @@ function MainApp() {
 
     if (withdrawAmount && userBankName && userAccountNum) {
       if (currentUser && currentUser.balance < amountNum) {
-        alert("Insufficient balance for withdrawal!");
+        triggerVisualNotification("insufficient_balance", "INSUFFICIENT BALANCE", "Please recharge your account");
         return;
       }
       setShowWithdrawConfirm(true);
@@ -803,11 +831,11 @@ function MainApp() {
     const totalAmount = min * (quantity || 1);
 
     if (currentUser.balance < totalAmount) {
-      alert(`Insufficient balance. You need at least ₦${totalAmount.toLocaleString()}`);
+      triggerVisualNotification("insufficient_balance", "INSUFFICIENT BALANCE", "Please recharge your account");
       return;
     }
     createInvestment(planName, totalAmount, roi, days, fixedDailyReturn, tPlusDays, quantity);
-    setActiveModal("purchaseSuccess");
+    triggerVisualNotification("purchase_success", "PURCHASE SUCCESSFUL", "Thank you for choosing Equinor");
   };
 
   const formatOfferDate = (dateString: string) => {
@@ -1420,7 +1448,10 @@ function MainApp() {
             <>
               {/* Floating Prize Draw */}
               <button 
-                onClick={() => setActiveModal("prizeDraw")}
+                onClick={() => {
+                  playNotificationSound('chime');
+                  setActiveModal("prizeDraw");
+                }}
                 className="absolute right-0 top-[200px] z-50 flex items-center justify-center animate-bounce group active:scale-95 transition-transform"
                 style={{ animationDuration: '3.5s' }}
               >
@@ -2095,25 +2126,8 @@ function MainApp() {
               ) : products.filter(p => p.type === productTab).length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center pb-32">
                   <div className="relative w-48 h-48 flex items-center justify-center mb-6">
-                    {/* Purple Glow Background */}
-                    <div className="absolute inset-0 bg-[#7B2FFF] rounded-full opacity-20 filter blur-xl mix-blend-screen animate-pulse" />
-                  
-                    {/* Central Illustration Area */}
-                    <div className="relative z-10 w-32 h-32 bg-gradient-to-tr from-[#6B2EFF]/30 to-[#C4B5FD]/10 rounded-full border border-white/10 shadow-[0_0_40px_rgba(107,46,255,0.3)] flex items-center justify-center backdrop-blur-sm">
-                      {/* Floating decorative elements */}
-                      <div className="absolute -top-2 -left-2 w-4 h-4 rounded-full bg-[#00D4FF] opacity-60" />
-                      <div className="absolute top-4 -right-4 w-3 h-3 rotate-45 bg-[#EC4899] opacity-60" />
-                      <div className="absolute -bottom-3 left-6 w-5 h-5 rounded-full border border-[#FFF] opacity-30" />
-                      <div className="absolute bottom-4 right-2 w-4 h-4 rounded-tl-lg bg-[#34D399] opacity-50" />
-                    
-                      <div className="relative flex items-center justify-center">
-                        <Bookmark className="w-14 h-14 text-white drop-shadow-lg" strokeWidth={1.5} />
-                        <Star className="w-6 h-6 text-[#FFD400] absolute transform -translate-y-1 translate-x-1 drop-shadow-md fill-[#FFD400]" />
-                      </div>
-                    </div>
+                    <EquinorStar className="w-24 h-24 text-white/20" />
                   </div>
-                
-                  <span className="text-white/60 text-[15px] font-medium tracking-wide">No data</span>
                 </div>
               ) : (
                 <div className="flex-1 overflow-y-auto px-5 pb-[140px] space-y-4">
@@ -2237,7 +2251,7 @@ function MainApp() {
                                   }
                                   if (!currentUser) return;
                                   if (currentUser.balance < plan.min) {
-                                    alert(`Insufficient balance. You need at least ₦${plan.min.toLocaleString()}`);
+                                    triggerVisualNotification("insufficient_balance", "INSUFFICIENT BALANCE", "Please recharge your account");
                                     return;
                                   }
 
@@ -2362,7 +2376,7 @@ function MainApp() {
                                   }
                                   if (!currentUser) return;
                                   if (currentUser.balance < amount) {
-                                    alert(`Insufficient balance. You need at least ₦${amount.toLocaleString()}`);
+                                    triggerVisualNotification("insufficient_balance", "INSUFFICIENT BALANCE", "Please recharge your account");
                                     return;
                                   }
 
@@ -2469,7 +2483,7 @@ function MainApp() {
                                 }
                                 if (!currentUser) return;
                                 if (currentUser.balance < plan.min) {
-                                  alert(`Insufficient balance. You need at least ₦${plan.min.toLocaleString()}`);
+                                  triggerVisualNotification("insufficient_balance", "INSUFFICIENT BALANCE", "Please recharge your account");
                                   return;
                                 }
 
@@ -2680,17 +2694,7 @@ function MainApp() {
                       </div>
                     ) : filteredInvestments.length === 0 ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center -mt-20">
-                        <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center mb-4 relative border border-white/10">
-                          <div className="bg-transparent relative z-10 flex flex-col items-center">
-                            <div className="text-gray-500">
-                              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-                                <polygon points="12 11 9 13 10 9 7 7 11 7 12 3 13 7 17 7 14 9 15 13 12 11" fill="currentColor" stroke="none"></polygon>
-                              </svg>
-                            </div>
-                          </div>
-                        </div>
-                        <p className="text-gray-500 text-[16px] font-medium tracking-wide">No data</p>
+                        <EquinorStar className="w-24 h-24 text-white/20 mb-4" />
                       </div>
                     ) : (
                       filteredInvestments.map(inv => {
@@ -3811,8 +3815,45 @@ function MainApp() {
           </div>
         </div>
 
+        {activeModal === "visualNotification" && (
+          <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity duration-200" onClick={() => setActiveModal(null)}>
+            <div className="relative w-full max-w-[340px] aspect-[3/4] rounded-[24px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+              <img 
+                src={
+                  notificationData.type === 'purchase_success' ? imgPurchaseSuccess :
+                  notificationData.type === 'reward_unlocked' ? imgRewardUnlocked :
+                  notificationData.type === 'you_won' ? imgYouWon :
+                  notificationData.type === 'try_again' ? imgTryAgain :
+                  imgInsufficientBalance
+                } 
+                className="w-full h-full object-cover select-none pointer-events-none absolute inset-0" 
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#B20F24]/80 via-transparent to-black/30 pointer-events-none" />
+              
+              <button 
+                onClick={() => setActiveModal(null)}
+                className="absolute top-4 right-4 bg-black/40 hover:bg-[#B20F24] text-white rounded-full w-8 h-8 flex items-center justify-center backdrop-blur transition-colors"
+                style={{ zIndex: 10 }}
+              >
+                ✕
+              </button>
+
+              <div className="absolute bottom-0 left-0 right-0 p-8 flex flex-col items-center text-center">
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl px-6 py-4 border border-white/20 w-full shadow-lg">
+                  <h3 className="text-white font-bold text-[22px] tracking-wide mb-1 drop-shadow-md">
+                    {notificationData.title}
+                  </h3>
+                  <p className="text-white/90 text-[14px] font-medium leading-snug drop-shadow-sm">
+                    {notificationData.subtitle}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modals */}
-        {activeModal && !["convidar", "levelUp", "about", "setup", "setupPhone", "setupPassword", "setupAlertThreshold", "bankDetails", "prizeDraw", "fundingDetails", "addProduct", "editProduct", "commissionRecord", "incomeRecord", "redemptionCode", "redemptionReward", "withdraw", "deposit", "purchaseSuccess", "contact", "equinorConfirm", "sysAnnouncement", "download"].includes(activeModal) && (
+        {activeModal && !["convidar", "levelUp", "about", "setup", "setupPhone", "setupPassword", "setupAlertThreshold", "bankDetails", "prizeDraw", "fundingDetails", "addProduct", "editProduct", "commissionRecord", "incomeRecord", "redemptionCode", "redemptionReward", "withdraw", "deposit", "purchaseSuccess", "contact", "equinorConfirm", "sysAnnouncement", "download", "visualNotification"].includes(activeModal) && (
           <div className="absolute inset-0 z-50 bg-[#0A0E2E]/80 backdrop-blur-md flex flex-col justify-end">
             <div className="bg-white rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom flex flex-col max-h-[80%] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
@@ -3859,7 +3900,7 @@ function MainApp() {
                   <button 
                     key={i}
                     onClick={() => {
-                       alert("0 Remaining opportunities!");
+                       triggerVisualNotification("try_again", "BETTER LUCK NEXT TIME", "Keep engaging with Equinor");
                     }}
                     className="aspect-[100/140] w-full rounded-[16px] bg-gradient-to-b from-[#00D4FF] to-[#7B2FFF] border-[2px] border-[#FFD600] flex flex-col items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.3)] active:scale-95 transition-transform overflow-hidden relative"
                     style={{ animation: `fadeIn 0.3s ease-out ${i * 0.05}s both` }}
@@ -3889,6 +3930,13 @@ function MainApp() {
                           { id: '708****1M', amount: '80' },
                           { id: '815****4K', amount: '50' },
                           { id: '906****9Y', amount: '200' },
+                          { id: '803****5B', amount: '150' },
+                          { id: '704****8W', amount: '25' },
+                          { id: '810****2L', amount: '450' },
+                          { id: '905****6P', amount: '120' },
+                          { id: '701****3R', amount: '600' },
+                          { id: '807****8T', amount: '15' },
+                          { id: '912****4H', amount: '85' },
                         ].map((winner, idx) => (
                            <div key={idx} className="flex flex-shrink-0 items-center justify-between bg-[#222222] p-3 rounded-xl border border-white/5">
                               <div className="flex flex-col">
@@ -4109,17 +4157,15 @@ function MainApp() {
                       const hasClaimed = currentUser ? found.claimedBy.includes(currentUser.id) : false;
                       
                       if (isExpired) {
-                        setToastMessage("This redemption code has expired.");
-                        setTimeout(() => setToastMessage(null), 2000);
+                        triggerVisualNotification("try_again", "CODE EXPIRED", "This redemption code has expired");
                       } else if (isMaxedOut) {
-                        setToastMessage("This redemption code has reached its maximum claims limit.");
-                        setTimeout(() => setToastMessage(null), 2000);
+                        triggerVisualNotification("try_again", "LIMIT REACHED", "Maximum claims limit reached");
                       } else if (hasClaimed) {
-                        setToastMessage("You have already claimed this redemption code.");
-                        setTimeout(() => setToastMessage(null), 2000);
+                        triggerVisualNotification("try_again", "ALREADY CLAIMED", "You have already claimed this code");
                       } else {
                         setRewardAmount(found.amount);
                         setActiveModal("redemptionReward");
+                        playNotificationSound('chime');
                         setShowCongratsEffect(true);
                         setTimeout(() => setShowCongratsEffect(false), 2500);
                         const prodToUpdate = freshProducts.find(p => p.type === 'redemption_code' && p.name === redemptionCode);
@@ -4130,8 +4176,7 @@ function MainApp() {
                         setRedemptionCode("");
                       }
                     } else {
-                      setToastMessage("Invalid redemption code");
-                      setTimeout(() => setToastMessage(null), 2000);
+                      triggerVisualNotification("try_again", "INVALID CODE", "Please check your code and try again");
                     }
                     setIsProcessing(false);
                   }}
@@ -4270,8 +4315,7 @@ function MainApp() {
                 <button
                   onClick={() => {
                     addBalance(rewardAmount);
-                    alert(`Received ₦${rewardAmount}!`);
-                    setActiveModal(null);
+                    triggerVisualNotification("you_won", "CONGRATULATIONS", `You've earned ₦${rewardAmount}`);
                   }}
                   className="w-full h-12 bg-[#FFF3E0] hover:bg-[#FFE0B2] text-[#212121] rounded-full font-semibold text-[16px] transition-all shadow-md active:scale-95 flex items-center justify-center"
                 >
@@ -5477,19 +5521,7 @@ function MainApp() {
                 if (myWithdrawals.length === 0) {
                   return (
                     <div className="flex-1 flex flex-col items-center justify-center">
-                      {/* Illustration */}
-                      <div className="relative w-40 h-40 flex items-center justify-center mb-2" aria-label="Loading withdrawal records">
-                        <div className="absolute inset-0 bg-[#3B82F6] blur-[60px] opacity-20 rounded-full w-32 h-32 m-auto"></div>
-                        <svg width="80" height="100" viewBox="0 0 80 100" fill="none" className="relative z-10 drop-shadow-[0_10px_20px_rgba(123,47,255,0.4)]">
-                          <linearGradient id="wdBookmarkGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-                            <stop stopColor="#4DA8FF" />
-                            <stop offset="1" stopColor="#7B2FFF" />
-                          </linearGradient>
-                          <path d="M10,0 C4.5,0 0,4.5 0,10 L0,100 L40,80 L80,100 L80,10 C80,4.5 75.5,0 70,0 L10,0 Z" fill="url(#wdBookmarkGrad)"/>
-                          <path d="M40,20 L45,35 L60,35 L48,45 L52,60 L40,50 L28,60 L32,45 L20,35 L35,35 Z" fill="#FFD700" className="drop-shadow-[0_0_8px_rgba(255,215,0,0.6)]" />
-                        </svg>
-                      </div>
-                      <h3 className="text-white/80 text-base font-medium">No data</h3>
+                      <EquinorStar className="w-24 h-24 text-white/20 mb-4" />
                     </div>
                   );
                 }
@@ -5612,8 +5644,7 @@ function MainApp() {
                 if (myCommissions.length === 0) {
                   return (
                     <div className="h-full flex flex-col items-center justify-center -mt-20">
-                      {/* Status Message */}
-                      <h3 className="text-white/80 text-base font-medium">No data</h3>
+                      <EquinorStar className="w-24 h-24 text-white/20 mb-4" />
                     </div>
                   );
                 }
@@ -5683,8 +5714,7 @@ function MainApp() {
                 if (myIncomes.length === 0) {
                   return (
                     <div className="h-full flex flex-col items-center justify-center -mt-20">
-                      {/* Status Message */}
-                      <h3 className="text-white/80 text-base font-medium">No data</h3>
+                      <EquinorStar className="w-24 h-24 text-white/20 mb-4" />
                     </div>
                   );
                 }

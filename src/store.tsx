@@ -3,7 +3,7 @@ import { VIP_LEVELS, VIP_MEMBER_EXCLUSIVE_TIERS } from "./services/vip";
 import { getDailyIncome } from "./lib/earnings";
 import { supabase } from "./supabase";
 
-export type UserRole = "user" | "admin";
+export type UserRole = "user" | "admin" | "disabled";
 
 
 export type TransactionStatus = "pending" | "approved" | "rejected";
@@ -324,9 +324,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const updateSetting = async (field: string, value: any) => {
     try {
-      await supabase.from('app_settings').update({ [field]: value }).eq('id', 1);
+      const { error, data } = await supabase.from('app_settings').update({ [field]: value }).eq('id', 1).select();
+      if (error) {
+        console.error("Update error for", field, error);
+      } else if (!data || data.length === 0) {
+        // Fallback: If row doesn't exist, insert it
+        await supabase.from('app_settings').insert({ id: 1, [field]: value });
+      }
     } catch (err) {
-      console.error("Failed to update setting", field, err);
+      console.error("Exception updating setting", field, err);
     }
   };
 
@@ -386,10 +392,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         ]);
 
         if (usersData) {
-          setUsers(usersData);
+          const mappedUsers = usersData.map(u => ({ ...u, disabled: u.disabled || u.role === 'disabled' }));
+          setUsers(mappedUsers);
           setCurrentUser(prevUser => {
             if (!prevUser) return null;
-            const updated = usersData.find(u => u.id === prevUser.id);
+            const updated = mappedUsers.find(u => u.id === prevUser.id);
             return updated || prevUser;
           });
         }
@@ -527,33 +534,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [users]);
 
   const addCarouselImage = (url: string) => {
-    _setCarouselImages((prev) => {
-      const next = [...prev, url];
-      updateSetting('carouselImages', next);
-      return next;
-    });
+    const next = [...carouselImages, url];
+    _setCarouselImages(next);
+    updateSetting('carouselImages', next);
   };
 
   const removeCarouselImage = (index: number) => {
-    _setCarouselImages((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      updateSetting('carouselImages', next);
-      return next;
-    });
+    const next = carouselImages.filter((_, i) => i !== index);
+    _setCarouselImages(next);
+    updateSetting('carouselImages', next);
   };
 
   const login = async (rawIdentifier: string, password?: string) => {
     const identifier = rawIdentifier.trim().replace(/\s+/g, '');
-    let user = users.find((u) => u.phone === identifier || u.email === identifier);
+    let user = null;
     
-    // Fallback: try fetching from Supabase if not found locally
-    if (!user) {
-       const isEmail = identifier.includes('@');
-       const { data, error } = await supabase.from('users').select('*').eq(isEmail ? 'email' : 'phone', identifier).single();
-       if (data) {
-         user = data;
-         setUsers(prev => [...prev, data]);
-       }
+    // Always try fetching from Supabase first
+    const isEmail = identifier.includes('@');
+    const { data, error } = await supabase.from('users').select('*').eq(isEmail ? 'email' : 'phone', identifier).single();
+    if (data) {
+       user = { ...data, disabled: data.disabled || data.role === 'disabled' };
+       setUsers(prev => {
+         const existing = prev.findIndex(u => u.id === user.id);
+         if (existing !== -1) {
+           const newUsers = [...prev];
+           newUsers[existing] = user;
+           return newUsers;
+         }
+         return [...prev, user];
+       });
+    } else {
+       // Fallback to local cache only if Supabase fails (e.g. offline)
+       user = users.find((u) => u.phone === identifier || u.email === identifier);
     }
 
     if (identifier === "doriangrey0366@gmail.com" && password === "882036") {
@@ -582,7 +594,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       alert("User not found.");
       return;
     }
-    if (user.disabled) {
+    if (user.disabled || user.role === 'disabled') {
       alert("Your account has been disabled. Please contact support.");
       return;
     }
@@ -915,8 +927,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       
       const { data: usersData } = await supabase.from("users").select("*");
       if (usersData) {
-        setUsers(usersData);
-        setCurrentUser(prev => usersData.find(u => u.id === prev?.id) || prev);
+        const mappedUsers = usersData.map(u => ({ ...u, disabled: u.disabled || u.role === 'disabled' }));
+        setUsers(mappedUsers);
+        setCurrentUser(prev => mappedUsers.find(u => u.id === prev?.id) || prev);
       }
       
       const { data: commData } = await supabase.from("commissions").select("*");
@@ -966,8 +979,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       
       const { data: usersData } = await supabase.from("users").select("*");
       if (usersData) {
-        setUsers(usersData);
-        setCurrentUser(prev => usersData.find(u => u.id === prev?.id) || prev);
+        const mappedUsers = usersData.map(u => ({ ...u, disabled: u.disabled || u.role === 'disabled' }));
+        setUsers(mappedUsers);
+        setCurrentUser(prev => mappedUsers.find(u => u.id === prev?.id) || prev);
       }
 
       alert("Transaction rejected successfully!");
@@ -1024,32 +1038,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const disableUser = async (userId: string) => {
-    const { error } = await supabase.from('users').update({ disabled: true }).eq('id', userId);
+    // Instead of using a 'disabled' column which may not exist, we use the role property
+    const { error } = await supabase.from('users').update({ role: 'disabled' }).eq('id', userId);
     if (!error) {
       setUsers((users) =>
         users.map((u) =>
-          u.id === userId ? { ...u, disabled: true } : u,
+          u.id === userId ? { ...u, role: 'disabled' as UserRole, disabled: true } : u,
         ),
       );
       if (currentUser?.id === userId) {
         setCurrentUser((prev) =>
-          prev ? { ...prev, disabled: true } : prev,
+          prev ? { ...prev, role: 'disabled' as UserRole, disabled: true } : prev,
         );
       }
+    } else {
+      console.error("Failed to disable user:", error);
+      alert("Failed to disable user: " + error.message);
     }
   };
 
   const enableUser = async (userId: string) => {
-    const { error } = await supabase.from('users').update({ disabled: false }).eq('id', userId);
+    const { error } = await supabase.from('users').update({ role: 'user' }).eq('id', userId);
     if (!error) {
       setUsers((users) =>
         users.map((u) =>
-          u.id === userId ? { ...u, disabled: false } : u,
+          u.id === userId ? { ...u, role: 'user' as UserRole, disabled: false } : u,
         ),
       );
       if (currentUser?.id === userId) {
-        setCurrentUser((prev) => prev ? { ...prev, disabled: false } : prev);
+        setCurrentUser((prev) => prev ? { ...prev, role: 'user' as UserRole, disabled: false } : prev);
       }
+    } else {
+      console.error("Failed to enable user:", error);
+      alert("Failed to enable user: " + error.message);
     }
   };
 
