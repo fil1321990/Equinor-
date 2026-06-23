@@ -1039,7 +1039,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const disableUser = async (userId: string) => {
     // Instead of using a 'disabled' column which may not exist, we use the role property
-    const { error } = await supabase.from('users').update({ role: 'disabled' }).eq('id', userId);
+    const { error } = await supabase.from('users').update({ role: 'disabled', disabled: true }).eq('id', userId);
     if (!error) {
       setUsers((users) =>
         users.map((u) =>
@@ -1058,7 +1058,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const enableUser = async (userId: string) => {
-    const { error } = await supabase.from('users').update({ role: 'user' }).eq('id', userId);
+    const { error } = await supabase.from('users').update({ role: 'user', disabled: false }).eq('id', userId);
     if (!error) {
       setUsers((users) =>
         users.map((u) =>
