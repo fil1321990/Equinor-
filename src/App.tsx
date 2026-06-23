@@ -4014,7 +4014,7 @@ function MainApp() {
                 to { transform: translateY(-50%); }
               }
               .animate-scroll-winners {
-                animation: scrollWinners 10s linear infinite;
+                animation: scrollWinners 60s linear infinite;
               }
             `}} />
           </div>
