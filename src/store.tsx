@@ -195,6 +195,8 @@ interface AppContextType extends AppState {
   addSystemDepositAccount: (account: Omit<SystemDepositAccount, "id">) => void;
   editSystemDepositAccount: (id: string, account: Partial<SystemDepositAccount>) => void;
   deleteSystemDepositAccount: (id: string) => void;
+  productPromoCountdown: string | null;
+  setProductPromoCountdown: (val: string | null) => void;
 }
 
 const defaultUsers: User[] = [
@@ -320,6 +322,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [promoImage, _setPromoImage] = useState<string | null>(null);
   const [aboutUsImage, _setAboutUsImage] = useState<string | null>(null);
   const [carouselImages, _setCarouselImages] = useState<string[]>([]);
+  const [productPromoCountdown, _setProductPromoCountdown] = useState<string | null>(null);
   const [isLoadingStore, setIsLoadingStore] = useState(true);
 
   const updateSetting = async (field: string, value: any) => {
@@ -351,6 +354,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const setAboutUsImage = (val: string | null) => {
     _setAboutUsImage(val);
     updateSetting('aboutUsImage', val);
+  };
+  const setProductPromoCountdown = (val: string | null) => {
+    _setProductPromoCountdown(val);
+    updateSetting('productPromoCountdown', val);
   };
 
   useEffect(() => {
@@ -418,6 +425,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           _setAnnouncement(settingsData.announcement || null);
           _setAdminUsdtAddress(settingsData.adminUsdtAddress || null);
           _setPromoImage(settingsData.promoImage || null);
+          _setProductPromoCountdown(settingsData.productPromoCountdown || null);
           _setAboutUsImage(settingsData.aboutUsImage || "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Equinor_logo.svg/1024px-Equinor_logo.svg.png");
           _setCarouselImages(settingsData.carouselImages || [
              "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800",
@@ -1428,6 +1436,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         carouselImages,
         addCarouselImage,
         removeCarouselImage,
+        productPromoCountdown,
+        setProductPromoCountdown,
         sendChatMessage,
       }}
     >

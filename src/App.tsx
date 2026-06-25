@@ -86,6 +86,87 @@ const triggerHaptic = () => {
   }
 };
 
+const PromoCountdownCard = ({ targetDate }: { targetDate: string }) => {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    const target = new Date(targetDate).getTime();
+    
+    const updateTime = () => {
+      const now = new Date().getTime();
+      const difference = target - now;
+      
+      if (difference > 0) {
+        setTimeLeft({
+          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+          minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((difference % (1000 * 60)) / 1000)
+        });
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      }
+    };
+    
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  const NumberBox = ({ num, label, isSeconds }: { num: number, label: string, isSeconds?: boolean }) => (
+    <div className="flex flex-col items-center justify-center">
+      <span className={`font-mono font-bold text-[32px] text-white leading-none ${isSeconds ? 'animate-pulse-opacity' : ''}`}>
+        {num.toString().padStart(2, '0')}
+      </span>
+      <span className="text-[10px] text-white/40 uppercase tracking-[1px] mt-1 font-medium">{label}</span>
+    </div>
+  );
+
+  const Divider = () => (
+    <div className="w-[1px] h-[32px] bg-white/10 mx-2" />
+  );
+
+  return (
+    <div className="relative overflow-hidden rounded-[24px] bg-[#6B3CFF] shadow-[0_8px_24px_rgba(0,0,0,0.12)] p-6 mb-4 isolate mx-5">
+      {/* Texture / Noise */}
+      <div className="absolute inset-0 opacity-[0.02] mix-blend-overlay pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
+      
+      {/* Subtle Gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none rounded-[24px]" />
+
+      {/* Mood Overlay: Blue Ascent */}
+      <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-400/20 rounded-full blur-3xl pointer-events-none" />
+
+      {/* Content */}
+      <div className="relative z-10 flex flex-col items-center">
+        <h3 className="text-white text-[18px] font-bold tracking-tight mb-4 drop-shadow-sm flex items-center justify-center relative">
+          <span className="absolute inset-0 bg-black/5 -m-1 rounded"></span>
+          <span className="relative">Special Promotion Ends In</span>
+        </h3>
+        
+        <div className="flex items-center justify-center bg-black/10 backdrop-blur-[8px] rounded-2xl py-3 px-6 border border-white/5 shadow-inner">
+          <NumberBox num={timeLeft.days} label="Days" />
+          <Divider />
+          <NumberBox num={timeLeft.hours} label="Hrs" />
+          <Divider />
+          <NumberBox num={timeLeft.minutes} label="Min" />
+          <Divider />
+          <NumberBox num={timeLeft.seconds} label="Sec" isSeconds={true} />
+        </div>
+      </div>
+      <style>{`
+        @keyframes pulse-opacity {
+          0% { opacity: 1; }
+          100% { opacity: 0.7; }
+        }
+        .animate-pulse-opacity {
+          animation: pulse-opacity 1s ease-in-out infinite alternate;
+        }
+      `}</style>
+    </div>
+  );
+};
+
 const CountdownTimer = ({ targetDate }: { targetDate: string }) => {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
@@ -194,6 +275,14 @@ const processImageUpload = async (file: File): Promise<string> => {
   });
 };
 
+const getPrizeDrawReward = (productAmount: number) => {
+  const possibleOptions = [20, 30, 40, 50, 70, 80, 90, 100, 150, 200, 250, 300, 350, 400, 450, 500];
+  if (productAmount < 2000) return possibleOptions[Math.floor(Math.random() * 4)]; // 20 - 50
+  if (productAmount < 5000) return possibleOptions[Math.floor(Math.random() * 4) + 4]; // 70 - 100
+  if (productAmount < 15000) return possibleOptions[Math.floor(Math.random() * 4) + 8]; // 150 - 300
+  return possibleOptions[Math.floor(Math.random() * 4) + 12]; // 350 - 500
+};
+
 function MainApp() {
   const {
     currentUser,
@@ -226,6 +315,8 @@ function MainApp() {
     enableUser,
     adminUsdtAddress,
     setAdminUsdtAddress,
+    productPromoCountdown,
+    setProductPromoCountdown,
     announcement,
     setAnnouncement,
     promoImage,
@@ -249,6 +340,14 @@ function MainApp() {
     sendChatMessage,
     updateBalanceAlertThreshold,
   } = useAppStore();
+
+  const prizeDrawOpportunities = useMemo(() => {
+    if (!currentUser) return [];
+    const claimed = currentUser.claimedTasks || [];
+    return investments.filter(
+      (inv) => inv.userId === currentUser.id && !claimed.includes(`prize_draw_${inv.id}`)
+    );
+  }, [currentUser, investments]);
 
   useEffect(() => {
     if (currentUser?.disabled || currentUser?.role === 'disabled') {
@@ -2103,8 +2202,11 @@ function MainApp() {
               </div>
 
               {/* Content Area */}
+              <div className="flex-1 overflow-y-auto pb-[140px]">
+                {productPromoCountdown && <PromoCountdownCard targetDate={productPromoCountdown} />}
+                
               {isLoadingProducts ? (
-                <div className="flex-1 overflow-y-auto px-5 pb-[140px] space-y-4">
+                <div className="px-5 space-y-4">
                   {[1, 2, 3].map((i) => (
                     <div key={i} className="bg-white rounded-[20px] shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
                       <div className="w-full h-[180px] sm:h-[220px] bg-slate-200 animate-pulse"></div>
@@ -2125,12 +2227,12 @@ function MainApp() {
                 </div>
               ) : products.filter(p => p.type === productTab).length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center pb-32">
-                  <div className="relative w-48 h-48 flex items-center justify-center mb-6">
-                    <EquinorStar className="w-24 h-24 text-white/20" />
+                  <div className="relative w-48 h-48 flex items-center justify-center mb-6 mt-12">
+                    <EquinorStar className="w-24 h-24 text-black/10" />
                   </div>
                 </div>
               ) : (
-                <div className="flex-1 overflow-y-auto px-5 pb-[140px] space-y-4">
+                <div className="px-5 space-y-4">
                   {products.filter(p => p.type === productTab).map((plan) => {
                     let cost = plan.min;
                     let roi = plan.roi;
@@ -2507,6 +2609,7 @@ function MainApp() {
                   })}
                 </div>
               )}
+              </div>
             </div>
             </div>
           )}
@@ -3117,6 +3220,21 @@ function MainApp() {
                       placeholder="e.g. T..." 
                       value={adminUsdtAddress || ''} 
                       onChange={(e) => setAdminUsdtAddress(e.target.value)}
+                      className="bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 overflow-hidden shrink-0 mt-2">
+                  <div className="p-4 border-b border-white/10 text-sm font-bold text-white tracking-wide uppercase">
+                    Product Promo Countdown
+                  </div>
+                  <div className="p-4 flex flex-col gap-3">
+                    <span className="text-white/70 text-xs">Set a closing date for the product promotion (e.g. 2026-06-30T23:59:00). Leave empty to disable.</span>
+                    <input 
+                      type="datetime-local" 
+                      value={productPromoCountdown ? new Date(new Date(productPromoCountdown).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''} 
+                      onChange={(e) => setProductPromoCountdown(e.target.value ? new Date(e.target.value).toISOString() : null)}
                       className="bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30"
                     />
                   </div>
@@ -3816,7 +3934,12 @@ function MainApp() {
         </div>
 
         {activeModal === "visualNotification" && (
-          <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity duration-200" onClick={() => setActiveModal(null)}>
+          <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-black/80 backdrop-blur-sm transition-opacity duration-200" onClick={() => {
+            setActiveModal(null);
+            if (notificationData.type === 'purchase_success') {
+              setTimeout(() => setActiveModal("prizeDraw"), 50);
+            }
+          }}>
             <div className="relative w-full max-w-[340px] aspect-[3/4] rounded-[24px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
               <img 
                 src={
@@ -3831,7 +3954,12 @@ function MainApp() {
               <div className="absolute inset-0 bg-gradient-to-t from-[#B20F24]/80 via-transparent to-black/30 pointer-events-none" />
               
               <button 
-                onClick={() => setActiveModal(null)}
+                onClick={() => {
+                  setActiveModal(null);
+                  if (notificationData.type === 'purchase_success') {
+                    setTimeout(() => setActiveModal("prizeDraw"), 50);
+                  }
+                }}
                 className="absolute top-4 right-4 bg-black/40 hover:bg-[#B20F24] text-white rounded-full w-8 h-8 flex items-center justify-center backdrop-blur transition-colors"
                 style={{ zIndex: 10 }}
               >
@@ -3892,7 +4020,7 @@ function MainApp() {
 
             <div className="flex flex-col items-center pt-[24px] pb-[32px] px-4">
               <div className="mb-8 bg-[#7B2FFF]/30 border border-[#7B2FFF]/50 px-4 py-2 rounded-full shadow-[0_4px_12px_rgba(123,47,255,0.2)]">
-                 <span className="text-white text-sm font-medium">0 Remaining opportunities</span>
+                 <span className="text-white text-sm font-medium">{prizeDrawOpportunities.length} Remaining opportunities</span>
               </div>
               
               <div className="grid grid-cols-3 gap-3 w-full max-w-[342px] mx-auto mb-10">
@@ -3900,7 +4028,14 @@ function MainApp() {
                   <button 
                     key={i}
                     onClick={() => {
-                       triggerVisualNotification("try_again", "BETTER LUCK NEXT TIME", "Keep engaging with Equinor");
+                       if (prizeDrawOpportunities.length === 0) {
+                         triggerVisualNotification("try_again", "BETTER LUCK NEXT TIME", "Purchase a product to get more chances");
+                         return;
+                       }
+                       const opp = prizeDrawOpportunities[0];
+                       const reward = getPrizeDrawReward(opp.amount);
+                       claimTask(`prize_draw_${opp.id}`, reward);
+                       triggerVisualNotification("you_won", "CONGRATULATIONS", `You won ₦${reward}`);
                     }}
                     className="aspect-[100/140] w-full rounded-[16px] bg-gradient-to-b from-[#00D4FF] to-[#7B2FFF] border-[2px] border-[#FFD600] flex flex-col items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.3)] active:scale-95 transition-transform overflow-hidden relative"
                     style={{ animation: `fadeIn 0.3s ease-out ${i * 0.05}s both` }}
