@@ -179,8 +179,8 @@ interface AppContextType extends AppState {
   deleteProduct: (id: string) => void;
   refreshProducts: () => Promise<Product[] | null>;
   upgradeVip: () => void;
-  addBalance: (amount: number) => void;
-  claimTask: (taskId: string, reward: number) => void;
+  addBalance: (amount: number, source?: string, refId?: string) => Promise<void> | void;
+  claimTask: (taskId: string, reward: number) => Promise<void> | void;
   promoImage: string | null;
   setPromoImage: (url: string | null) => void;
   adminUsdtAddress: string | null;
@@ -1343,6 +1343,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       };
     });
 
+    let planName = "Task Bonus";
+    if (taskId.startsWith("prize_draw")) planName = "Prize Draw Reward";
+    else if (taskId.startsWith("check_in")) planName = "Daily Check-in";
+    else if (taskId.startsWith("bonus_")) planName = "Check-in Bonus";
+    else if (taskId.startsWith("vip_upgrade")) planName = "VIP Upgrade Bonus";
+    
+    if (reward > 0) {
+      const newRecord = {
+        id: Math.random().toString(36).substring(2, 9),
+        userId: currentUser.id,
+        investmentId: taskId,
+        planName,
+        amount: reward,
+        date: new Date().toISOString()
+      };
+      setIncomeRecords(prev => [newRecord, ...prev]);
+      await supabase.from('incomeRecords').insert(newRecord);
+    }
+
     // Save to supabase
     await supabase.from('users').update({ balance: newBalance, claimedTasks: newTasks }).eq('id', currentUser.id);
   };
@@ -1368,14 +1387,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const addBalance = (amount: number) => {
+  const addBalance = async (amount: number, source?: string, refId?: string) => {
     if (!currentUser) return;
+    const newBalance = currentUser.balance + amount;
     setUsers((prev) =>
-      prev.map((u) => (u.id === currentUser.id ? { ...u, balance: u.balance + amount } : u))
+      prev.map((u) => (u.id === currentUser.id ? { ...u, balance: newBalance } : u))
     );
     setCurrentUser((prev) =>
-      prev ? { ...prev, balance: prev.balance + amount } : prev
+      prev ? { ...prev, balance: newBalance } : prev
     );
+
+    if (amount > 0) {
+      const newRecord = {
+        id: Math.random().toString(36).substring(2, 9),
+        userId: currentUser.id,
+        investmentId: refId || "bonus",
+        planName: source || "Bonus",
+        amount,
+        date: new Date().toISOString()
+      };
+      setIncomeRecords(prev => [newRecord, ...prev]);
+      await supabase.from('incomeRecords').insert(newRecord);
+    }
+
+    await supabase.from('users').update({ balance: newBalance }).eq('id', currentUser.id);
   };
 
   return (

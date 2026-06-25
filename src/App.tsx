@@ -86,7 +86,97 @@ const triggerHaptic = () => {
   }
 };
 
-const PromoCountdownCard = ({ targetDate }: { targetDate: string }) => {
+const StampCountdown = ({ targetDate, title = "Unlocks In" }: { targetDate: string, title?: string }) => {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    const target = new Date(targetDate).getTime();
+    
+    const updateTime = () => {
+      const now = new Date().getTime();
+      const difference = target - now;
+      
+      if (difference > 0) {
+        setTimeLeft({
+          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+          minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((difference % (1000 * 60)) / 1000)
+        });
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      }
+    };
+    
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  return (
+    <div className="relative pointer-events-none group flex flex-col items-center justify-center w-[320px] h-[320px]" style={{ animation: 'floatStamp 4s ease-in-out infinite' }}>
+      <style>{`
+        @keyframes floatStamp {
+          0%, 100% { transform: translateY(0) rotate(-10deg) scale(1); opacity: 0.95; }
+          50% { transform: translateY(-6px) rotate(-8deg) scale(1.02); opacity: 1; }
+        }
+        @keyframes rotate3DStar {
+          0% { transform: perspective(400px) rotateY(0deg) rotateX(10deg); }
+          50% { transform: perspective(400px) rotateY(180deg) rotateX(-10deg); }
+          100% { transform: perspective(400px) rotateY(360deg) rotateX(10deg); }
+        }
+      `}</style>
+      
+      {/* Background SVG for stamp edge effect */}
+      <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
+        <svg viewBox="0 0 240 240" className="w-[320px] h-[320px] opacity-90 drop-shadow-[0_12px_24px_rgba(0,0,0,0.6)]" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="stampOuterGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#00D4FF" />
+              <stop offset="33%" stopColor="#7B2FF7" />
+              <stop offset="66%" stopColor="#FF4D4F" />
+              <stop offset="100%" stopColor="#FFD700" />
+            </linearGradient>
+          </defs>
+          <circle cx="120" cy="120" r="114" fill="rgba(255,255,255,0.05)" stroke="url(#stampOuterGradient)" strokeWidth="6" strokeDasharray="16 16" strokeLinecap="round" />
+        </svg>
+      </div>
+      
+      {/* Glassmorphic Inner Circle */}
+      <div className="relative z-10 w-[290px] h-[290px] rounded-[50%] backdrop-blur-[12px] bg-gradient-to-br from-[#00D4FF]/20 via-[#7B2FF7]/20 to-[#FF4D4F]/20 border-[2px] border-white/50 shadow-[inset_0_0_30px_rgba(255,255,255,0.6)] flex flex-col items-center justify-center px-4">
+        
+        {/* Inner solid border line for stamp detail */}
+        <div className="absolute inset-3 rounded-[50%] border-[16px] border-white/90 pointer-events-none"></div>
+
+        <div className="flex flex-col items-center gap-2 mb-3 relative z-10 mt-2">
+          {/* 3D Equinor SVG Special Design */}
+          <div className="relative w-16 h-16 flex items-center justify-center mb-1" style={{ animation: 'rotate3DStar 6s linear infinite' }}>
+             <EquinorStar className="w-16 h-16 text-white drop-shadow-[0_8px_16px_rgba(0,0,0,0.8)] filter brightness-110" />
+             <div className="absolute inset-0 bg-gradient-to-tr from-[#00D4FF]/40 via-[#7B2FF7]/40 to-[#FF4D4F]/40 mix-blend-overlay rounded-full"></div>
+          </div>
+          <h3 className="text-transparent bg-clip-text bg-gradient-to-r from-[#00D4FF] via-white to-[#FFD700] text-[16px] font-black tracking-[0.2em] uppercase drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] text-center leading-tight">
+            {title}
+          </h3>
+        </div>
+        
+        <div className="relative z-10 flex flex-col items-center justify-center font-mono font-bold text-[32px] drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] leading-none gap-2">
+          <div className="flex items-center justify-center gap-1">
+            <span className="text-[#00D4FF]">{timeLeft.days}d</span>
+            <span className="opacity-70 text-[24px] pb-1 text-white">:</span>
+            <span className="text-[#7B2FF7] drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(123,47,247,0.5), 0 0 20px rgba(123,47,247,0.3)"}}>{timeLeft.hours.toString().padStart(2, '0')}h</span>
+          </div>
+          <div className="flex items-center justify-center gap-1">
+            <span className="text-[#FF4D4F] drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(255,77,79,0.5), 0 0 20px rgba(255,77,79,0.3)"}}>{timeLeft.minutes.toString().padStart(2, '0')}m</span>
+            <span className="opacity-70 text-[24px] pb-1 text-white">:</span>
+            <span className="text-[#FFD700] animate-pulse-opacity drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3)"}}>{timeLeft.seconds.toString().padStart(2, '0')}s</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PromoCountdownCard = ({ targetDate, title = "Special Promotion Ends In", className = "mb-4 mx-5" }: { targetDate: string, title?: string, className?: string }) => {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
@@ -114,20 +204,32 @@ const PromoCountdownCard = ({ targetDate }: { targetDate: string }) => {
   }, [targetDate]);
 
   const NumberBox = ({ num, label, isSeconds }: { num: number, label: string, isSeconds?: boolean }) => (
-    <div className="flex flex-col items-center justify-center">
+    <div className="flex flex-col items-center justify-center min-w-[48px]">
       <span className={`font-mono font-bold text-[32px] text-white leading-none ${isSeconds ? 'animate-pulse-opacity' : ''}`}>
         {num.toString().padStart(2, '0')}
       </span>
-      <span className="text-[10px] text-white/40 uppercase tracking-[1px] mt-1 font-medium">{label}</span>
+      <span className="text-[10px] text-white/60 uppercase tracking-[1px] mt-1 font-bold">{label}</span>
     </div>
   );
 
   const Divider = () => (
-    <div className="w-[1px] h-[32px] bg-white/10 mx-2" />
+    <div className="w-[1px] h-[32px] bg-white/20 mx-1 sm:mx-2" />
   );
 
   return (
-    <div className="relative overflow-hidden rounded-[24px] bg-[#6A00F4] shadow-[0_12px_36px_rgba(106,0,244,0.3),inset_0_2px_4px_rgba(255,255,255,0.3)] p-6 mb-4 isolate mx-5 transform perspective-1000 rotate-x-1 rotate-y-2 hover:rotate-x-0 hover:rotate-y-0 transition-transform duration-500">
+    <div 
+      className={`relative overflow-hidden rounded-[24px] bg-[#6A00F4] shadow-[0_12px_36px_rgba(106,0,244,0.3),inset_0_2px_4px_rgba(255,255,255,0.3)] p-6 isolate transition-transform duration-500 hover:scale-[1.02] ${className}`}
+      style={{
+        transform: 'perspective(1000px) rotateX(4deg) rotateY(-4deg)',
+        transformStyle: 'preserve-3d'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'perspective(1000px) rotateX(4deg) rotateY(-4deg)';
+      }}
+    >
       {/* Texture / Noise */}
       <div className="absolute inset-0 opacity-[0.03] mix-blend-overlay pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
       
@@ -139,20 +241,20 @@ const PromoCountdownCard = ({ targetDate }: { targetDate: string }) => {
       <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-[#00D4FF]/20 rounded-full blur-3xl pointer-events-none" />
 
       {/* 3D Background Logo */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[180%] h-[180%] opacity-10 pointer-events-none mix-blend-overlay" style={{ transform: 'translate3d(-50%, -50%, -50px) rotate(-15deg)' }}>
+      <div className="absolute top-1/2 left-1/2 w-[180%] h-[180%] opacity-10 pointer-events-none mix-blend-overlay" style={{ transform: 'translate3d(-50%, -50%, -50px) rotate(-15deg)' }}>
         <EquinorStar className="w-full h-full text-white" />
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex flex-col items-center">
+      <div className="relative z-10 flex flex-col items-center" style={{ transform: 'translateZ(30px)' }}>
         <div className="flex items-center gap-2 mb-4 justify-center relative">
           <EquinorStar className="w-6 h-6 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" />
-          <h3 className="text-white text-[18px] font-bold tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-            Special Promotion Ends In
+          <h3 className="text-white text-[16px] sm:text-[18px] font-bold tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+            {title}
           </h3>
         </div>
         
-        <div className="flex items-center justify-center bg-black/20 backdrop-blur-md rounded-2xl py-3 px-6 border border-white/10 shadow-[inset_0_2px_8px_rgba(255,255,255,0.1),0_8px_16px_rgba(0,0,0,0.2)]">
+        <div className="flex items-center justify-center bg-black/20 backdrop-blur-md rounded-2xl py-3 px-3 sm:px-6 border border-white/10 shadow-[inset_0_2px_8px_rgba(255,255,255,0.1),0_8px_16px_rgba(0,0,0,0.2)] w-full max-w-[320px]">
           <NumberBox num={timeLeft.days} label="Days" />
           <Divider />
           <NumberBox num={timeLeft.hours} label="Hrs" />
@@ -2279,13 +2381,9 @@ function MainApp() {
                       
                       return (
                         <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
-                          {isPromoLocked ? (
-                            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-gradient-to-r from-[#00D4FF]/95 to-[#7B2FF7]/95 backdrop-blur-lg text-white py-6 z-20 shadow-[0_10px_40px_rgba(0,10,30,0.5)] flex flex-col items-center justify-center gap-2 border-y border-white/40">
-                              <div className="flex items-center gap-2">
-                                <Clock className="w-6 h-6 animate-pulse" /> 
-                                <span className="text-sm font-bold tracking-widest uppercase">Unlocks In</span>
-                              </div>
-                              <span className="text-4xl sm:text-5xl font-black font-mono tracking-widest drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">{promoTimerString}</span>
+                          {isPromoLocked && plan.promotionalUnlockDate ? (
+                            <div className="absolute inset-0 bg-transparent z-20 flex flex-col items-center justify-center pt-28 pointer-events-none">
+                                <StampCountdown targetDate={plan.promotionalUnlockDate} title="Unlocks In" />
                             </div>
                           ) : (
                             <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
@@ -2401,13 +2499,9 @@ function MainApp() {
                     if (plan.type === 'vip' && plan.name === 'Equinor Equity Exchange Project') {
                       return (
                         <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
-                          {isPromoLocked ? (
-                            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-gradient-to-r from-[#00D4FF]/95 to-[#7B2FF7]/95 backdrop-blur-lg text-white py-6 z-20 shadow-[0_10px_40px_rgba(0,10,30,0.5)] flex flex-col items-center justify-center gap-2 border-y border-white/40">
-                              <div className="flex items-center gap-2">
-                                <Clock className="w-6 h-6 animate-pulse" /> 
-                                <span className="text-sm font-bold tracking-widest uppercase">Unlocks In</span>
-                              </div>
-                              <span className="text-4xl sm:text-5xl font-black font-mono tracking-widest drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">{promoTimerString}</span>
+                          {isPromoLocked && plan.promotionalUnlockDate ? (
+                            <div className="absolute inset-0 bg-transparent z-20 flex flex-col items-center justify-center pt-28 pointer-events-none">
+                                <StampCountdown targetDate={plan.promotionalUnlockDate} title="Unlocks In" />
                             </div>
                           ) : (
                             <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
@@ -2520,13 +2614,9 @@ function MainApp() {
                     
                     return (
                       <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
-                          {isPromoLocked ? (
-                            <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 bg-gradient-to-r from-[#00D4FF]/95 to-[#7B2FF7]/95 backdrop-blur-lg text-white py-6 z-20 shadow-[0_10px_40px_rgba(0,10,30,0.5)] flex flex-col items-center justify-center gap-2 border-y border-white/40">
-                              <div className="flex items-center gap-2">
-                                <Clock className="w-6 h-6 animate-pulse" /> 
-                                <span className="text-sm font-bold tracking-widest uppercase">Unlocks In</span>
-                              </div>
-                              <span className="text-4xl sm:text-5xl font-black font-mono tracking-widest drop-shadow-[0_4px_4px_rgba(0,0,0,0.5)]">{promoTimerString}</span>
+                          {isPromoLocked && plan.promotionalUnlockDate ? (
+                            <div className="absolute inset-0 bg-transparent z-20 flex flex-col items-center justify-center pt-28 pointer-events-none">
+                                <StampCountdown targetDate={plan.promotionalUnlockDate} title="Unlocks In" />
                             </div>
                           ) : (
                             <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
@@ -4495,7 +4585,7 @@ function MainApp() {
               <div className="px-4 pb-4 relative z-20">
                 <button
                   onClick={() => {
-                    addBalance(rewardAmount);
+                    addBalance(rewardAmount, "Redemption Code", "redemption");
                     triggerVisualNotification("you_won", "CONGRATULATIONS", `You've earned ₦${rewardAmount}`);
                   }}
                   className="w-full h-12 bg-[#FFF3E0] hover:bg-[#FFE0B2] text-[#212121] rounded-full font-semibold text-[16px] transition-all shadow-md active:scale-95 flex items-center justify-center"
