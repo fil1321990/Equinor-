@@ -125,6 +125,10 @@ const StampCountdown = ({ targetDate, title = "Unlocks In" }: { targetDate: stri
           50% { transform: perspective(400px) rotateY(180deg) rotateX(-10deg); }
           100% { transform: perspective(400px) rotateY(360deg) rotateX(10deg); }
         }
+        @keyframes spinOuter {
+          from { transform: rotate(0deg); transform-origin: center; }
+          to { transform: rotate(360deg); transform-origin: center; }
+        }
       `}</style>
       
       {/* Background SVG for stamp edge effect */}
@@ -138,7 +142,9 @@ const StampCountdown = ({ targetDate, title = "Unlocks In" }: { targetDate: stri
               <stop offset="100%" stopColor="#FFD700" />
             </linearGradient>
           </defs>
-          <circle cx="120" cy="120" r="114" fill="rgba(255,255,255,0.05)" stroke="url(#stampOuterGradient)" strokeWidth="6" strokeDasharray="16 16" strokeLinecap="round" />
+          <g style={{ animation: 'spinOuter 15s linear infinite', transformOrigin: '120px 120px' }}>
+            <circle cx="120" cy="120" r="114" fill="rgba(255,255,255,0.05)" stroke="url(#stampOuterGradient)" strokeWidth="6" strokeDasharray="16 16" strokeLinecap="round" />
+          </g>
         </svg>
       </div>
       
@@ -148,26 +154,25 @@ const StampCountdown = ({ targetDate, title = "Unlocks In" }: { targetDate: stri
         {/* Inner solid border line for stamp detail */}
         <div className="absolute inset-3 rounded-[50%] border-[16px] border-white/90 pointer-events-none"></div>
 
-        <div className="flex flex-col items-center gap-2 mb-3 relative z-10 mt-2">
+        <div className="flex flex-col items-center gap-2 mb-1 relative z-10 mt-[-10px]">
           {/* 3D Equinor SVG Special Design */}
-          <div className="relative w-16 h-16 flex items-center justify-center mb-1" style={{ animation: 'rotate3DStar 6s linear infinite' }}>
-             <EquinorStar className="w-16 h-16 text-white drop-shadow-[0_8px_16px_rgba(0,0,0,0.8)] filter brightness-110" />
+          <div className="relative w-14 h-14 flex items-center justify-center mb-1" style={{ animation: 'rotate3DStar 6s linear infinite' }}>
+             <EquinorStar className="w-14 h-14 text-white drop-shadow-[0_8px_16px_rgba(0,0,0,0.8)] filter brightness-110" />
              <div className="absolute inset-0 bg-gradient-to-tr from-[#00D4FF]/40 via-[#7B2FF7]/40 to-[#FF4D4F]/40 mix-blend-overlay rounded-full"></div>
           </div>
-          <h3 className="text-transparent bg-clip-text bg-gradient-to-r from-[#00D4FF] via-white to-[#FFD700] text-[16px] font-black tracking-[0.2em] uppercase drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] text-center leading-tight">
+          <h3 className="text-transparent bg-clip-text bg-gradient-to-r from-[#00D4FF] via-white to-[#FFD700] text-[15px] font-black tracking-[0.1em] uppercase drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] text-center leading-tight">
             {title}
           </h3>
         </div>
         
-        <div className="relative z-10 flex flex-col items-center justify-center font-mono font-bold text-[32px] drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] leading-none gap-2">
-          <div className="flex items-center justify-center gap-1">
-            <span className="text-[#00D4FF]">{timeLeft.days}d</span>
-            <span className="opacity-70 text-[24px] pb-1 text-white">:</span>
-            <span className="text-[#7B2FF7] drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(123,47,247,0.5), 0 0 20px rgba(123,47,247,0.3)"}}>{timeLeft.hours.toString().padStart(2, '0')}h</span>
-          </div>
-          <div className="flex items-center justify-center gap-1">
-            <span className="text-[#FF4D4F] drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(255,77,79,0.5), 0 0 20px rgba(255,77,79,0.3)"}}>{timeLeft.minutes.toString().padStart(2, '0')}m</span>
-            <span className="opacity-70 text-[24px] pb-1 text-white">:</span>
+        <div className="relative z-10 w-[250px] mt-2 py-3 bg-gradient-to-r from-black/20 via-black/40 to-black/20 border-y border-white/30 backdrop-blur-md flex items-center justify-center text-white font-mono font-bold text-[20px] drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] leading-none shadow-lg">
+          <div className="flex items-center justify-center gap-2 px-2 whitespace-nowrap">
+            <span className="text-[#FFD700] drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3)"}}>{timeLeft.days}d</span>
+            <span className="opacity-70 text-[18px] pb-0.5 text-[#FFD700]">:</span>
+            <span className="text-[#FFD700] drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3)"}}>{timeLeft.hours.toString().padStart(2, '0')}h</span>
+            <span className="opacity-70 text-[18px] pb-0.5 text-[#FFD700]">:</span>
+            <span className="text-[#FFD700] drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3)"}}>{timeLeft.minutes.toString().padStart(2, '0')}m</span>
+            <span className="opacity-70 text-[18px] pb-0.5 text-[#FFD700]">:</span>
             <span className="text-[#FFD700] animate-pulse-opacity drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3)"}}>{timeLeft.seconds.toString().padStart(2, '0')}s</span>
           </div>
         </div>
