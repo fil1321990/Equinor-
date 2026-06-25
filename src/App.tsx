@@ -127,24 +127,32 @@ const PromoCountdownCard = ({ targetDate }: { targetDate: string }) => {
   );
 
   return (
-    <div className="relative overflow-hidden rounded-[24px] bg-[#6B3CFF] shadow-[0_8px_24px_rgba(0,0,0,0.12)] p-6 mb-4 isolate mx-5">
+    <div className="relative overflow-hidden rounded-[24px] bg-[#6A00F4] shadow-[0_12px_36px_rgba(106,0,244,0.3),inset_0_2px_4px_rgba(255,255,255,0.3)] p-6 mb-4 isolate mx-5 transform perspective-1000 rotate-x-1 rotate-y-2 hover:rotate-x-0 hover:rotate-y-0 transition-transform duration-500">
       {/* Texture / Noise */}
-      <div className="absolute inset-0 opacity-[0.02] mix-blend-overlay pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
+      <div className="absolute inset-0 opacity-[0.03] mix-blend-overlay pointer-events-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }}></div>
       
       {/* Subtle Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent pointer-events-none rounded-[24px]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-black/40 pointer-events-none rounded-[24px]" />
 
       {/* Mood Overlay: Blue Ascent */}
-      <div className="absolute -top-10 -right-10 w-40 h-40 bg-blue-400/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#FF1243]/30 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-[#00D4FF]/20 rounded-full blur-3xl pointer-events-none" />
+
+      {/* 3D Background Logo */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[180%] h-[180%] opacity-10 pointer-events-none mix-blend-overlay" style={{ transform: 'translate3d(-50%, -50%, -50px) rotate(-15deg)' }}>
+        <EquinorStar className="w-full h-full text-white" />
+      </div>
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center">
-        <h3 className="text-white text-[18px] font-bold tracking-tight mb-4 drop-shadow-sm flex items-center justify-center relative">
-          <span className="absolute inset-0 bg-black/5 -m-1 rounded"></span>
-          <span className="relative">Special Promotion Ends In</span>
-        </h3>
+        <div className="flex items-center gap-2 mb-4 justify-center relative">
+          <EquinorStar className="w-6 h-6 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]" />
+          <h3 className="text-white text-[18px] font-bold tracking-tight drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+            Special Promotion Ends In
+          </h3>
+        </div>
         
-        <div className="flex items-center justify-center bg-black/10 backdrop-blur-[8px] rounded-2xl py-3 px-6 border border-white/5 shadow-inner">
+        <div className="flex items-center justify-center bg-black/20 backdrop-blur-md rounded-2xl py-3 px-6 border border-white/10 shadow-[inset_0_2px_8px_rgba(255,255,255,0.1),0_8px_16px_rgba(0,0,0,0.2)]">
           <NumberBox num={timeLeft.days} label="Days" />
           <Divider />
           <NumberBox num={timeLeft.hours} label="Hrs" />
