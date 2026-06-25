@@ -74,6 +74,7 @@ export interface Product {
   tPlusDays?: number;
   maxQuota?: number;
   promotionalUnlockDate?: string;
+  promoClosingDate?: string;
 }
 
 export interface BankDetails {
@@ -174,6 +175,7 @@ interface AppContextType extends AppState {
   updatePassword: (password: string) => void;
   updateBalanceAlertThreshold: (threshold: number) => void;
   adminResetUserPassword: (userId: string, newPassword?: string) => void;
+  adminUpdateUserBalance: (userId: string, delta: number) => Promise<void>;
   addProduct: (product: Omit<Product, "id">) => void;
   editProduct: (id: string, product: Partial<Product>) => void;
   deleteProduct: (id: string) => void;
@@ -1278,6 +1280,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   };
 
+  const adminUpdateUserBalance = async (userId: string, delta: number) => {
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    const newBalance = user.balance + delta;
+
+    setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, balance: newBalance } : u));
+    
+    if (currentUser?.id === userId) {
+      setCurrentUser(prev => prev ? { ...prev, balance: newBalance } : prev);
+    }
+    
+    await supabase.from('users').update({ balance: newBalance }).eq('id', userId);
+  };
+
   const upgradeVip = () => {
     if (!currentUser) return;
     
@@ -1314,11 +1330,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const claimTask = async (taskId: string, reward: number) => {
     if (!currentUser) return;
     
-    // Check locally first
-    const currentTasks = currentUser.claimedTasks || [];
+    // Check locally first to fail fast
+    if (currentUser.claimedTasks?.includes(taskId)) return;
+
+    // Fetch latest to avoid race conditions
+    const { data: latestUser } = await supabase.from('users').select('balance, claimedTasks').eq('id', currentUser.id).single();
+    if (!latestUser) return;
+
+    const currentTasks = latestUser.claimedTasks || [];
     if (currentTasks.includes(taskId)) return;
 
-    const newBalance = currentUser.balance + reward;
+    const newBalance = Number(latestUser.balance || 0) + reward;
     const newTasks = [...currentTasks, taskId];
 
     // Optimistic update
@@ -1349,17 +1371,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     else if (taskId.startsWith("bonus_")) planName = "Check-in Bonus";
     else if (taskId.startsWith("vip_upgrade")) planName = "VIP Upgrade Bonus";
     
-    if (reward > 0) {
-      const newRecord = {
-        id: Math.random().toString(36).substring(2, 9),
+    if (reward >= 0) {
+      const dbRecord = {
         userId: currentUser.id,
         investmentId: taskId,
         planName,
         amount: reward,
         date: new Date().toISOString()
       };
+      const newRecord = {
+        id: Math.random().toString(36).substring(2, 9),
+        ...dbRecord
+      };
       setIncomeRecords(prev => [newRecord, ...prev]);
-      await supabase.from('incomeRecords').insert(newRecord);
+      await supabase.from('incomeRecords').insert(dbRecord);
     }
 
     // Save to supabase
@@ -1397,17 +1422,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       prev ? { ...prev, balance: newBalance } : prev
     );
 
-    if (amount > 0) {
-      const newRecord = {
-        id: Math.random().toString(36).substring(2, 9),
+    if (amount >= 0) {
+      const dbRecord = {
         userId: currentUser.id,
         investmentId: refId || "bonus",
         planName: source || "Bonus",
         amount,
         date: new Date().toISOString()
       };
+      const newRecord = {
+        id: Math.random().toString(36).substring(2, 9),
+        ...dbRecord
+      };
       setIncomeRecords(prev => [newRecord, ...prev]);
-      await supabase.from('incomeRecords').insert(newRecord);
+      await supabase.from('incomeRecords').insert(dbRecord);
     }
 
     await supabase.from('users').update({ balance: newBalance }).eq('id', currentUser.id);
@@ -1450,6 +1478,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         updatePassword,
         updateBalanceAlertThreshold,
         adminResetUserPassword,
+        adminUpdateUserBalance,
         addProduct,
         editProduct,
         deleteProduct,

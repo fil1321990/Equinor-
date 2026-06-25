@@ -444,6 +444,7 @@ function MainApp() {
     addBalance,
     claimTask,
     adminResetUserPassword,
+    adminUpdateUserBalance,
     managerLink,
     groupLink,
     updateContactLinks,
@@ -707,6 +708,7 @@ function MainApp() {
   const [newProductType, setNewProductType] = useState<"general"|"vip"|"special">("general");
   const [newProductImageUrl, setNewProductImageUrl] = useState("");
   const [newProductPromoUnlock, setNewProductPromoUnlock] = useState("");
+  const [newProductPromoClosing, setNewProductPromoClosing] = useState("");
   const [newDepositAccountBank, setNewDepositAccountBank] = useState("Opay");
   const [newDepositAccountName, setNewDepositAccountName] = useState("");
   const [newDepositAccountNumber, setNewDepositAccountNumber] = useState("");
@@ -877,11 +879,11 @@ function MainApp() {
       bonusMessage = ` Bonus claimed! +₦${bonus}`;
       
       // We will claim the bonus task id as well
-      claimTask(getBonusTaskId(newStreak), bonus);
+      await claimTask(getBonusTaskId(newStreak), bonus);
     }
 
     // Call store to save the checkin and give the reward
-    claimTask(getCheckinTaskId(today), 0);
+    await claimTask(getCheckinTaskId(today), 0);
 
     if (bonusMessage) {
       setToastMessage(`Checked in!${bonusMessage}`);
@@ -2340,7 +2342,7 @@ function MainApp() {
                     </div>
                   ))}
                 </div>
-              ) : products.filter(p => p.type === productTab).length === 0 ? (
+              ) : products.filter(p => p.type === productTab).filter(p => !p.promoClosingDate || new Date(p.promoClosingDate).getTime() > Date.now()).length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center pb-32">
                   <div className="relative w-48 h-48 flex items-center justify-center mb-6 mt-12">
                     <EquinorStar className="w-24 h-24 text-black/10" />
@@ -2348,7 +2350,7 @@ function MainApp() {
                 </div>
               ) : (
                 <div className="px-5 space-y-4">
-                  {products.filter(p => p.type === productTab).map((plan) => {
+                  {products.filter(p => p.type === productTab).filter(p => !p.promoClosingDate || new Date(p.promoClosingDate).getTime() > Date.now()).map((plan) => {
                     let cost = plan.min;
                     let roi = plan.roi;
                     let get24h = 0;
@@ -2822,7 +2824,7 @@ function MainApp() {
                     {/* Right Card */}
                     <div className="flex-1 bg-gradient-to-br from-[#4DA8FF] to-[#00C9FF] rounded-[12px] p-3 text-white shadow-md flex flex-col justify-center min-w-0">
                       <div className="text-[14px] xs:text-[16px] font-black leading-tight mb-1 truncate">
-                        ₦{totalCanBeCollected.toLocaleString(undefined, {minimumFractionDigits: 5, maximumFractionDigits: 5})}
+                        ₦{totalCanBeCollected.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                       </div>
                       <div className="text-[10px] font-medium text-white/90 truncate uppercase tracking-wide">Can be collected</div>
                     </div>
@@ -3011,7 +3013,7 @@ function MainApp() {
                               <div className="flex justify-between items-center mt-3 pt-1">
                                 <div className="flex flex-col">
                                   <span className="text-[14px] text-[#6B7280] font-medium mb-0.5">Live generated income</span>
-                                  <span className="text-[#FF3B30] text-[20px] font-bold leading-none">+₦{profitAccrued.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 5})}</span>
+                                  <span className="text-[#FF3B30] text-[20px] font-bold leading-none">+₦{profitAccrued.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                 </div>
                                 
                                 {canCollect ? (
@@ -3305,6 +3307,7 @@ function MainApp() {
                     setNewProductType("general");
                     setNewProductImageUrl("");
                     setNewProductPromoUnlock("");
+                    setNewProductPromoClosing("");
                     setActiveModal("addProduct");
                   }}
                   className="w-full bg-gradient-to-r from-[#00D4FF] to-[#7B2FF7] text-white font-bold py-3 rounded-xl shadow-lg hover:opacity-90 active:scale-95 transition-all text-sm tracking-wide"
@@ -3402,6 +3405,12 @@ function MainApp() {
                             </div>
                           </div>
                         </div>
+                        {p.promotionalUnlockDate && (
+                          <div className="text-[10px] text-yellow-400 mt-1">Unlock: {new Date(p.promotionalUnlockDate).toLocaleString()}</div>
+                        )}
+                        {p.promoClosingDate && (
+                          <div className="text-[10px] text-red-400 mt-1">Closes: {new Date(p.promoClosingDate).toLocaleString()}</div>
+                        )}
                         <div className="flex gap-2 mt-1">
                           <button
                             onClick={() => {
@@ -3416,6 +3425,7 @@ function MainApp() {
                               setNewProductType(p.type as any);
                               setNewProductImageUrl(p.imageUrl || "");
                               setNewProductPromoUnlock(p.promotionalUnlockDate || "");
+                              setNewProductPromoClosing(p.promoClosingDate || "");
                               setActiveModal("editProduct");
                             }}
                             className="flex-1 bg-white/10 hover:bg-white/20 text-white py-1.5 rounded-lg text-xs font-bold transition-colors"
@@ -3514,9 +3524,26 @@ function MainApp() {
                               alert("Password reset successfully.");
                             }
                           }}
-                          className="flex-1 bg-white/10 hover:bg-white/20 text-white py-1.5 rounded-lg text-xs font-bold transition-colors"
+                          className="flex-1 bg-white/10 hover:bg-white/20 text-white py-1.5 rounded-lg text-[10px] font-bold transition-colors"
                         >
-                          Reset Password
+                          Reset Pass
+                        </button>
+                        <button
+                          onClick={() => {
+                            const deltaStr = window.prompt(`Enter amount to add (positive) or subtract (negative) for ${u.name || u.phone}:`);
+                            if (deltaStr !== null) {
+                              const delta = parseFloat(deltaStr);
+                              if (!isNaN(delta)) {
+                                adminUpdateUserBalance(u.id, delta);
+                                alert("Balance updated successfully.");
+                              } else {
+                                alert("Invalid amount.");
+                              }
+                            }
+                          }}
+                          className="flex-1 bg-yellow-500/20 hover:bg-yellow-500/40 text-yellow-400 py-1.5 rounded-lg text-[10px] font-bold transition-colors"
+                        >
+                          Adjust Bal
                         </button>
                         <button
                           onClick={() => {
@@ -6113,6 +6140,7 @@ function MainApp() {
                         type: newProductType,
                         imageUrl: newProductImageUrl,
                         promotionalUnlockDate: newProductPromoUnlock || undefined,
+                        promoClosingDate: newProductPromoClosing || undefined
                       });
                       setNewProductName("");
                       setNewProductTitle("EQUINOR");
@@ -6124,6 +6152,7 @@ function MainApp() {
                       setNewProductType("general");
                       setNewProductImageUrl("");
                       setNewProductPromoUnlock("");
+                      setNewProductPromoClosing("");
                       setIsProcessingProduct(false);
                       setActiveModal(null);
                       // alert("Product added successfully!");
@@ -6274,6 +6303,16 @@ function MainApp() {
                   />
                   <p className="text-[10px] text-slate-400 mt-1">If set, users cannot buy this product until this time.</p>
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Promo Countdown (Optional)</label>
+                  <input
+                    type="datetime-local"
+                    value={newProductPromoClosing}
+                    onChange={(e) => setNewProductPromoClosing(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">If set, product disappears after this time ends.</p>
+                </div>
                 <button
                   type="submit"
                   className="w-full bg-gradient-to-r from-[#7B2FF7] to-[#00D4FF] text-white py-4 rounded-xl font-bold tracking-wider mt-4"
@@ -6327,6 +6366,7 @@ function MainApp() {
                         type: newProductType,
                         imageUrl: newProductImageUrl,
                         promotionalUnlockDate: newProductPromoUnlock || undefined,
+                        promoClosingDate: newProductPromoClosing || undefined
                       });
                       setNewProductName("");
                       setNewProductTitle("EQUINOR");
@@ -6338,6 +6378,7 @@ function MainApp() {
                       setNewProductType("general");
                       setNewProductImageUrl("");
                       setNewProductPromoUnlock("");
+                      setNewProductPromoClosing("");
                       setIsProcessingProduct(false);
                       setActiveModal(null);
                       setEditingProduct(null);
@@ -6487,6 +6528,16 @@ function MainApp() {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
                   />
                   <p className="text-[10px] text-slate-400 mt-1">If set, users cannot buy this product until this time.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Promo Countdown (Optional)</label>
+                  <input
+                    type="datetime-local"
+                    value={newProductPromoClosing}
+                    onChange={(e) => setNewProductPromoClosing(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">If set, product disappears after this time ends.</p>
                 </div>
                 <button
                   type="submit"
