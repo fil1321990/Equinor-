@@ -45,7 +45,7 @@ export interface Investment {
 export interface IncomeRecord {
   id: string;
   userId: string;
-  investmentId: string;
+  investmentId?: string | null;
   planName: string;
   amount: number;
   date: string;
@@ -1294,7 +1294,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     await supabase.from('users').update({ balance: newBalance }).eq('id', userId);
   };
 
-  const upgradeVip = () => {
+  const upgradeVip = async () => {
     if (!currentUser) return;
     
     const newVipLevel = (currentUser.vipLevelIndex || 0) + 1;
@@ -1312,6 +1312,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         type: 'vip_upgrade'
       };
       setCommissions(prev => [...prev, newCommission]);
+      await supabase.from('commissions').insert({
+        userId: newCommission.userId,
+        fromUserId: newCommission.fromUserId,
+        amount: newCommission.amount,
+        date: newCommission.date,
+        level: newCommission.level,
+        type: newCommission.type
+      });
+      await supabase.from('users').update({ 
+        balance: referer.balance + bonus, 
+        referralEarnings: referer.referralEarnings + bonus 
+      }).eq('id', referer.id);
     }
 
     setUsers((prev) =>
@@ -1325,6 +1337,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setCurrentUser((prev) =>
       prev ? { ...prev, vipLevelIndex: newVipLevel } : prev
     );
+
+    await supabase.from('users').update({ vipLevelIndex: newVipLevel }).eq('id', currentUser.id);
   };
 
   const claimTask = async (taskId: string, reward: number) => {
@@ -1374,7 +1388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (reward >= 0) {
       const dbRecord = {
         userId: currentUser.id,
-        investmentId: taskId,
+        investmentId: null, // set null to avoid FK error
         planName,
         amount: reward,
         date: new Date().toISOString()
@@ -1425,7 +1439,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (amount >= 0) {
       const dbRecord = {
         userId: currentUser.id,
-        investmentId: refId || "bonus",
+        investmentId: null, // set null to avoid FK error
         planName: source || "Bonus",
         amount,
         date: new Date().toISOString()
