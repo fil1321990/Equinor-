@@ -86,8 +86,8 @@ const triggerHaptic = () => {
   }
 };
 
-const StampCountdown = ({ targetDate, title = "Unlocks In" }: { targetDate: string, title?: string }) => {
-  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+const ProductPromoClosingTag = ({ targetDate }: { targetDate: string }) => {
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
     const target = new Date(targetDate).getTime();
@@ -98,13 +98,47 @@ const StampCountdown = ({ targetDate, title = "Unlocks In" }: { targetDate: stri
       
       if (difference > 0) {
         setTimeLeft({
-          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+          hours: Math.floor(difference / (1000 * 60 * 60)),
           minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
           seconds: Math.floor((difference % (1000 * 60)) / 1000)
         });
       } else {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
+      }
+    };
+    
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  return (
+    <div className="absolute top-0 right-0 bg-black/80 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1.5 rounded-bl-[16px] z-20 shadow-sm leading-none flex items-center gap-1.5 border-b border-l border-white/10">
+      <Clock className="w-3 h-3 text-[#00D4FF] animate-pulse" />
+      <span className="text-[#00D4FF] tracking-wider">ENDS IN</span>
+      <span className="font-mono text-xs">{timeLeft.hours.toString().padStart(2, '0')}:{timeLeft.minutes.toString().padStart(2, '0')}:{timeLeft.seconds.toString().padStart(2, '0')}</span>
+    </div>
+  );
+};
+
+const StampCountdown = ({ targetDate, title = "Unlocks In" }: { targetDate: string, title?: string }) => {
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    const target = new Date(targetDate).getTime();
+    
+    const updateTime = () => {
+      const now = new Date().getTime();
+      const difference = target - now;
+      
+      if (difference > 0) {
+        setTimeLeft({
+          hours: Math.floor(difference / (1000 * 60 * 60)),
+          minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((difference % (1000 * 60)) / 1000)
+        });
+      } else {
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
       }
     };
     
@@ -167,8 +201,6 @@ const StampCountdown = ({ targetDate, title = "Unlocks In" }: { targetDate: stri
         
         <div className="relative z-10 w-[250px] mt-2 py-3 bg-gradient-to-r from-black/20 via-black/40 to-black/20 border-y border-white/30 backdrop-blur-md flex items-center justify-center text-white font-mono font-bold text-[20px] drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] leading-none shadow-lg">
           <div className="flex items-center justify-center gap-2 px-2 whitespace-nowrap">
-            <span className="text-[#FFD700] drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3)"}}>{timeLeft.days}d</span>
-            <span className="opacity-70 text-[18px] pb-0.5 text-[#FFD700]">:</span>
             <span className="text-[#FFD700] drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3)"}}>{timeLeft.hours.toString().padStart(2, '0')}h</span>
             <span className="opacity-70 text-[18px] pb-0.5 text-[#FFD700]">:</span>
             <span className="text-[#FFD700] drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3)"}}>{timeLeft.minutes.toString().padStart(2, '0')}m</span>
@@ -182,7 +214,7 @@ const StampCountdown = ({ targetDate, title = "Unlocks In" }: { targetDate: stri
 };
 
 const PromoCountdownCard = ({ targetDate, title = "Special Promotion Ends In", className = "mb-4 mx-5" }: { targetDate: string, title?: string, className?: string }) => {
-  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
     const target = new Date(targetDate).getTime();
@@ -193,13 +225,12 @@ const PromoCountdownCard = ({ targetDate, title = "Special Promotion Ends In", c
       
       if (difference > 0) {
         setTimeLeft({
-          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+          hours: Math.floor(difference / (1000 * 60 * 60)),
           minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
           seconds: Math.floor((difference % (1000 * 60)) / 1000)
         });
       } else {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
       }
     };
     
@@ -260,8 +291,6 @@ const PromoCountdownCard = ({ targetDate, title = "Special Promotion Ends In", c
         </div>
         
         <div className="flex items-center justify-center bg-black/20 backdrop-blur-md rounded-2xl py-3 px-3 sm:px-6 border border-white/10 shadow-[inset_0_2px_8px_rgba(255,255,255,0.1),0_8px_16px_rgba(0,0,0,0.2)] w-full max-w-[320px]">
-          <NumberBox num={timeLeft.days} label="Days" />
-          <Divider />
           <NumberBox num={timeLeft.hours} label="Hrs" />
           <Divider />
           <NumberBox num={timeLeft.minutes} label="Min" />
@@ -686,6 +715,7 @@ function MainApp() {
   const [newRedemptionMin, setNewRedemptionMin] = useState("1");
   const [newRedemptionMax, setNewRedemptionMax] = useState("1");
   const [newRedemptionValidity, setNewRedemptionValidity] = useState("60");
+  const [adminGeneratedCode, setAdminGeneratedCode] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentProcessingState, setPaymentProcessingState] = useState<{ step: number, message: string } | null>(null);
   const [collectingIds, setCollectingIds] = useState<Record<string, boolean>>({});
@@ -957,6 +987,12 @@ function MainApp() {
   const handleWithdraw = async (e: React.FormEvent) => {
     e.preventDefault();
     triggerHaptic();
+
+    if (currentUser?.withdrawalRestricted) {
+      triggerVisualNotification("try_again", "RESTRICTED", "Your account is currently restricted from making withdrawals. Please contact support.");
+      return;
+    }
+
     const amountNum = Number(withdrawAmount);
     if (amountNum < 6000) {
       alert("Minimum withdrawal is ₦6,000");
@@ -2359,11 +2395,10 @@ function MainApp() {
                     const isPromoLocked = promoDiff > 0;
                     let promoTimerString = "";
                     if (isPromoLocked) {
-                      const d = Math.floor(promoDiff / (1000 * 60 * 60 * 24));
-                      const h = Math.floor((promoDiff / (1000 * 60 * 60)) % 24);
+                      const h = Math.floor(promoDiff / (1000 * 60 * 60));
                       const m = Math.floor((promoDiff / 1000 / 60) % 60);
                       const s = Math.floor((promoDiff / 1000) % 60);
-                      promoTimerString = `${d > 0 ? d + 'd ' : ''}${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                      promoTimerString = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
                     }
 
                     if (plan.type === 'vip' && plan.name === 'Equinor Equity Exchange Project' && currentUser) {
@@ -2392,6 +2427,8 @@ function MainApp() {
                             <div className="absolute inset-0 bg-transparent z-20 flex flex-col items-center justify-center pt-28 pointer-events-none">
                                 <StampCountdown targetDate={plan.promotionalUnlockDate} title="Unlocks In" />
                             </div>
+                          ) : plan.promoClosingDate ? (
+                            <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
                           ) : (
                             <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
                           )}
@@ -2510,6 +2547,8 @@ function MainApp() {
                             <div className="absolute inset-0 bg-transparent z-20 flex flex-col items-center justify-center pt-28 pointer-events-none">
                                 <StampCountdown targetDate={plan.promotionalUnlockDate} title="Unlocks In" />
                             </div>
+                          ) : plan.promoClosingDate ? (
+                            <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
                           ) : (
                             <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
                           )}
@@ -2625,6 +2664,8 @@ function MainApp() {
                             <div className="absolute inset-0 bg-transparent z-20 flex flex-col items-center justify-center pt-28 pointer-events-none">
                                 <StampCountdown targetDate={plan.promotionalUnlockDate} title="Unlocks In" />
                             </div>
+                          ) : plan.promoClosingDate ? (
+                            <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
                           ) : (
                             <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
                           )}
@@ -3332,21 +3373,6 @@ function MainApp() {
                 </div>
 
                 <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 overflow-hidden shrink-0 mt-2">
-                  <div className="p-4 border-b border-white/10 text-sm font-bold text-white tracking-wide uppercase">
-                    Product Promo Countdown
-                  </div>
-                  <div className="p-4 flex flex-col gap-3">
-                    <span className="text-white/70 text-xs">Set a closing date for the product promotion (e.g. 2026-06-30T23:59:00). Leave empty to disable.</span>
-                    <input 
-                      type="datetime-local" 
-                      value={productPromoCountdown ? new Date(new Date(productPromoCountdown).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : ''} 
-                      onChange={(e) => setProductPromoCountdown(e.target.value ? new Date(e.target.value).toISOString() : null)}
-                      className="bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-white/30"
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 overflow-hidden shrink-0 mt-2">
                   <div className="p-4 border-b border-white/10 flex justify-between items-center text-sm">
                     <h3 className="text-white font-bold uppercase tracking-wider">Deposit Accounts (NGN)</h3>
                     <button 
@@ -3424,8 +3450,20 @@ function MainApp() {
                               setNewProductQuota(p.maxQuota?.toString() || "0");
                               setNewProductType(p.type as any);
                               setNewProductImageUrl(p.imageUrl || "");
-                              setNewProductPromoUnlock(p.promotionalUnlockDate || "");
-                              setNewProductPromoClosing(p.promoClosingDate || "");
+                              
+                              let unlockHours = "";
+                              if (p.promotionalUnlockDate) {
+                                const diff = new Date(p.promotionalUnlockDate).getTime() - Date.now();
+                                if (diff > 0) unlockHours = (diff / (1000 * 60 * 60)).toFixed(2);
+                              }
+                              setNewProductPromoUnlock(unlockHours);
+                              
+                              let closingHours = "";
+                              if (p.promoClosingDate) {
+                                const diff = new Date(p.promoClosingDate).getTime() - Date.now();
+                                if (diff > 0) closingHours = (diff / (1000 * 60 * 60)).toFixed(2);
+                              }
+                              setNewProductPromoClosing(closingHours);
                               setActiveModal("editProduct");
                             }}
                             className="flex-1 bg-white/10 hover:bg-white/20 text-white py-1.5 rounded-lg text-xs font-bold transition-colors"
@@ -3638,7 +3676,7 @@ function MainApp() {
                               maxQuota: max
                             });
                             setNewRedemptionAmount("");
-                            alert(`Code generated: ${code}`);
+                            setAdminGeneratedCode(code);
                           } else {
                             alert("Please enter valid amounts (Max >= Min > 0, Validity > 0)");
                           }
@@ -3649,6 +3687,30 @@ function MainApp() {
                       </button>
                     </div>
                   </div>
+                  {adminGeneratedCode && (
+                    <div className="mt-4 bg-gradient-to-r from-[#7B2FF7]/20 to-[#00D4FF]/20 border border-[#00D4FF]/30 rounded-xl p-4 flex flex-col items-center shadow-lg relative">
+                      <button 
+                        onClick={() => setAdminGeneratedCode(null)}
+                        className="absolute top-2 right-2 text-white/50 hover:text-white"
+                      >
+                        <X size={16} />
+                      </button>
+                      <span className="text-white/80 text-xs font-bold uppercase tracking-wider mb-2">Generated Code</span>
+                      <div className="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-lg border border-white/10 w-full justify-between">
+                        <code className="text-[#00D4FF] font-bold text-2xl tracking-widest">{adminGeneratedCode}</code>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(adminGeneratedCode);
+                            alert("Code copied to clipboard!");
+                          }}
+                          className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-lg transition-colors active:scale-95 flex items-center gap-2"
+                        >
+                          <Copy size={18} />
+                          <span className="text-sm font-bold">Copy</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {validRedemptionCodes.length > 0 && (
                     <div className="mt-2 space-y-2">
                       <div className="text-xs text-white/50 font-bold uppercase">Active Codes:</div>
@@ -3656,13 +3718,25 @@ function MainApp() {
                         const isExpired = Date.now() > c.createdAt + (c.validityMinutes * 60 * 1000);
                         const isMaxedOut = c.claimedBy.length >= c.maxClaims;
                         return (
-                          <div key={c.code} className={`flex flex-col bg-white/5 p-2 rounded-lg text-sm border border-white/5 ${isExpired || isMaxedOut ? 'opacity-50' : ''}`}>
-                            <div className="flex justify-between items-center mb-1">
-                              <code className="text-[#00D4FF] font-bold tracking-widest">{c.code}</code>
-                              <span className="text-white font-medium">₦ {c.amount.toFixed(2)}</span>
+                          <div key={c.code} className={`flex flex-col bg-white/5 p-3 rounded-xl border border-white/10 shadow-sm relative ${isExpired || isMaxedOut ? 'opacity-50' : ''}`}>
+                            <div className="flex justify-between items-center mb-2">
+                              <div className="flex items-center gap-2">
+                                <code className="text-[#00D4FF] font-bold text-lg tracking-widest bg-black/20 px-2 py-1 rounded">{c.code}</code>
+                                <button
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(c.code);
+                                    alert("Code copied to clipboard!");
+                                  }}
+                                  className="bg-white/10 hover:bg-white/20 text-white p-1.5 rounded transition-colors active:scale-95"
+                                  title="Copy to clipboard"
+                                >
+                                  <Copy className="w-4 h-4" />
+                                </button>
+                              </div>
+                              <span className="text-white font-bold text-base">₦ {c.amount.toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between items-center text-xs text-white/60">
-                              <span>Claims: {c.claimedBy.length}/{c.maxClaims} {c.minClaims > 1 ? `(Min: ${c.minClaims})` : ''}</span>
+                              <span>Claims: <span className="text-white">{c.claimedBy.length}/{c.maxClaims}</span> {c.minClaims > 1 ? `(Min: ${c.minClaims})` : ''}</span>
                               <span>{c.validityMinutes}m {isExpired ? '(Expired)' : ''}</span>
                             </div>
                           </div>
@@ -6139,8 +6213,8 @@ function MainApp() {
                         maxQuota: Number(newProductQuota),
                         type: newProductType,
                         imageUrl: newProductImageUrl,
-                        promotionalUnlockDate: newProductPromoUnlock || undefined,
-                        promoClosingDate: newProductPromoClosing || undefined
+                        promotionalUnlockDate: newProductPromoUnlock ? new Date(Date.now() + Number(newProductPromoUnlock) * 60 * 60 * 1000).toISOString() : undefined,
+                        promoClosingDate: newProductPromoClosing ? new Date(Date.now() + Number(newProductPromoClosing) * 60 * 60 * 1000).toISOString() : undefined
                       });
                       setNewProductName("");
                       setNewProductTitle("EQUINOR");
@@ -6294,24 +6368,28 @@ function MainApp() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Promotional Unlock Time (Optional)</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Promotional Unlock Time (Hours, Optional)</label>
                   <input
-                    type="datetime-local"
+                    type="number"
+                    placeholder="e.g. 24"
+                    step="0.01"
                     value={newProductPromoUnlock}
                     onChange={(e) => setNewProductPromoUnlock(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">If set, users cannot buy this product until this time.</p>
+                  <p className="text-[10px] text-slate-400 mt-1">If set, users cannot buy this product until this many hours from now.</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Promo Countdown (Optional)</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Promo Countdown (Hours, Optional)</label>
                   <input
-                    type="datetime-local"
+                    type="number"
+                    placeholder="e.g. 48"
+                    step="0.01"
                     value={newProductPromoClosing}
                     onChange={(e) => setNewProductPromoClosing(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">If set, product disappears after this time ends.</p>
+                  <p className="text-[10px] text-slate-400 mt-1">If set, product disappears after this many hours from now.</p>
                 </div>
                 <button
                   type="submit"
@@ -6365,8 +6443,8 @@ function MainApp() {
                         maxQuota: Number(newProductQuota),
                         type: newProductType,
                         imageUrl: newProductImageUrl,
-                        promotionalUnlockDate: newProductPromoUnlock || undefined,
-                        promoClosingDate: newProductPromoClosing || undefined
+                        promotionalUnlockDate: newProductPromoUnlock ? new Date(Date.now() + Number(newProductPromoUnlock) * 60 * 60 * 1000).toISOString() : undefined,
+                        promoClosingDate: newProductPromoClosing ? new Date(Date.now() + Number(newProductPromoClosing) * 60 * 60 * 1000).toISOString() : undefined
                       });
                       setNewProductName("");
                       setNewProductTitle("EQUINOR");
@@ -6520,24 +6598,28 @@ function MainApp() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Promotional Unlock Time (Optional)</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Promotional Unlock Time (Hours, Optional)</label>
                   <input
-                    type="datetime-local"
+                    type="number"
+                    placeholder="e.g. 24"
+                    step="0.01"
                     value={newProductPromoUnlock}
                     onChange={(e) => setNewProductPromoUnlock(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">If set, users cannot buy this product until this time.</p>
+                  <p className="text-[10px] text-slate-400 mt-1">If set, users cannot buy this product until this many hours from now.</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Promo Countdown (Optional)</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Promo Countdown (Hours, Optional)</label>
                   <input
-                    type="datetime-local"
+                    type="number"
+                    placeholder="e.g. 48"
+                    step="0.01"
                     value={newProductPromoClosing}
                     onChange={(e) => setNewProductPromoClosing(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">If set, product disappears after this time ends.</p>
+                  <p className="text-[10px] text-slate-400 mt-1">If set, product disappears after this many hours from now.</p>
                 </div>
                 <button
                   type="submit"

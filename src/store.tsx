@@ -1384,21 +1384,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     else if (taskId.startsWith("check_in")) planName = "Daily Check-in";
     else if (taskId.startsWith("bonus_")) planName = "Check-in Bonus";
     else if (taskId.startsWith("vip_upgrade")) planName = "VIP Upgrade Bonus";
+    else if (taskId === "task1") planName = "Invite registration";
+    else if (taskId === "task2") planName = "First invest";
+    else if (taskId === "task3") planName = "Cumulative investment";
+    else if (taskId === "task4") planName = "VIP level";
+    else if (taskId === "task5") planName = "Register and top up";
     
     if (reward >= 0) {
       const dbRecord = {
         userId: currentUser.id,
-        investmentId: null, // set null to avoid FK error
         planName,
         amount: reward,
         date: new Date().toISOString()
       };
       const newRecord = {
-        id: Math.random().toString(36).substring(2, 9),
+        id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
         ...dbRecord
       };
       setIncomeRecords(prev => [newRecord, ...prev]);
-      await supabase.from('incomeRecords').insert(dbRecord);
+      const { error: incErr1 } = await supabase.from('incomeRecords').insert(newRecord);
+      if (incErr1) console.error("claimTask incomeRecords insert err:", incErr1);
     }
 
     // Save to supabase
@@ -1439,17 +1444,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (amount >= 0) {
       const dbRecord = {
         userId: currentUser.id,
-        investmentId: null, // set null to avoid FK error
         planName: source || "Bonus",
         amount,
         date: new Date().toISOString()
       };
       const newRecord = {
-        id: Math.random().toString(36).substring(2, 9),
+        id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
         ...dbRecord
       };
       setIncomeRecords(prev => [newRecord, ...prev]);
-      await supabase.from('incomeRecords').insert(dbRecord);
+      const { error: incErr2 } = await supabase.from('incomeRecords').insert(newRecord);
+      if (incErr2) console.error("addBalance incomeRecords insert err:", incErr2);
     }
 
     await supabase.from('users').update({ balance: newBalance }).eq('id', currentUser.id);
