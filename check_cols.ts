@@ -1,0 +1,10 @@
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+async function run() {
+  const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
+  const { data, error } = await supabase.from('users').select('*').limit(1);
+  console.log('Users columns:', data ? Object.keys(data[0]) : error);
+}
+run();

@@ -87,7 +87,7 @@ const triggerHaptic = () => {
 };
 
 const ProductPromoClosingTag = ({ targetDate }: { targetDate: string }) => {
-  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
+  const [timeLeft, setTimeLeft] = useState({ years: 0, days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
     const target = new Date(targetDate).getTime();
@@ -98,12 +98,14 @@ const ProductPromoClosingTag = ({ targetDate }: { targetDate: string }) => {
       
       if (difference > 0) {
         setTimeLeft({
-          hours: Math.floor(difference / (1000 * 60 * 60)),
+          years: Math.floor(difference / (1000 * 60 * 60 * 24 * 365)),
+          days: Math.floor((difference % (1000 * 60 * 60 * 24 * 365)) / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
           minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
           seconds: Math.floor((difference % (1000 * 60)) / 1000)
         });
       } else {
-        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
+        setTimeLeft({ years: 0, days: 0, hours: 0, minutes: 0, seconds: 0 });
       }
     };
     
@@ -113,93 +115,60 @@ const ProductPromoClosingTag = ({ targetDate }: { targetDate: string }) => {
   }, [targetDate]);
 
   return (
-    <div className="absolute top-6 right-2 z-10 flex items-center gap-1">
-      <div className="bg-black text-white font-bold text-xs w-6 h-6 flex items-center justify-center rounded-md shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+    <div className="flex items-center gap-1">
+      {timeLeft.years > 0 && <div className="bg-[#1C1C1E] text-white rounded-[6px] px-2 h-[26px] flex items-center justify-center font-bold text-[11px] min-w-[34px]">{timeLeft.years} Year</div>}
+      {(timeLeft.years > 0 || timeLeft.days > 0) && <div className="bg-[#1C1C1E] text-white rounded-[6px] px-2 h-[26px] flex items-center justify-center font-bold text-[11px] min-w-[34px]">{timeLeft.days} Day</div>}
+      <div className="bg-[#1C1C1E] text-white rounded-[6px] w-[30px] h-[26px] flex items-center justify-center font-bold text-[12px]">
         {timeLeft.hours.toString().padStart(2, '0')}
       </div>
-      <span className="text-white font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">:</span>
-      <div className="bg-black text-white font-bold text-xs w-6 h-6 flex items-center justify-center rounded-md shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+      <span className="text-[#1C1C1E] font-black text-sm leading-none -mt-0.5">:</span>
+      <div className="bg-[#1C1C1E] text-white rounded-[6px] w-[30px] h-[26px] flex items-center justify-center font-bold text-[12px]">
         {timeLeft.minutes.toString().padStart(2, '0')}
+      </div>
+      <span className="text-[#1C1C1E] font-black text-sm leading-none -mt-0.5">:</span>
+      <div className="bg-[#1C1C1E] text-white rounded-[6px] w-[30px] h-[26px] flex items-center justify-center font-bold text-[12px]">
+        {timeLeft.seconds.toString().padStart(2, '0')}
       </div>
     </div>
   );
 };
 
 const StampCountdown = ({ targetDate }: { targetDate: string }) => {
-  const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
-
-  useEffect(() => {
-    const target = new Date(targetDate).getTime();
-    
-    const updateTime = () => {
-      const now = new Date().getTime();
-      const difference = target - now;
-      
-      if (difference > 0) {
-        setTimeLeft({
-          hours: Math.floor(difference / (1000 * 60 * 60)),
-          minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
-          seconds: Math.floor((difference % (1000 * 60)) / 1000)
-        });
-      } else {
-        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
-      }
-    };
-    
-    updateTime();
-    const timer = setInterval(updateTime, 1000);
-    return () => clearInterval(timer);
-  }, [targetDate]);
-
   return (
-    <div className="absolute inset-0 z-20 flex flex-row items-center justify-end pr-4 pointer-events-none">
-      {/* Container to group stamp and timer */}
-      <div className="relative flex items-center">
-        {/* Stamp Circle */}
-        <div className="relative z-10 flex items-center justify-center transform -rotate-12">
-          <svg viewBox="0 0 100 100" className="w-[85px] h-[85px] drop-shadow-[0_4px_8px_rgba(0,0,0,0.3)]">
-            {/* White gear teeth using stroke */}
-            <circle cx="50" cy="50" r="45" fill="#ffffff" />
-            <circle cx="50" cy="50" r="47" fill="none" stroke="#ffffff" strokeWidth="6" strokeDasharray="5 4.84" />
-            
-            {/* Inner gray center */}
-            <circle cx="50" cy="50" r="39" fill="#E5E7EB" />
-            
-            {/* Thin white inner ring */}
-            <circle cx="50" cy="50" r="35" fill="none" stroke="#ffffff" strokeWidth="1.5" />
-            
-            {/* 5-point stars spaced around the white ring */}
-            <g fill="#9CA3AF">
-              {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => {
-                const rad = (angle * Math.PI) / 180;
-                const x = 50 + 42 * Math.cos(rad);
-                const y = 50 + 42 * Math.sin(rad);
-                return (
-                  <path key={i} d={`M${x} ${y-2.5} L${x+0.8} ${y-0.8} L${x+2.5} ${y-0.8} L${x+1.2} ${y+0.4} L${x+1.6} ${y+2.2} L${x} ${y+1.1} L${x-1.6} ${y+2.2} L${x-1.2} ${y+0.4} L${x-2.5} ${y-0.8} L${x-0.8} ${y-0.8} Z`} />
-                );
-              })}
-            </g>
-            
-            {/* Diagonal Ribbon */}
-            <g transform="rotate(25 50 50)">
-              {/* Ribbon background */}
-              <rect x="0" y="38" width="100" height="24" fill="#000000" />
-              {/* Ribbon text */}
-              <text x="50" y="55" fill="#ffffff" fontSize="13" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle" letterSpacing="0.5">EM BREVE</text>
-            </g>
-          </svg>
-        </div>
-
-        {/* Timer behind stamp */}
-        <div className="bg-black/90 backdrop-blur-md rounded-r-xl pl-8 pr-3 py-1.5 border-y border-r border-white/20 translate-x-[-24px] flex items-center gap-1 shadow-xl z-0">
-          <div className="bg-[#1A1A24] text-white font-bold text-xs w-6 h-6 flex items-center justify-center rounded-md">
-            {timeLeft.hours.toString().padStart(2, '0')}
-          </div>
-          <span className="text-white font-bold drop-shadow-md">:</span>
-          <div className="bg-[#1A1A24] text-white font-bold text-xs w-6 h-6 flex items-center justify-center rounded-md">
-            {timeLeft.minutes.toString().padStart(2, '0')}
-          </div>
-        </div>
+    <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+      {/* Stamp Circle */}
+      <div className="relative z-10 flex items-center justify-center transform -rotate-12">
+        <svg viewBox="0 0 100 100" className="w-[110px] h-[110px] drop-shadow-[0_4px_8px_rgba(0,0,0,0.3)]">
+          {/* White gear teeth using stroke */}
+          <circle cx="50" cy="50" r="45" fill="#ffffff" />
+          <circle cx="50" cy="50" r="47" fill="none" stroke="#ffffff" strokeWidth="6" strokeDasharray="5 4.84" />
+          
+          {/* Inner gray center */}
+          <circle cx="50" cy="50" r="39" fill="#E5E7EB" />
+          
+          {/* Thin white inner ring */}
+          <circle cx="50" cy="50" r="35" fill="none" stroke="#ffffff" strokeWidth="1.5" />
+          
+          {/* 5-point stars spaced around the white ring */}
+          <g fill="#9CA3AF">
+            {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => {
+              const rad = (angle * Math.PI) / 180;
+              const x = 50 + 42 * Math.cos(rad);
+              const y = 50 + 42 * Math.sin(rad);
+              return (
+                <path key={i} d={`M${x} ${y-2.5} L${x+0.8} ${y-0.8} L${x+2.5} ${y-0.8} L${x+1.2} ${y+0.4} L${x+1.6} ${y+2.2} L${x} ${y+1.1} L${x-1.6} ${y+2.2} L${x-1.2} ${y+0.4} L${x-2.5} ${y-0.8} L${x-0.8} ${y-0.8} Z`} />
+              );
+            })}
+          </g>
+          
+          {/* Diagonal Ribbon */}
+          <g transform="rotate(25 50 50)">
+            {/* Ribbon background */}
+            <rect x="0" y="38" width="100" height="24" fill="#000000" />
+            {/* Ribbon text */}
+            <text x="50" y="55" fill="#ffffff" fontSize="13" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle" letterSpacing="0.5">EM BREVE</text>
+          </g>
+        </svg>
       </div>
     </div>
   );
@@ -1655,7 +1624,7 @@ function MainApp() {
           </div>
         )}
         {/* Top Navigation */}
-        {activeTab !== "order" && activeTab !== "home" && (
+        {activeTab !== "product" && activeTab !== "order" && activeTab !== "home" && (
           <div className="flex items-center justify-center h-[48px] relative z-10 shrink-0 bg-[#0A0E2E]/80 backdrop-blur-xl gap-2">
             <EquinorStar className="w-5 h-5 text-white" />
             <h1
@@ -2414,308 +2383,61 @@ function MainApp() {
                       const totalIncome = calculatedDailyReturn * plan.days;
                       
                       return (
-                        <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
-                          {isPromoLocked && plan.promotionalUnlockDate ? (
-                            <StampCountdown targetDate={plan.promotionalUnlockDate} />
-                          ) : (
-                            <>
-                              <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
-                              {plan.promoClosingDate && (
-                                <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
+                        <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-sm overflow-hidden flex flex-col">
+                          {/* Image Header wrapper */}
+                          <div className="px-3.5 pt-3.5 w-full">
+                            <div className={`relative w-full aspect-[16/9] rounded-[18px] ${isVipTeam ? 'bg-gradient-to-r from-red-900 to-black' : 'bg-gradient-to-br from-[#1F2937] to-[#111827]'} flex items-center justify-center overflow-hidden`}>
+                              {plan.imageUrl ? (
+                                <img src={plan.imageUrl} alt={plan.name} className="w-full h-full object-cover" />
+                              ) : isVipTeam ? (
+                                <>
+                                  <div className="flex flex-col items-center justify-center z-10">
+                                    <span className="text-[#FBBF24] font-black text-4xl tracking-widest drop-shadow-lg scale-y-110">VIP</span>
+                                    <span className="text-white font-bold tracking-[0.3em] text-sm mt-1">GROUP</span>
+                                  </div>
+                                  <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-red-600/20 to-transparent z-0"></div>
+                                  <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-black/80 to-transparent z-0"></div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#FBBF24] to-[#F59E0B] flex items-center justify-center shadow-[0_0_30px_rgba(245,158,11,0.6)] z-10">
+                                    <span className="text-white font-bold text-2xl tracking-tighter">VIP</span>
+                                  </div>
+                                  <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-white/5 blur-3xl z-0"></div>
+                                  <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#6366F1]/20 blur-3xl z-0"></div>
+                                </>
                               )}
-                            </>
-                          )}
-                          
-                          {/* Image Header */}
-                          <div className={`relative w-full h-[110px] sm:h-[130px] ${isVipTeam ? 'bg-gradient-to-r from-red-900 to-black' : 'bg-gradient-to-br from-[#1F2937] to-[#111827]'} flex items-center justify-center overflow-hidden`}>
-                            {plan.imageUrl ? (
-                              <img src={plan.imageUrl} alt={plan.name} className="w-full h-full object-cover" />
-                            ) : isVipTeam ? (
-                              <>
-                                <div className="flex flex-col items-center justify-center z-10">
-                                  <span className="text-[#FBBF24] font-black text-4xl tracking-widest drop-shadow-lg scale-y-110">VIP</span>
-                                  <span className="text-white font-bold tracking-[0.3em] text-sm mt-1">GROUP</span>
-                                </div>
-                                <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-red-600/20 to-transparent z-0"></div>
-                                <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-black/80 to-transparent z-0"></div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#FBBF24] to-[#F59E0B] flex items-center justify-center shadow-[0_0_30px_rgba(245,158,11,0.6)] z-10">
-                                  <span className="text-white font-bold text-2xl tracking-tighter">VIP</span>
-                                </div>
-                                <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-white/5 blur-3xl z-0"></div>
-                                <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#6366F1]/20 blur-3xl z-0"></div>
-                              </>
-                            )}
-                          </div>
-                          
-                          <div className="p-3 flex flex-col gap-2">
-                            {/* Header Metadata Row */}
-                            <div className="flex justify-start items-center">
-                              <span className="bg-[#FFECEC] text-[#FF4D4F] px-3 py-1 rounded-full font-bold text-[11px]">
-                                T+{plan.tPlusDays || 1}
-                              </span>
-                            </div>
-                        
-                            {/* Title */}
-                            <h3 className="uppercase text-[16px] sm:text-[18px] font-semibold text-[#111827] tracking-tight leading-tight">
-                              {plan.name}
-                            </h3>
-                        
-                            {/* Financial Metrics Grid */}
-                            <div className="flex flex-col gap-1.5 mt-0.5">
-                              <div className="grid grid-cols-2 gap-1.5">
-                                <div className="bg-[#EDE7FF] rounded-[12px] p-2 flex flex-col items-center justify-center text-center">
-                                  <span className="text-[10px] text-[#5B3DF6]/80 font-medium mb-0.5">Daily income</span>
-                                  <span className="text-[#5B3DF6] font-semibold text-[13px]">₦{calculatedDailyReturn.toLocaleString()}</span>
-                                </div>
-                                <div className="bg-[#EDE7FF] rounded-[12px] p-2 flex flex-col items-center justify-center text-center">
-                                  <span className="text-[10px] text-[#5B3DF6]/80 font-medium mb-0.5">Cycle</span>
-                                  <span className="text-[#5B3DF6] font-semibold text-[13px]">{plan.days} Days</span>
-                                </div>
-                              </div>
-                              <div className="bg-[#EDE7FF] rounded-[12px] p-2.5 flex justify-between items-center px-3">
-                                 <span className="text-[#5B3DF6]/80 text-[12px] font-medium">Price: ₦{plan.min.toLocaleString()}</span>
-                                 <span className="text-[#5B3DF6] font-semibold text-[11px] uppercase">Quota: {plan.maxQuota || '∞'}</span>
-                              </div>
-                            </div>
-                        
-                            {/* CTA & Profit Display */}
-                            <div className="flex justify-between items-center mt-2">
-                              <div className="flex flex-col">
-                                <span className="text-[12px] text-[#6B7280] font-medium mb-0.5">Total income</span>
-                                <span className="text-[#FF3B30] text-[18px] font-bold leading-none">₦{totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                              </div>
                               
-                              <button 
-                                onClick={() => {
-                                  if (isPromoLocked) {
-                                    alert("This product is currently locked for a promotional period.");
-                                    return;
-                                  }
-                                  if (!currentUser) return;
-                                  if (currentUser.balance < plan.min) {
-                                    triggerVisualNotification("insufficient_balance", "INSUFFICIENT BALANCE", "Please recharge your account");
-                                    return;
-                                  }
-
-                                  if (plan.type === "vip" && VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex === 0) {
-                                    alert("This is a VIP product. You must be at least VIP1 to invest.");
-                                    return;
-                                  }
-                                  
-                                  if (isVipTeam) {
-                                    const aLevelSubordinates = users.filter(u => u.referredBy === currentUser.referralCode).length;
-                                    if (aLevelSubordinates < 30) {
-                                      alert("You need at least 30 team members to purchase the VIP team exclusive project.");
-                                      return;
-                                    }
-                                  }
-                                  
-                                  const hasPurchased = investments.some(inv => inv.userId === currentUser.id && inv.planName === plan.name);
-                                  if (hasPurchased) {
-                                    alert("You have already reached the quota for this project.");
-                                    return;
-                                  }
-                                  
-                                  setEquinorSelectedPlan({ ...plan, buyAmount: plan.min, calculatedRoi: plan.min > 0 ? (calculatedDailyReturn / plan.min) * 100 : 0 });
-                                  setBuyingQuantity("1");
-                                  setActiveModal("equinorConfirm");
-                                }}
-                                className={isPromoLocked ? "bg-slate-300 text-slate-500 px-6 h-[40px] rounded-[20px] font-bold text-[14px] shadow-sm cursor-not-allowed transform transition" : "bg-gradient-to-r from-[#8A63FF] to-[#C26BFF] text-white px-6 h-[40px] rounded-[20px] font-bold text-[14px] shadow-md transform transition active:scale-[0.98]"}
-                              >
-                                {isPromoLocked ? "Locked" : "Buy"}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    if (plan.type === 'vip' && plan.name === 'Equinor Equity Exchange Project') {
-                      return (
-                        <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
-                          {isPromoLocked && plan.promotionalUnlockDate ? (
-                            <StampCountdown targetDate={plan.promotionalUnlockDate} />
-                          ) : (
-                            <>
-                              <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
-                              {plan.promoClosingDate && (
-                                <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
+                              {/* Tags overlay */}
+                              <div className="absolute top-0 right-0 bg-[#F97316] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
+                              
+                              {/* EM BREVE overlay */}
+                              {isPromoLocked && plan.promotionalUnlockDate && (
+                                <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center">
+                                  <StampCountdown targetDate={plan.promotionalUnlockDate} />
+                                </div>
                               )}
-                            </>
-                          )}
-                          
-                          {/* Image Header */}
-                          <div className={`relative w-full h-[110px] sm:h-[130px] bg-[#1E1E2D] flex items-center justify-center overflow-hidden`}>
-                            {/* Simulated chart background */}
-                            <svg viewBox="0 0 100 40" className="absolute bottom-0 w-full h-[80%] opacity-30" preserveAspectRatio="none">
-                              <path d="M0,40 L0,20 L10,25 L20,15 L30,22 L40,10 L50,18 L60,5 L70,12 L80,2 L90,10 L100,0 L100,40 Z" fill="#28C76F" opacity="0.3" />
-                              <polyline points="0,20 10,25 20,15 30,22 40,10 50,18 60,5 70,12 80,2 90,10 100,0" fill="none" stroke="#28C76F" strokeWidth="1" />
-                            </svg>
+                            </div>
                           </div>
                           
-                          <div className="p-3 flex flex-col gap-2">
-                            {/* Header Metadata Row */}
-                            <div className="flex justify-start items-center">
-                              <span className="bg-[#FFECEC] text-[#FF4D4F] px-3 py-1 rounded-full font-bold text-[11px]">
-                                T+{plan.tPlusDays || 1}
-                              </span>
-                            </div>
-                        
-                            {/* Title */}
-                            <h3 className="uppercase text-[16px] sm:text-[18px] font-semibold text-[#111827] tracking-tight leading-tight">
-                              {plan.name}
-                            </h3>
-                        
-                            <div className="text-[#6E6B7B] text-[12px] leading-relaxed">
-                              Participate in our VIP equity exchange program. Benefits are distributed after each 1-day cycle, with a minimum entry of ₦ {cost.toLocaleString()}. Advance to higher VIP tiers to increase your returns and discount rate.
-                            </div>
-                        
-                            {/* Financial Metrics Grid */}
-                            <div className="flex flex-col gap-1.5 mt-0.5">
-                              <div className="grid grid-cols-2 gap-1.5">
-                                <div className="bg-[#EDE7FF] rounded-[12px] p-2 flex flex-col items-center justify-center text-center">
-                                  <span className="text-[10px] text-[#5B3DF6]/80 font-medium mb-0.5">24H Returns</span>
-                                  <span className="text-[#5B3DF6] font-semibold text-[13px]">₦{get24h.toLocaleString()}</span>
-                                </div>
-                                <div className="bg-[#EDE7FF] rounded-[12px] p-2 flex flex-col items-center justify-center text-center">
-                                  <span className="text-[10px] text-[#5B3DF6]/80 font-medium mb-0.5">Cycle</span>
-                                  <span className="text-[#5B3DF6] font-semibold text-[13px]">1 Days</span>
-                                </div>
-                              </div>
-                            </div>
-                        
-                            {/* Input Field aligned to match general row size */}
-                            <div className="flex flex-col">
-                              <span className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-2">
-                                Enter Amount (Min ₦{cost.toLocaleString()})
-                                {plan.maxQuota ? <span className="text-[#0052FF] text-[9px] font-bold tracking-wider bg-blue-50 px-1.5 py-0.5 rounded uppercase">Quota: {plan.maxQuota}</span> : null}
-                              </span>
-                              <div className="border border-gray-200 focus-within:border-[#8A63FF] rounded-[10px] px-3 py-3 mt-1 transition-colors flex items-center bg-[#F8F9FA]">
-                                <span className="text-gray-500 font-bold mr-1">₦</span>
-                                <input 
-                                  type="number"
-                                  placeholder={`${cost}`}
-                                  value={equinorInputAmount}
-                                  onChange={(e) => setEquinorInputAmount(e.target.value)}
-                                  className="w-full bg-transparent outline-none font-mono text-gray-800 text-base font-semibold placeholder:font-normal placeholder-gray-400"
-                                />
-                              </div>
-                            </div>
-                        
-                            {/* CTA & Profit Display equivalent */}
-                            <div className="flex justify-end items-center mt-1.5">
-                              <button 
-                                onClick={() => {
-                                  if (isPromoLocked) {
-                                    alert("This product is currently locked for a promotional period.");
-                                    return;
-                                  }
-                                  const amount = Number(equinorInputAmount) || cost;
-                                  if (amount < cost) {
-                                    alert(`Minimum amount is ₦${cost.toLocaleString()}`);
-                                    return;
-                                  }
-                                  if (!currentUser) return;
-                                  if (currentUser.balance < amount) {
-                                    triggerVisualNotification("insufficient_balance", "INSUFFICIENT BALANCE", "Please recharge your account");
-                                    return;
-                                  }
-
-                                  if (plan.type === "vip" && VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex === 0) {
-                                    alert("This is a VIP product. You must be at least VIP1 to invest.");
-                                    return;
-                                  }
-
-                                  setEquinorSelectedPlan({ ...plan, buyAmount: amount, calculatedRoi: roi });
-                                  setBuyingQuantity("1");
-                                  setActiveModal("equinorConfirm");
-                                }}
-                                className={isPromoLocked ? "bg-slate-300 text-slate-500 px-6 h-[40px] rounded-[20px] font-bold text-[14px] shadow-sm cursor-not-allowed transform transition" : "bg-gradient-to-r from-[#8A63FF] to-[#C26BFF] text-white px-6 h-[40px] rounded-[20px] font-bold text-[14px] shadow-md transform transition active:scale-[0.98]"}
-                              >
-                                {isPromoLocked ? "Locked" : "Buy"}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    const mockInv = {
-                      planName: plan.name,
-                      amount: plan.min,
-                      expectedRoi: plan.roi,
-                      fixedDailyReturn: plan.fixedDailyReturn,
-                    } as import('./store').Investment;
-                    const calculatedDailyReturn = getDailyIncome(mockInv, currentUser, users, investments);
-                    const totalIncome = calculatedDailyReturn * plan.days;
-                    
-                    return (
-                      <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
-                          {isPromoLocked && plan.promotionalUnlockDate ? (
-                            <StampCountdown targetDate={plan.promotionalUnlockDate} />
-                          ) : (
-                            <>
-                              <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
-                              {plan.promoClosingDate && (
-                                <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
-                              )}
-                            </>
-                          )}
-                        
-                        {/* Image Header */}
-                        <div className={`relative w-full h-[110px] sm:h-[130px] bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center overflow-hidden`}>
-                          {plan.imageUrl ? (
-                            <img src={plan.imageUrl} alt={plan.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <>
-                              <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#6366F1] to-[#4F46E5] flex items-center justify-center shadow-[0_0_30px_rgba(99,102,241,0.6)] z-10">
-                                <span className="text-white font-bold text-3xl tracking-tighter">{plan.name.charAt(0).toUpperCase()}</span>
-                              </div>
-                              <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-white/5 blur-3xl z-0"></div>
-                              <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#6366F1]/20 blur-3xl z-0"></div>
-                            </>
-                          )}
-                        </div>
-
-                        <div className="p-3 flex flex-col gap-2">
-                          {/* Header Metadata Row */}
-                          <div className="flex justify-start items-center">
+                          {/* Below Image Row */}
+                          <div className="px-4 pt-3 flex justify-between items-center h-[32px]">
                             <span className="bg-[#FFECEC] text-[#FF4D4F] px-3 py-1 rounded-full font-bold text-[11px]">
                               T+{plan.tPlusDays || 1}
                             </span>
+                            
+                            {(isPromoLocked && plan.promotionalUnlockDate) ? (
+                              <ProductPromoClosingTag targetDate={plan.promotionalUnlockDate} />
+                            ) : plan.promoClosingDate ? (
+                              <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
+                            ) : null}
                           </div>
-                      
-                          {/* Title */}
-                          <h3 className="uppercase text-[16px] sm:text-[18px] font-semibold text-[#111827] tracking-tight leading-tight">
-                            {plan.name}
-                          </h3>
-                      
-                          {/* Financial Metrics Grid */}
-                          <div className="flex flex-col gap-1.5 mt-0.5">
-                            <div className="grid grid-cols-2 gap-1.5">
-                              <div className="bg-[#EDE7FF] rounded-[12px] p-2 flex flex-col items-center justify-center text-center">
-                                <span className="text-[10px] text-[#5B3DF6]/80 font-medium mb-0.5">Daily income</span>
-                                <span className="text-[#5B3DF6] font-semibold text-[13px]">₦{calculatedDailyReturn.toLocaleString()}</span>
-                              </div>
-                              <div className="bg-[#EDE7FF] rounded-[12px] p-2 flex flex-col items-center justify-center text-center">
-                                <span className="text-[10px] text-[#5B3DF6]/80 font-medium mb-0.5">Cycle</span>
-                                <span className="text-[#5B3DF6] font-semibold text-[13px]">{plan.days} Days</span>
-                              </div>
-                            </div>
-                            <div className="bg-[#EDE7FF] rounded-[12px] p-2.5 flex justify-between items-center px-3">
-                               <span className="text-[#5B3DF6]/80 text-[12px] font-medium">Price: ₦{plan.min.toLocaleString()}</span>
-                               <span className="text-[#5B3DF6] font-semibold text-[11px] uppercase">Quota: {plan.maxQuota || '∞'}</span>
-                            </div>
-                          </div>
-                      
-                          {/* CTA & Profit Display */}
-                          <div className="flex justify-between items-center mt-2">
+
+                          {/* Product details row */}
+                          <div className="px-4 py-3 flex justify-between items-center">
                             <div className="flex flex-col">
-                              <span className="text-[12px] text-[#6B7280] font-medium mb-0.5">Total income</span>
-                              <span className="text-[#FF3B30] text-[18px] font-bold leading-none">₦{totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                              <h3 className="font-bold text-[#1C1C1E] text-[16px] max-w-[160px] leading-tight mb-1">{plan.name}</h3>
+                              <span className="text-[#FF3B30] font-bold text-[22px] leading-none tracking-tight">₦{plan.min.toLocaleString()}</span>
                             </div>
                             
                             <button 
@@ -2735,14 +2457,274 @@ function MainApp() {
                                   return;
                                 }
                                 
+                                if (isVipTeam) {
+                                  const aLevelSubordinates = users.filter(u => u.referredBy === currentUser.referralCode).length;
+                                  if (aLevelSubordinates < 30) {
+                                    alert("You need at least 30 team members to purchase the VIP team exclusive project.");
+                                    return;
+                                  }
+                                }
+                                
+                                const hasPurchased = investments.some(inv => inv.userId === currentUser.id && inv.planName === plan.name);
+                                if (hasPurchased) {
+                                  alert("You have already reached the quota for this project.");
+                                  return;
+                                }
+                                
                                 setEquinorSelectedPlan({ ...plan, buyAmount: plan.min, calculatedRoi: plan.min > 0 ? (calculatedDailyReturn / plan.min) * 100 : 0 });
                                 setBuyingQuantity("1");
                                 setActiveModal("equinorConfirm");
                               }}
-                              className={isPromoLocked ? "bg-slate-300 text-slate-500 px-6 h-[40px] rounded-[20px] font-bold text-[14px] shadow-sm cursor-not-allowed transform transition" : "bg-gradient-to-r from-[#8A63FF] to-[#C26BFF] text-white px-6 h-[40px] rounded-[20px] font-bold text-[14px] shadow-md transform transition active:scale-[0.98]"}
+                              className={isPromoLocked ? "bg-slate-300 text-slate-500 px-6 py-2.5 rounded-[20px] font-bold text-[14px] cursor-not-allowed transform transition" : "bg-[#7B2FF7] text-white px-6 py-2.5 rounded-[20px] font-bold text-[14px] shadow-sm transform transition active:scale-95"}
                             >
-                              {isPromoLocked ? "Locked" : "Buy"}
+                              {isPromoLocked ? "Locked" : "Rush to buy"}
                             </button>
+                          </div>
+
+                          {/* Stats Grid Bottom Section */}
+                          <div className="px-4 pb-4">
+                            <div className="bg-[#F8F9FA] rounded-[12px] p-3 grid grid-cols-2 gap-y-2 gap-x-2">
+                              <div className="flex justify-between items-center pr-3">
+                                <span className="text-[#6B7280] text-[12px]">Total income:</span>
+                                <span className="text-[#1C1C1E] font-medium text-[13px]">₦{totalIncome.toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between items-center pl-3">
+                                <span className="text-[#6B7280] text-[12px]">Quota:</span>
+                                <span className="text-[#1C1C1E] font-medium text-[13px]">{plan.maxQuota || '∞'}</span>
+                              </div>
+                              <div className="flex justify-between items-center pr-3">
+                                <span className="text-[#6B7280] text-[12px]">Cycle:</span>
+                                <span className="text-[#1C1C1E] font-medium text-[13px]">{plan.days} Days</span>
+                              </div>
+                              <div className="flex justify-between items-center pl-3">
+                                <span className="text-[#6B7280] text-[12px]">Daily income:</span>
+                                <span className="text-[#1C1C1E] font-medium text-[13px]">₦{calculatedDailyReturn.toLocaleString()}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (plan.type === 'vip' && plan.name === 'Equinor Equity Exchange Project') {
+                      return (
+                        <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-sm overflow-hidden flex flex-col">
+                          {/* Image Header wrapper */}
+                          <div className="px-3.5 pt-3.5 w-full">
+                            <div className={`relative w-full aspect-[16/9] rounded-[18px] bg-[#1E1E2D] flex items-center justify-center overflow-hidden`}>
+                              {/* Simulated chart background */}
+                              <svg viewBox="0 0 100 40" className="absolute bottom-0 w-full h-[80%] opacity-30" preserveAspectRatio="none">
+                                <path d="M0,40 L0,20 L10,25 L20,15 L30,22 L40,10 L50,18 L60,5 L70,12 L80,2 L90,10 L100,0 L100,40 Z" fill="#28C76F" opacity="0.3" />
+                                <polyline points="0,20 10,25 20,15 30,22 40,10 50,18 60,5 70,12 80,2 90,10 100,0" fill="none" stroke="#28C76F" strokeWidth="1" />
+                              </svg>
+  
+                              {/* Tags overlay */}
+                              <div className="absolute top-0 right-0 bg-[#F97316] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
+                              
+                              {/* EM BREVE overlay */}
+                              {isPromoLocked && plan.promotionalUnlockDate && (
+                                <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center">
+                                  <StampCountdown targetDate={plan.promotionalUnlockDate} />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Below Image Row */}
+                          <div className="px-4 pt-3 flex justify-between items-center h-[32px]">
+                            <span className="bg-[#FFECEC] text-[#FF4D4F] px-3 py-1 rounded-full font-bold text-[11px]">
+                              T+{plan.tPlusDays || 1}
+                            </span>
+                            
+                            {(isPromoLocked && plan.promotionalUnlockDate) ? (
+                              <ProductPromoClosingTag targetDate={plan.promotionalUnlockDate} />
+                            ) : plan.promoClosingDate ? (
+                              <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
+                            ) : null}
+                          </div>
+
+                          {/* Product details row */}
+                          <div className="px-4 py-3 flex justify-between items-start">
+                            <div className="flex flex-col">
+                              <h3 className="font-bold text-[#1C1C1E] text-[16px] max-w-[160px] leading-tight mb-1">{plan.name}</h3>
+                              <div className="text-[#6E6B7B] text-[11px] leading-snug mt-1 max-w-[180px]">
+                                VIP equity exchange program. Distributed after each 1-day cycle, min ₦ {cost.toLocaleString()}.
+                              </div>
+                            </div>
+                            
+                            <button 
+                              onClick={() => {
+                                if (isPromoLocked) {
+                                  alert("This product is currently locked for a promotional period.");
+                                  return;
+                                }
+                                const amount = Number(equinorInputAmount) || cost;
+                                if (amount < cost) {
+                                  alert(`Minimum amount is ₦${cost.toLocaleString()}`);
+                                  return;
+                                }
+                                if (!currentUser) return;
+                                if (currentUser.balance < amount) {
+                                  triggerVisualNotification("insufficient_balance", "INSUFFICIENT BALANCE", "Please recharge your account");
+                                  return;
+                                }
+
+                                if (plan.type === "vip" && VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex === 0) {
+                                  alert("This is a VIP product. You must be at least VIP1 to invest.");
+                                  return;
+                                }
+
+                                setEquinorSelectedPlan({ ...plan, buyAmount: amount, calculatedRoi: roi });
+                                setBuyingQuantity("1");
+                                setActiveModal("equinorConfirm");
+                              }}
+                              className={isPromoLocked ? "bg-slate-300 text-slate-500 px-6 py-2.5 rounded-[20px] font-bold text-[14px] cursor-not-allowed transform transition shrink-0 mt-1" : "bg-[#7B2FF7] text-white px-6 py-2.5 rounded-[20px] font-bold text-[14px] shadow-sm transform transition active:scale-95 shrink-0 mt-1"}
+                            >
+                              {isPromoLocked ? "Locked" : "Rush to buy"}
+                            </button>
+                          </div>
+
+                          {/* Input Section */}
+                          <div className="px-4 pb-2">
+                            <div className="flex flex-col">
+                              <span className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-2">
+                                Enter Amount (Min ₦{cost.toLocaleString()})
+                                {plan.maxQuota ? <span className="text-[#0052FF] text-[9px] font-bold tracking-wider bg-blue-50 px-1.5 py-0.5 rounded uppercase">Quota: {plan.maxQuota}</span> : null}
+                              </span>
+                              <div className="border border-gray-200 focus-within:border-[#8A63FF] rounded-[10px] px-3 py-2 transition-colors flex items-center bg-[#F8F9FA]">
+                                <span className="text-gray-500 font-bold mr-1">₦</span>
+                                <input 
+                                  type="number"
+                                  placeholder={`${cost}`}
+                                  value={equinorInputAmount}
+                                  onChange={(e) => setEquinorInputAmount(e.target.value)}
+                                  className="w-full bg-transparent outline-none font-mono text-gray-800 text-base font-semibold placeholder:font-normal placeholder-gray-400"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Stats Grid Bottom Section */}
+                          <div className="px-4 pb-4">
+                            <div className="bg-[#F8F9FA] rounded-[12px] p-3 grid grid-cols-2 gap-y-2 gap-x-2">
+                              <div className="flex justify-between items-center pr-3">
+                                <span className="text-[#6B7280] text-[12px]">24H Returns:</span>
+                                <span className="text-[#1C1C1E] font-medium text-[13px]">₦{get24h.toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between items-center pl-3">
+                                <span className="text-[#6B7280] text-[12px]">Cycle:</span>
+                                <span className="text-[#1C1C1E] font-medium text-[13px]">1 Days</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    const mockInv = {
+                      planName: plan.name,
+                      amount: plan.min,
+                      expectedRoi: plan.roi,
+                      fixedDailyReturn: plan.fixedDailyReturn,
+                    } as import('./store').Investment;
+                    const calculatedDailyReturn = getDailyIncome(mockInv, currentUser, users, investments);
+                    const totalIncome = calculatedDailyReturn * plan.days;
+                    
+                    return (
+                      <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-sm overflow-hidden flex flex-col">
+                        {/* Image Header wrapper */}
+                        <div className="px-3.5 pt-3.5 w-full">
+                          <div className={`relative w-full aspect-[16/9] rounded-[18px] bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center overflow-hidden`}>
+                            {plan.imageUrl ? (
+                              <img src={plan.imageUrl} alt={plan.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <>
+                                <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#6366F1] to-[#4F46E5] flex items-center justify-center shadow-[0_0_30px_rgba(99,102,241,0.6)] z-10">
+                                  <span className="text-white font-bold text-3xl tracking-tighter">{plan.name.charAt(0).toUpperCase()}</span>
+                                </div>
+                                <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-white/5 blur-3xl z-0"></div>
+                                <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-[#6366F1]/20 blur-3xl z-0"></div>
+                              </>
+                            )}
+  
+                            {/* Tags overlay */}
+                            <div className="absolute top-0 right-0 bg-[#F97316] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
+                            
+                            {/* EM BREVE overlay */}
+                            {isPromoLocked && plan.promotionalUnlockDate && (
+                              <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center">
+                                <StampCountdown targetDate={plan.promotionalUnlockDate} />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Below Image Row */}
+                        <div className="px-4 pt-3 flex justify-between items-center h-[32px]">
+                          <span className="bg-[#FFECEC] text-[#FF4D4F] px-3 py-1 rounded-full font-bold text-[11px]">
+                            T+{plan.tPlusDays || 1}
+                          </span>
+                          
+                          {(isPromoLocked && plan.promotionalUnlockDate) ? (
+                            <ProductPromoClosingTag targetDate={plan.promotionalUnlockDate} />
+                          ) : plan.promoClosingDate ? (
+                            <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
+                          ) : null}
+                        </div>
+
+                        {/* Product details row */}
+                        <div className="px-4 py-3 flex justify-between items-center">
+                          <div className="flex flex-col">
+                            <h3 className="font-bold text-[#1C1C1E] text-[16px] max-w-[160px] leading-tight mb-1">{plan.name}</h3>
+                            <span className="text-[#FF3B30] font-bold text-[22px] leading-none tracking-tight">₦{plan.min.toLocaleString()}</span>
+                          </div>
+                          
+                          <button 
+                            onClick={() => {
+                              if (isPromoLocked) {
+                                alert("This product is currently locked for a promotional period.");
+                                return;
+                              }
+                              if (!currentUser) return;
+                              if (currentUser.balance < plan.min) {
+                                triggerVisualNotification("insufficient_balance", "INSUFFICIENT BALANCE", "Please recharge your account");
+                                return;
+                              }
+
+                              if (plan.type === "vip" && VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex === 0) {
+                                alert("This is a VIP product. You must be at least VIP1 to invest.");
+                                return;
+                              }
+                              
+                              setEquinorSelectedPlan({ ...plan, buyAmount: plan.min, calculatedRoi: plan.min > 0 ? (calculatedDailyReturn / plan.min) * 100 : 0 });
+                              setBuyingQuantity("1");
+                              setActiveModal("equinorConfirm");
+                            }}
+                            className={isPromoLocked ? "bg-slate-300 text-slate-500 px-6 py-2.5 rounded-[20px] font-bold text-[14px] cursor-not-allowed transform transition" : "bg-[#7B2FF7] text-white px-6 py-2.5 rounded-[20px] font-bold text-[14px] shadow-sm transform transition active:scale-95"}
+                          >
+                            {isPromoLocked ? "Locked" : "Rush to buy"}
+                          </button>
+                        </div>
+
+                        {/* Stats Grid Bottom Section */}
+                        <div className="px-4 pb-4">
+                          <div className="bg-[#F8F9FA] rounded-[12px] p-3 grid grid-cols-2 gap-y-2 gap-x-2">
+                            <div className="flex justify-between items-center pr-3">
+                              <span className="text-[#6B7280] text-[12px]">Total income:</span>
+                              <span className="text-[#1C1C1E] font-medium text-[13px]">₦{totalIncome.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center pl-3">
+                              <span className="text-[#6B7280] text-[12px]">Quota:</span>
+                              <span className="text-[#1C1C1E] font-medium text-[13px]">{plan.maxQuota || '∞'}</span>
+                            </div>
+                            <div className="flex justify-between items-center pr-3">
+                              <span className="text-[#6B7280] text-[12px]">Cycle:</span>
+                              <span className="text-[#1C1C1E] font-medium text-[13px]">{plan.days} Days</span>
+                            </div>
+                            <div className="flex justify-between items-center pl-3">
+                              <span className="text-[#6B7280] text-[12px]">Daily income:</span>
+                              <span className="text-[#1C1C1E] font-medium text-[13px]">₦{calculatedDailyReturn.toLocaleString()}</span>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2839,15 +2821,7 @@ function MainApp() {
                 <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none overflow-hidden z-0">
                   <EquinorStar className="w-[60vw] max-w-[300px] text-white absolute" />
                 </div>
-                <div className="relative z-10 p-4 pt-0 flex flex-col h-full overflow-hidden w-full max-w-md mx-auto">
-                  {/* Logo Center */}
-                  <div className="text-center h-[48px] flex justify-center items-center gap-2">
-                    <EquinorStar className="w-5 h-5 text-white" />
-                    <span className="text-[18px] font-semibold tracking-widest uppercase text-white">
-                      EQUINOR
-                    </span>
-                  </div>
-
+                <div className="relative z-10 p-4 pt-4 flex flex-col h-full overflow-hidden w-full max-w-md mx-auto">
                   {/* Summary Cards outside scroll */}
                   <div className="flex gap-2 mb-3 shrink-0 z-10 w-full mt-2">
                     {/* Left Card */}
@@ -6752,19 +6726,23 @@ function MainApp() {
 
                   <div className="pt-8">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         if (!bankAccountName || !bankAccountNumber || !selectedBankCode) {
                           alert("Please fill out all fields.");
                           return;
                         }
                         const bankNameStr = banksList.find((b) => b.code === selectedBankCode)?.name || "";
-                        updateBankDetails({
+                        const success = await updateBankDetails({
                           accountName: bankAccountName,
                           accountNumber: bankAccountNumber,
                           bankCode: selectedBankCode,
                           bankName: bankNameStr,
                         });
-                        setActiveModal(null);
+                        if (success) {
+                          setToastMessage("Bank details saved successfully!");
+                          setTimeout(() => setToastMessage(null), 3000);
+                          setIsEditingBank(false);
+                        }
                       }}
                       className="w-full h-[56px] rounded-full bg-[#A855F7] text-white font-bold text-[16px] shadow-[0_4px_14px_rgba(168,85,247,0.4)] active:scale-95 transition-transform"
                     >

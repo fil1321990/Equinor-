@@ -169,7 +169,7 @@ interface AppContextType extends AppState {
   enableUser: (userId: string) => void;
   restrictUserWithdrawals: (userId: string, restricted: boolean) => void;
   collectEarnings: (investmentId: string, suppressAlert?: boolean) => Promise<{ success: boolean; amount?: number; message?: string }>;
-  updateBankDetails: (details: BankDetails) => void;
+  updateBankDetails: (details: BankDetails) => Promise<boolean>;
   updateAvatar: (avatarBase64: string) => void;
   updatePhone: (phone: string) => void;
   updatePassword: (password: string) => void;
@@ -1213,15 +1213,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     return { success: true, amount: totalToAdd };
   };
 
-  const updateBankDetails = (details: BankDetails) => {
-    if (!currentUser) return;
+  const updateBankDetails = async (details: BankDetails): Promise<boolean> => {
+    if (!currentUser) return false;
+    
+    // Optimistic update
     setUsers((prev) =>
       prev.map((u) => (u.id === currentUser.id ? { ...u, bankDetails: details } : u))
     );
     setCurrentUser((prev) =>
       prev ? { ...prev, bankDetails: details } : prev
     );
-    alert('Bank details updated successfully!');
+
+    // Persist to Supabase
+    const { error } = await supabase.from('users').update({ bankDetails: details }).eq('id', currentUser.id);
+    if (error) {
+      console.error("Failed to update bank details in Supabase", error);
+      alert('Failed to save bank details. ' + error.message);
+      // Revert optimistic update
+      fetchData();
+      return false;
+    } else {
+      // Force a fetch to ensure sync but don't alert to avoid interrupting flow
+      fetchData();
+      return true;
+    }
   };
 
   const updateAvatar = (avatarBase64: string) => {
