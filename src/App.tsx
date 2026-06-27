@@ -113,15 +113,19 @@ const ProductPromoClosingTag = ({ targetDate }: { targetDate: string }) => {
   }, [targetDate]);
 
   return (
-    <div className="absolute top-0 right-0 bg-black/80 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1.5 rounded-bl-[16px] z-20 shadow-sm leading-none flex items-center gap-1.5 border-b border-l border-white/10">
-      <Clock className="w-3 h-3 text-[#00D4FF] animate-pulse" />
-      <span className="text-[#00D4FF] tracking-wider">ENDS IN</span>
-      <span className="font-mono text-xs">{timeLeft.hours.toString().padStart(2, '0')}:{timeLeft.minutes.toString().padStart(2, '0')}:{timeLeft.seconds.toString().padStart(2, '0')}</span>
+    <div className="absolute top-6 right-2 z-10 flex items-center gap-1">
+      <div className="bg-black text-white font-bold text-xs w-6 h-6 flex items-center justify-center rounded-md shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+        {timeLeft.hours.toString().padStart(2, '0')}
+      </div>
+      <span className="text-white font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">:</span>
+      <div className="bg-black text-white font-bold text-xs w-6 h-6 flex items-center justify-center rounded-md shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+        {timeLeft.minutes.toString().padStart(2, '0')}
+      </div>
     </div>
   );
 };
 
-const StampCountdown = ({ targetDate, title = "Unlocks In" }: { targetDate: string, title?: string }) => {
+const StampCountdown = ({ targetDate }: { targetDate: string }) => {
   const [timeLeft, setTimeLeft] = useState({ hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
@@ -148,64 +152,52 @@ const StampCountdown = ({ targetDate, title = "Unlocks In" }: { targetDate: stri
   }, [targetDate]);
 
   return (
-    <div className="relative pointer-events-none group flex flex-col items-center justify-center w-[320px] h-[320px]" style={{ animation: 'floatStamp 4s ease-in-out infinite' }}>
-      <style>{`
-        @keyframes floatStamp {
-          0%, 100% { transform: translateY(0) rotate(-10deg) scale(1); opacity: 0.95; }
-          50% { transform: translateY(-6px) rotate(-8deg) scale(1.02); opacity: 1; }
-        }
-        @keyframes rotate3DStar {
-          0% { transform: perspective(400px) rotateY(0deg) rotateX(10deg); }
-          50% { transform: perspective(400px) rotateY(180deg) rotateX(-10deg); }
-          100% { transform: perspective(400px) rotateY(360deg) rotateX(10deg); }
-        }
-        @keyframes spinOuter {
-          from { transform: rotate(0deg); transform-origin: center; }
-          to { transform: rotate(360deg); transform-origin: center; }
-        }
-      `}</style>
-      
-      {/* Background SVG for stamp edge effect */}
-      <div className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none">
-        <svg viewBox="0 0 240 240" className="w-[320px] h-[320px] opacity-90 drop-shadow-[0_12px_24px_rgba(0,0,0,0.6)]" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="stampOuterGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#00D4FF" />
-              <stop offset="33%" stopColor="#7B2FF7" />
-              <stop offset="66%" stopColor="#FF4D4F" />
-              <stop offset="100%" stopColor="#FFD700" />
-            </linearGradient>
-          </defs>
-          <g style={{ animation: 'spinOuter 15s linear infinite', transformOrigin: '120px 120px' }}>
-            <circle cx="120" cy="120" r="114" fill="rgba(255,255,255,0.05)" stroke="url(#stampOuterGradient)" strokeWidth="6" strokeDasharray="16 16" strokeLinecap="round" />
-          </g>
-        </svg>
-      </div>
-      
-      {/* Glassmorphic Inner Circle */}
-      <div className="relative z-10 w-[290px] h-[290px] rounded-[50%] backdrop-blur-[12px] bg-gradient-to-br from-[#00D4FF]/20 via-[#7B2FF7]/20 to-[#FF4D4F]/20 border-[2px] border-white/50 shadow-[inset_0_0_30px_rgba(255,255,255,0.6)] flex flex-col items-center justify-center px-4">
-        
-        {/* Inner solid border line for stamp detail */}
-        <div className="absolute inset-3 rounded-[50%] border-[16px] border-white/90 pointer-events-none"></div>
-
-        <div className="flex flex-col items-center gap-2 mb-1 relative z-10 mt-[-10px]">
-          {/* 3D Equinor SVG Special Design */}
-          <div className="relative w-14 h-14 flex items-center justify-center mb-1" style={{ animation: 'rotate3DStar 6s linear infinite' }}>
-             <EquinorStar className="w-14 h-14 text-white drop-shadow-[0_8px_16px_rgba(0,0,0,0.8)] filter brightness-110" />
-             <div className="absolute inset-0 bg-gradient-to-tr from-[#00D4FF]/40 via-[#7B2FF7]/40 to-[#FF4D4F]/40 mix-blend-overlay rounded-full"></div>
-          </div>
-          <h3 className="text-transparent bg-clip-text bg-gradient-to-r from-[#00D4FF] via-white to-[#FFD700] text-[15px] font-black tracking-[0.1em] uppercase drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] text-center leading-tight">
-            {title}
-          </h3>
+    <div className="absolute inset-0 z-20 flex flex-row items-center justify-end pr-4 pointer-events-none">
+      {/* Container to group stamp and timer */}
+      <div className="relative flex items-center">
+        {/* Stamp Circle */}
+        <div className="relative z-10 flex items-center justify-center transform -rotate-12">
+          <svg viewBox="0 0 100 100" className="w-[85px] h-[85px] drop-shadow-[0_4px_8px_rgba(0,0,0,0.3)]">
+            {/* White gear teeth using stroke */}
+            <circle cx="50" cy="50" r="45" fill="#ffffff" />
+            <circle cx="50" cy="50" r="47" fill="none" stroke="#ffffff" strokeWidth="6" strokeDasharray="5 4.84" />
+            
+            {/* Inner gray center */}
+            <circle cx="50" cy="50" r="39" fill="#E5E7EB" />
+            
+            {/* Thin white inner ring */}
+            <circle cx="50" cy="50" r="35" fill="none" stroke="#ffffff" strokeWidth="1.5" />
+            
+            {/* 5-point stars spaced around the white ring */}
+            <g fill="#9CA3AF">
+              {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => {
+                const rad = (angle * Math.PI) / 180;
+                const x = 50 + 42 * Math.cos(rad);
+                const y = 50 + 42 * Math.sin(rad);
+                return (
+                  <path key={i} d={`M${x} ${y-2.5} L${x+0.8} ${y-0.8} L${x+2.5} ${y-0.8} L${x+1.2} ${y+0.4} L${x+1.6} ${y+2.2} L${x} ${y+1.1} L${x-1.6} ${y+2.2} L${x-1.2} ${y+0.4} L${x-2.5} ${y-0.8} L${x-0.8} ${y-0.8} Z`} />
+                );
+              })}
+            </g>
+            
+            {/* Diagonal Ribbon */}
+            <g transform="rotate(25 50 50)">
+              {/* Ribbon background */}
+              <rect x="0" y="38" width="100" height="24" fill="#000000" />
+              {/* Ribbon text */}
+              <text x="50" y="55" fill="#ffffff" fontSize="13" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle" letterSpacing="0.5">EM BREVE</text>
+            </g>
+          </svg>
         </div>
-        
-        <div className="relative z-10 w-[250px] mt-2 py-3 bg-gradient-to-r from-black/20 via-black/40 to-black/20 border-y border-white/30 backdrop-blur-md flex items-center justify-center text-white font-mono font-bold text-[20px] drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] leading-none shadow-lg">
-          <div className="flex items-center justify-center gap-2 px-2 whitespace-nowrap">
-            <span className="text-[#FFD700] drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3)"}}>{timeLeft.hours.toString().padStart(2, '0')}h</span>
-            <span className="opacity-70 text-[18px] pb-0.5 text-[#FFD700]">:</span>
-            <span className="text-[#FFD700] drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3)"}}>{timeLeft.minutes.toString().padStart(2, '0')}m</span>
-            <span className="opacity-70 text-[18px] pb-0.5 text-[#FFD700]">:</span>
-            <span className="text-[#FFD700] animate-pulse-opacity drop-shadow-[0_2px_4px_rgba(255,255,255,0.2)]" style={{textShadow: "0 0 10px rgba(255,215,0,0.5), 0 0 20px rgba(255,215,0,0.3)"}}>{timeLeft.seconds.toString().padStart(2, '0')}s</span>
+
+        {/* Timer behind stamp */}
+        <div className="bg-black/90 backdrop-blur-md rounded-r-xl pl-8 pr-3 py-1.5 border-y border-r border-white/20 translate-x-[-24px] flex items-center gap-1 shadow-xl z-0">
+          <div className="bg-[#1A1A24] text-white font-bold text-xs w-6 h-6 flex items-center justify-center rounded-md">
+            {timeLeft.hours.toString().padStart(2, '0')}
+          </div>
+          <span className="text-white font-bold drop-shadow-md">:</span>
+          <div className="bg-[#1A1A24] text-white font-bold text-xs w-6 h-6 flex items-center justify-center rounded-md">
+            {timeLeft.minutes.toString().padStart(2, '0')}
           </div>
         </div>
       </div>
@@ -2328,11 +2320,11 @@ function MainApp() {
           )}
 
           {activeTab === "product" && (
-            <div className="absolute inset-0 flex flex-col font-sans overflow-hidden z-20 bg-white">
+            <div className="absolute inset-0 flex flex-col font-sans overflow-hidden z-20 bg-gradient-to-b from-[#0A0E2E] to-[#1C0F3F]">
               <div className="relative z-10 flex flex-col h-full w-full">
                 {/* Tab Navigation directly beneath (Header removed) */}
                 <div className="px-5 shrink-0 mb-4 mt-1 pt-6">
-                <div className="flex justify-between items-center relative bg-[#F3F4F6] rounded-full p-1 border border-gray-100">
+                <div className="flex justify-between items-center relative bg-[#1A1E4E]/50 border border-white/10 rounded-full p-1 backdrop-blur-md">
                   {(["general", "vip", "special"] as const).map((tab, idx) => {
                     const isActive = productTab === tab;
                     const labels = ["General", "VIP", "Special"];
@@ -2341,7 +2333,7 @@ function MainApp() {
                         key={tab}
                         onClick={() => setProductTab(tab)}
                         className={`text-[14px] font-bold py-2 relative w-1/3 text-center transition-colors rounded-full z-10 ${
-                          isActive ? "text-white" : "text-gray-500 hover:text-gray-700"
+                          isActive ? "text-white" : "text-white/50 hover:text-white/80"
                         }`}
                       >
                         {labels[idx]}
@@ -2424,17 +2416,18 @@ function MainApp() {
                       return (
                         <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
                           {isPromoLocked && plan.promotionalUnlockDate ? (
-                            <div className="absolute inset-0 bg-transparent z-20 flex flex-col items-center justify-center pt-28 pointer-events-none">
-                                <StampCountdown targetDate={plan.promotionalUnlockDate} title="Unlocks In" />
-                            </div>
-                          ) : plan.promoClosingDate ? (
-                            <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
+                            <StampCountdown targetDate={plan.promotionalUnlockDate} />
                           ) : (
-                            <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
+                            <>
+                              <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
+                              {plan.promoClosingDate && (
+                                <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
+                              )}
+                            </>
                           )}
                           
                           {/* Image Header */}
-                          <div className={`relative w-full h-[180px] sm:h-[220px] ${isVipTeam ? 'bg-gradient-to-r from-red-900 to-black' : 'bg-gradient-to-br from-[#1F2937] to-[#111827]'} flex items-center justify-center overflow-hidden`}>
+                          <div className={`relative w-full h-[110px] sm:h-[130px] ${isVipTeam ? 'bg-gradient-to-r from-red-900 to-black' : 'bg-gradient-to-br from-[#1F2937] to-[#111827]'} flex items-center justify-center overflow-hidden`}>
                             {plan.imageUrl ? (
                               <img src={plan.imageUrl} alt={plan.name} className="w-full h-full object-cover" />
                             ) : isVipTeam ? (
@@ -2457,42 +2450,42 @@ function MainApp() {
                             )}
                           </div>
                           
-                          <div className="p-3.5 sm:p-4 flex flex-col gap-3">
+                          <div className="p-3 flex flex-col gap-2">
                             {/* Header Metadata Row */}
                             <div className="flex justify-start items-center">
-                              <span className="bg-[#FFECEC] text-[#FF4D4F] px-4 py-1.5 rounded-full font-bold text-[12px]">
+                              <span className="bg-[#FFECEC] text-[#FF4D4F] px-3 py-1 rounded-full font-bold text-[11px]">
                                 T+{plan.tPlusDays || 1}
                               </span>
                             </div>
                         
                             {/* Title */}
-                            <h3 className="uppercase text-[18px] sm:text-[20px] font-semibold text-[#111827] tracking-tight leading-tight">
+                            <h3 className="uppercase text-[16px] sm:text-[18px] font-semibold text-[#111827] tracking-tight leading-tight">
                               {plan.name}
                             </h3>
                         
                             {/* Financial Metrics Grid */}
-                            <div className="flex flex-col gap-2 mt-1">
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="bg-[#EDE7FF] rounded-[14px] p-3 flex flex-col items-center justify-center text-center">
-                                  <span className="text-[11px] text-[#5B3DF6]/80 font-medium mb-1">Daily income</span>
-                                  <span className="text-[#5B3DF6] font-semibold text-[14px]">₦{calculatedDailyReturn.toLocaleString()}</span>
+                            <div className="flex flex-col gap-1.5 mt-0.5">
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <div className="bg-[#EDE7FF] rounded-[12px] p-2 flex flex-col items-center justify-center text-center">
+                                  <span className="text-[10px] text-[#5B3DF6]/80 font-medium mb-0.5">Daily income</span>
+                                  <span className="text-[#5B3DF6] font-semibold text-[13px]">₦{calculatedDailyReturn.toLocaleString()}</span>
                                 </div>
-                                <div className="bg-[#EDE7FF] rounded-[14px] p-3 flex flex-col items-center justify-center text-center">
-                                  <span className="text-[11px] text-[#5B3DF6]/80 font-medium mb-1">Cycle</span>
-                                  <span className="text-[#5B3DF6] font-semibold text-[14px]">{plan.days} Days</span>
+                                <div className="bg-[#EDE7FF] rounded-[12px] p-2 flex flex-col items-center justify-center text-center">
+                                  <span className="text-[10px] text-[#5B3DF6]/80 font-medium mb-0.5">Cycle</span>
+                                  <span className="text-[#5B3DF6] font-semibold text-[13px]">{plan.days} Days</span>
                                 </div>
                               </div>
-                              <div className="bg-[#EDE7FF] rounded-[14px] p-3 flex justify-between items-center px-4">
-                                 <span className="text-[#5B3DF6]/80 text-[13px] font-medium">Price: ₦{plan.min.toLocaleString()}</span>
-                                 <span className="text-[#5B3DF6] font-semibold text-[12px] uppercase">Quota: {plan.maxQuota || '∞'}</span>
+                              <div className="bg-[#EDE7FF] rounded-[12px] p-2.5 flex justify-between items-center px-3">
+                                 <span className="text-[#5B3DF6]/80 text-[12px] font-medium">Price: ₦{plan.min.toLocaleString()}</span>
+                                 <span className="text-[#5B3DF6] font-semibold text-[11px] uppercase">Quota: {plan.maxQuota || '∞'}</span>
                               </div>
                             </div>
                         
                             {/* CTA & Profit Display */}
-                            <div className="flex justify-between items-center mt-3 pt-1">
+                            <div className="flex justify-between items-center mt-2">
                               <div className="flex flex-col">
-                                <span className="text-[14px] text-[#6B7280] font-medium mb-0.5">Total income</span>
-                                <span className="text-[#FF3B30] text-[20px] font-bold leading-none">₦{totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                <span className="text-[12px] text-[#6B7280] font-medium mb-0.5">Total income</span>
+                                <span className="text-[#FF3B30] text-[18px] font-bold leading-none">₦{totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                               </div>
                               
                               <button 
@@ -2530,7 +2523,7 @@ function MainApp() {
                                   setBuyingQuantity("1");
                                   setActiveModal("equinorConfirm");
                                 }}
-                                className={isPromoLocked ? "bg-slate-300 text-slate-500 px-8 md:px-10 h-[48px] rounded-[24px] font-bold text-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.1)] cursor-not-allowed transform transition" : "bg-gradient-to-r from-[#8A63FF] to-[#C26BFF] text-white px-8 md:px-10 h-[48px] rounded-[24px] font-bold text-[16px] shadow-[0_4px_12px_rgba(138,99,255,0.4)] transform transition active:scale-[0.98]"}
+                                className={isPromoLocked ? "bg-slate-300 text-slate-500 px-6 h-[40px] rounded-[20px] font-bold text-[14px] shadow-sm cursor-not-allowed transform transition" : "bg-gradient-to-r from-[#8A63FF] to-[#C26BFF] text-white px-6 h-[40px] rounded-[20px] font-bold text-[14px] shadow-md transform transition active:scale-[0.98]"}
                               >
                                 {isPromoLocked ? "Locked" : "Buy"}
                               </button>
@@ -2544,17 +2537,18 @@ function MainApp() {
                       return (
                         <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
                           {isPromoLocked && plan.promotionalUnlockDate ? (
-                            <div className="absolute inset-0 bg-transparent z-20 flex flex-col items-center justify-center pt-28 pointer-events-none">
-                                <StampCountdown targetDate={plan.promotionalUnlockDate} title="Unlocks In" />
-                            </div>
-                          ) : plan.promoClosingDate ? (
-                            <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
+                            <StampCountdown targetDate={plan.promotionalUnlockDate} />
                           ) : (
-                            <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
+                            <>
+                              <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
+                              {plan.promoClosingDate && (
+                                <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
+                              )}
+                            </>
                           )}
                           
                           {/* Image Header */}
-                          <div className={`relative w-full h-[180px] sm:h-[220px] bg-[#1E1E2D] flex items-center justify-center overflow-hidden`}>
+                          <div className={`relative w-full h-[110px] sm:h-[130px] bg-[#1E1E2D] flex items-center justify-center overflow-hidden`}>
                             {/* Simulated chart background */}
                             <svg viewBox="0 0 100 40" className="absolute bottom-0 w-full h-[80%] opacity-30" preserveAspectRatio="none">
                               <path d="M0,40 L0,20 L10,25 L20,15 L30,22 L40,10 L50,18 L60,5 L70,12 L80,2 L90,10 L100,0 L100,40 Z" fill="#28C76F" opacity="0.3" />
@@ -2562,33 +2556,33 @@ function MainApp() {
                             </svg>
                           </div>
                           
-                          <div className="p-3.5 sm:p-4 flex flex-col gap-3">
+                          <div className="p-3 flex flex-col gap-2">
                             {/* Header Metadata Row */}
                             <div className="flex justify-start items-center">
-                              <span className="bg-[#FFECEC] text-[#FF4D4F] px-4 py-1.5 rounded-full font-bold text-[12px]">
+                              <span className="bg-[#FFECEC] text-[#FF4D4F] px-3 py-1 rounded-full font-bold text-[11px]">
                                 T+{plan.tPlusDays || 1}
                               </span>
                             </div>
                         
                             {/* Title */}
-                            <h3 className="uppercase text-[18px] sm:text-[20px] font-semibold text-[#111827] tracking-tight leading-tight">
+                            <h3 className="uppercase text-[16px] sm:text-[18px] font-semibold text-[#111827] tracking-tight leading-tight">
                               {plan.name}
                             </h3>
                         
-                            <div className="text-[#6E6B7B] text-[13px] leading-relaxed">
+                            <div className="text-[#6E6B7B] text-[12px] leading-relaxed">
                               Participate in our VIP equity exchange program. Benefits are distributed after each 1-day cycle, with a minimum entry of ₦ {cost.toLocaleString()}. Advance to higher VIP tiers to increase your returns and discount rate.
                             </div>
                         
                             {/* Financial Metrics Grid */}
-                            <div className="flex flex-col gap-2">
-                              <div className="grid grid-cols-2 gap-2">
-                                <div className="bg-[#EDE7FF] rounded-[14px] p-3 flex flex-col items-center justify-center text-center">
-                                  <span className="text-[11px] text-[#5B3DF6]/80 font-medium mb-1">24H Returns</span>
-                                  <span className="text-[#5B3DF6] font-semibold text-[14px]">₦{get24h.toLocaleString()}</span>
+                            <div className="flex flex-col gap-1.5 mt-0.5">
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <div className="bg-[#EDE7FF] rounded-[12px] p-2 flex flex-col items-center justify-center text-center">
+                                  <span className="text-[10px] text-[#5B3DF6]/80 font-medium mb-0.5">24H Returns</span>
+                                  <span className="text-[#5B3DF6] font-semibold text-[13px]">₦{get24h.toLocaleString()}</span>
                                 </div>
-                                <div className="bg-[#EDE7FF] rounded-[14px] p-3 flex flex-col items-center justify-center text-center">
-                                  <span className="text-[11px] text-[#5B3DF6]/80 font-medium mb-1">Cycle</span>
-                                  <span className="text-[#5B3DF6] font-semibold text-[14px]">1 Days</span>
+                                <div className="bg-[#EDE7FF] rounded-[12px] p-2 flex flex-col items-center justify-center text-center">
+                                  <span className="text-[10px] text-[#5B3DF6]/80 font-medium mb-0.5">Cycle</span>
+                                  <span className="text-[#5B3DF6] font-semibold text-[13px]">1 Days</span>
                                 </div>
                               </div>
                             </div>
@@ -2612,7 +2606,7 @@ function MainApp() {
                             </div>
                         
                             {/* CTA & Profit Display equivalent */}
-                            <div className="flex justify-end items-center mt-2">
+                            <div className="flex justify-end items-center mt-1.5">
                               <button 
                                 onClick={() => {
                                   if (isPromoLocked) {
@@ -2639,7 +2633,7 @@ function MainApp() {
                                   setBuyingQuantity("1");
                                   setActiveModal("equinorConfirm");
                                 }}
-                                className={isPromoLocked ? "bg-slate-300 text-slate-500 px-8 md:px-10 h-[48px] rounded-[24px] font-bold text-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.1)] cursor-not-allowed transform transition" : "bg-gradient-to-r from-[#8A63FF] to-[#C26BFF] text-white px-8 md:px-10 h-[48px] rounded-[24px] font-bold text-[16px] shadow-[0_4px_12px_rgba(138,99,255,0.4)] transform transition active:scale-[0.98]"}
+                                className={isPromoLocked ? "bg-slate-300 text-slate-500 px-6 h-[40px] rounded-[20px] font-bold text-[14px] shadow-sm cursor-not-allowed transform transition" : "bg-gradient-to-r from-[#8A63FF] to-[#C26BFF] text-white px-6 h-[40px] rounded-[20px] font-bold text-[14px] shadow-md transform transition active:scale-[0.98]"}
                               >
                                 {isPromoLocked ? "Locked" : "Buy"}
                               </button>
@@ -2661,17 +2655,18 @@ function MainApp() {
                     return (
                       <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-[0_8px_30px_rgba(0,0,0,0.15)] overflow-hidden">
                           {isPromoLocked && plan.promotionalUnlockDate ? (
-                            <div className="absolute inset-0 bg-transparent z-20 flex flex-col items-center justify-center pt-28 pointer-events-none">
-                                <StampCountdown targetDate={plan.promotionalUnlockDate} title="Unlocks In" />
-                            </div>
-                          ) : plan.promoClosingDate ? (
-                            <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
+                            <StampCountdown targetDate={plan.promotionalUnlockDate} />
                           ) : (
-                            <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
+                            <>
+                              <div className="absolute top-0 right-0 bg-[#FF4D4F] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
+                              {plan.promoClosingDate && (
+                                <ProductPromoClosingTag targetDate={plan.promoClosingDate} />
+                              )}
+                            </>
                           )}
                         
                         {/* Image Header */}
-                        <div className={`relative w-full h-[180px] sm:h-[220px] bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center overflow-hidden`}>
+                        <div className={`relative w-full h-[110px] sm:h-[130px] bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center overflow-hidden`}>
                           {plan.imageUrl ? (
                             <img src={plan.imageUrl} alt={plan.name} className="w-full h-full object-cover" />
                           ) : (
@@ -2685,42 +2680,42 @@ function MainApp() {
                           )}
                         </div>
 
-                        <div className="p-3.5 sm:p-4 flex flex-col gap-3">
+                        <div className="p-3 flex flex-col gap-2">
                           {/* Header Metadata Row */}
                           <div className="flex justify-start items-center">
-                            <span className="bg-[#FFECEC] text-[#FF4D4F] px-4 py-1.5 rounded-full font-bold text-[12px]">
+                            <span className="bg-[#FFECEC] text-[#FF4D4F] px-3 py-1 rounded-full font-bold text-[11px]">
                               T+{plan.tPlusDays || 1}
                             </span>
                           </div>
                       
                           {/* Title */}
-                          <h3 className="uppercase text-[18px] sm:text-[20px] font-semibold text-[#111827] tracking-tight leading-tight">
+                          <h3 className="uppercase text-[16px] sm:text-[18px] font-semibold text-[#111827] tracking-tight leading-tight">
                             {plan.name}
                           </h3>
                       
                           {/* Financial Metrics Grid */}
-                          <div className="flex flex-col gap-2 mt-1">
-                            <div className="grid grid-cols-2 gap-2">
-                              <div className="bg-[#EDE7FF] rounded-[14px] p-3 flex flex-col items-center justify-center text-center">
-                                <span className="text-[11px] text-[#5B3DF6]/80 font-medium mb-1">Daily income</span>
-                                <span className="text-[#5B3DF6] font-semibold text-[14px]">₦{calculatedDailyReturn.toLocaleString()}</span>
+                          <div className="flex flex-col gap-1.5 mt-0.5">
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <div className="bg-[#EDE7FF] rounded-[12px] p-2 flex flex-col items-center justify-center text-center">
+                                <span className="text-[10px] text-[#5B3DF6]/80 font-medium mb-0.5">Daily income</span>
+                                <span className="text-[#5B3DF6] font-semibold text-[13px]">₦{calculatedDailyReturn.toLocaleString()}</span>
                               </div>
-                              <div className="bg-[#EDE7FF] rounded-[14px] p-3 flex flex-col items-center justify-center text-center">
-                                <span className="text-[11px] text-[#5B3DF6]/80 font-medium mb-1">Cycle</span>
-                                <span className="text-[#5B3DF6] font-semibold text-[14px]">{plan.days} Days</span>
+                              <div className="bg-[#EDE7FF] rounded-[12px] p-2 flex flex-col items-center justify-center text-center">
+                                <span className="text-[10px] text-[#5B3DF6]/80 font-medium mb-0.5">Cycle</span>
+                                <span className="text-[#5B3DF6] font-semibold text-[13px]">{plan.days} Days</span>
                               </div>
                             </div>
-                            <div className="bg-[#EDE7FF] rounded-[14px] p-3 flex justify-between items-center px-4">
-                               <span className="text-[#5B3DF6]/80 text-[13px] font-medium">Price: ₦{plan.min.toLocaleString()}</span>
-                               <span className="text-[#5B3DF6] font-semibold text-[12px] uppercase">Quota: {plan.maxQuota || '∞'}</span>
+                            <div className="bg-[#EDE7FF] rounded-[12px] p-2.5 flex justify-between items-center px-3">
+                               <span className="text-[#5B3DF6]/80 text-[12px] font-medium">Price: ₦{plan.min.toLocaleString()}</span>
+                               <span className="text-[#5B3DF6] font-semibold text-[11px] uppercase">Quota: {plan.maxQuota || '∞'}</span>
                             </div>
                           </div>
                       
                           {/* CTA & Profit Display */}
-                          <div className="flex justify-between items-center mt-3 pt-1">
+                          <div className="flex justify-between items-center mt-2">
                             <div className="flex flex-col">
-                              <span className="text-[14px] text-[#6B7280] font-medium mb-0.5">Total income</span>
-                              <span className="text-[#FF3B30] text-[20px] font-bold leading-none">₦{totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                              <span className="text-[12px] text-[#6B7280] font-medium mb-0.5">Total income</span>
+                              <span className="text-[#FF3B30] text-[18px] font-bold leading-none">₦{totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                             </div>
                             
                             <button 
@@ -2744,7 +2739,7 @@ function MainApp() {
                                 setBuyingQuantity("1");
                                 setActiveModal("equinorConfirm");
                               }}
-                              className={isPromoLocked ? "bg-slate-300 text-slate-500 px-8 md:px-10 h-[48px] rounded-[24px] font-bold text-[16px] shadow-[0_4px_12px_rgba(0,0,0,0.1)] cursor-not-allowed transform transition" : "bg-gradient-to-r from-[#8A63FF] to-[#C26BFF] text-white px-8 md:px-10 h-[48px] rounded-[24px] font-bold text-[16px] shadow-[0_4px_12px_rgba(138,99,255,0.4)] transform transition active:scale-[0.98]"}
+                              className={isPromoLocked ? "bg-slate-300 text-slate-500 px-6 h-[40px] rounded-[20px] font-bold text-[14px] shadow-sm cursor-not-allowed transform transition" : "bg-gradient-to-r from-[#8A63FF] to-[#C26BFF] text-white px-6 h-[40px] rounded-[20px] font-bold text-[14px] shadow-md transform transition active:scale-[0.98]"}
                             >
                               {isPromoLocked ? "Locked" : "Buy"}
                             </button>
@@ -2978,7 +2973,7 @@ function MainApp() {
                         return (
                           <div key={inv.id} className="relative bg-white rounded-[16px] mb-4 shadow-[0_4px_20px_rgba(0,0,0,0.1)] overflow-hidden">
                             {/* Image Header */}
-                            <div className="relative w-full h-[140px] sm:h-[160px] bg-[#111827] flex items-center justify-center overflow-hidden">
+                            <div className="relative w-full h-[110px] sm:h-[130px] bg-[#111827] flex items-center justify-center overflow-hidden">
                               {product?.imageUrl ? (
                                 <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                               ) : (
@@ -2986,7 +2981,7 @@ function MainApp() {
                               )}
                             </div>
                           
-                            <div className="p-4 sm:p-5 flex flex-col gap-3">
+                            <div className="p-3 sm:p-4 flex flex-col gap-2.5">
                               {/* Header Metadata Row */}
                               <div className="flex justify-between items-center">
                                 <span className="bg-[#FFECEC] text-[#FF4D4F] px-3 py-1 rounded-full font-bold text-[11px]">
@@ -3029,8 +3024,8 @@ function MainApp() {
                               </div>
                           
                               {/* Financial Metrics Grid */}
-                              <div className="flex flex-col gap-3 mt-2">
-                                <div className="grid grid-cols-3 gap-2">
+                              <div className="flex flex-col gap-2 mt-1.5">
+                                <div className="grid grid-cols-3 gap-1.5">
                                   <div className="bg-[#EDE7FF] rounded-[12px] p-2 flex flex-col items-center justify-center text-center">
                                     <span className="text-[10px] text-[#5B3DF6]/80 font-medium mb-0.5">Daily income</span>
                                     <span className="text-[#5B3DF6] font-semibold text-[13px] truncate w-full">₦{dailyIncome.toLocaleString()}</span>
@@ -3051,10 +3046,10 @@ function MainApp() {
                               </div>
                           
                               {/* CTA & Profit Display */}
-                              <div className="flex justify-between items-center mt-3 pt-1">
+                              <div className="flex justify-between items-center mt-2">
                                 <div className="flex flex-col">
-                                  <span className="text-[14px] text-[#6B7280] font-medium mb-0.5">Live generated income</span>
-                                  <span className="text-[#FF3B30] text-[20px] font-bold leading-none">+₦{profitAccrued.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                  <span className="text-[12px] text-[#6B7280] font-medium mb-0.5">Live generated income</span>
+                                  <span className="text-[#FF3B30] text-[18px] font-bold leading-none">+₦{profitAccrued.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                                 </div>
                                 
                                 {canCollect ? (
@@ -3077,7 +3072,7 @@ function MainApp() {
                                         setCollectingIds(prev => ({ ...prev, [inv.id]: false }));
                                       }, 1000);
                                     }}
-                                    className={`bg-gradient-to-r from-[#EC4899] to-[#F43F5E] text-white px-8 md:px-10 h-[48px] rounded-[24px] font-bold text-[16px] shadow-[0_4px_12px_rgba(236,72,153,0.4)] transform transition flex flex-col justify-center items-center ${collectingIds[inv.id] ? 'opacity-80 scale-95' : 'active:scale-[0.98]'}`}
+                                    className={`bg-gradient-to-r from-[#EC4899] to-[#F43F5E] text-white px-6 h-[40px] rounded-[20px] font-bold text-[14px] shadow-md transform transition flex flex-col justify-center items-center ${collectingIds[inv.id] ? 'opacity-80 scale-95' : 'active:scale-[0.98]'}`}
                                   >
                                     {collectingIds[inv.id] ? (
                                       <div className="flex items-center gap-2">
