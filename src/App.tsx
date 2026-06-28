@@ -415,7 +415,6 @@ function MainApp() {
     incomeRecords,
     approveTransaction,
     rejectTransaction,
-    updateTransactionAdminInfo,
     disableUser,
     enableUser,
     adminUsdtAddress,
@@ -3524,10 +3523,10 @@ function MainApp() {
                       </div>
                       <div className="flex gap-2 mt-1">
                         <button
-                          onClick={() => {
+                          onClick={async () => {
                             const newPass = window.prompt(`Enter new password for ${u.name || u.phone} (leave empty to clear):`);
                             if (newPass !== null) {
-                              adminResetUserPassword(u.id, newPass);
+                              await adminResetUserPassword(u.id, newPass);
                               alert("Password reset successfully.");
                             }
                           }}
@@ -3784,50 +3783,6 @@ function MainApp() {
                           <div className="text-sm font-semibold text-blue-900">{tx.bankDetails.reference}</div>
                         </div>
                       )}
-                      
-                      {/* Admin Info (Tags & Notes) */}
-                      <div className="mt-2 text-sm bg-slate-100 p-3 rounded-xl border border-slate-200">
-                        {editingTxId === tx.id ? (
-                          <div className="flex flex-col gap-2">
-                             <div>
-                               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Tags (comma separated)</label>
-                               <input type="text" value={editingTxTags} onChange={(e) => setEditingTxTags(e.target.value)} className="w-full bg-white border border-slate-300 rounded-lg p-2 focus:border-[#7B2FFF] outline-none text-slate-800" placeholder="e.g. High Priority, Flagged" />
-                             </div>
-                             <div>
-                               <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Internal Notes</label>
-                               <textarea value={editingTxNotes} onChange={(e) => setEditingTxNotes(e.target.value)} className="w-full bg-white border border-slate-300 rounded-lg p-2 focus:border-[#7B2FFF] outline-none min-h-[60px] text-slate-800" placeholder="Add context..."></textarea>
-                             </div>
-                             <div className="flex gap-2 justify-end mt-1">
-                               <button onClick={() => setEditingTxId(null)} className="px-3 py-1.5 bg-slate-300 hover:bg-slate-400 text-slate-800 rounded-lg font-bold text-xs transition-colors">Cancel</button>
-                               <button onClick={() => {
-                                  const tags = editingTxTags.split(",").map(t => t.trim()).filter(Boolean);
-                                  updateTransactionAdminInfo(tx.id, editingTxNotes, tags);
-                                  setEditingTxId(null);
-                               }} className="px-4 py-1.5 bg-[#7B2FFF] hover:opacity-90 text-white rounded-lg font-bold text-xs transition-colors shadow">Save</button>
-                             </div>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col gap-1.5 cursor-pointer relative group" onClick={() => {
-                                setEditingTxId(tx.id);
-                                setEditingTxNotes(tx.internalNotes || "");
-                                setEditingTxTags((tx.adminTags || []).join(", "));
-                          }}>
-                             <div className="absolute top-0 right-0 p-0.5 text-slate-300 group-hover:text-[#7B2FFF] transition-colors"><Settings className="w-4 h-4"/></div>
-                             {(!tx.adminTags?.length && !tx.internalNotes) && (
-                                <div className="text-slate-400 italic text-xs">+ Add admin notes or tags ...</div>
-                             )}
-                             {(tx.adminTags && tx.adminTags.length > 0) && (
-                               <div className="flex flex-wrap gap-1 pr-6">
-                                 {tx.adminTags.map((tag, i) => <span key={i} className="bg-amber-100 text-amber-800 border border-amber-200 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">{tag}</span>)}
-                               </div>
-                             )}
-                             {tx.internalNotes && (
-                               <div className="text-slate-600 text-xs font-medium pr-6 mt-1 line-clamp-3"><span className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">Note:</span> {tx.internalNotes}</div>
-                             )}
-                          </div>
-                        )}
-                      </div>
-
                     </div>
                     
                     <div className="flex flex-wrap gap-2 mt-2">
@@ -5112,7 +5067,7 @@ function MainApp() {
 
               <div className="pt-4">
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (currentUser?.password && setupOldPasswordValue !== currentUser.password) {
                       alert("Incorrect old password.");
                       return;
@@ -5121,7 +5076,7 @@ function MainApp() {
                       alert("Please enter a valid new password.");
                       return;
                     }
-                    updatePassword(setupPasswordValue);
+                    await updatePassword(setupPasswordValue);
                     alert("Password updated successfully.");
                     setSetupOldPasswordValue("");
                     setSetupPasswordValue("");

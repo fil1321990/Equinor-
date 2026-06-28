@@ -16,8 +16,6 @@ export interface Transaction {
   amount: number;
   status: TransactionStatus;
   date: string;
-  internalNotes?: string;
-  adminTags?: string[];
   bankDetails?: {
     bankName?: string;
     accountNumber?: string;
@@ -156,7 +154,6 @@ interface AppContextType extends AppState {
   ) => void;
   approveTransaction: (id: string) => void;
   rejectTransaction: (id: string) => void;
-  updateTransactionAdminInfo: (txId: string, notes: string, tags: string[]) => void;
   updateRoi: () => void;
   signup: (phone: string, password?: string, referralCode?: string) => void;
   updateGlobalWithdrawalLimit: (limit: number) => void;
@@ -170,11 +167,11 @@ interface AppContextType extends AppState {
   restrictUserWithdrawals: (userId: string, restricted: boolean) => void;
   collectEarnings: (investmentId: string, suppressAlert?: boolean) => Promise<{ success: boolean; amount?: number; message?: string }>;
   updateBankDetails: (details: BankDetails) => Promise<boolean>;
-  updateAvatar: (avatarBase64: string) => void;
-  updatePhone: (phone: string) => void;
-  updatePassword: (password: string) => void;
-  updateBalanceAlertThreshold: (threshold: number) => void;
-  adminResetUserPassword: (userId: string, newPassword?: string) => void;
+  updateAvatar: (avatarBase64: string) => Promise<void>;
+  updatePhone: (phone: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
+  updateBalanceAlertThreshold: (threshold: number) => Promise<void>;
+  adminResetUserPassword: (userId: string, newPassword?: string) => Promise<void>;
   adminUpdateUserBalance: (userId: string, delta: number) => Promise<void>;
   addProduct: (product: Omit<Product, "id">) => void;
   editProduct: (id: string, product: Partial<Product>) => void;
@@ -608,7 +605,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       alert("Your account has been disabled. Please contact support.");
       return;
     }
-    if (user.password !== password) {
+    if (!user.password && password) {
+      // If password was cleared by admin, the next password they enter becomes their new password
+      await supabase.from('users').update({ password }).eq('id', user.id);
+      user.password = password;
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, password } : u));
+    } else if (user.password !== password) {
       alert("Incorrect password.");
       return;
     }
@@ -752,7 +754,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (data) {
       setTransactions((prev) => prev.map(t => t.id === localTxId ? data : t));
     }
-    alert("Withdrawal request submitted and is pending admin approval.");
+    alert("Withdrawal request submitted successfully and is pending Bank approval.");
   };
 
   const createInvestment = async (
@@ -1001,19 +1003,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  const updateTransactionAdminInfo = async (txId: string, notes: string, tags: string[]) => {
-    try {
-      const { error } = await supabase.from('transactions').update({ internalNotes: notes, adminTags: tags }).eq('id', txId);
-      if (error) throw new Error("Could not update transaction info: " + error.message);
-      const { data: txData } = await supabase.from("transactions").select("*");
-      if (txData) setTransactions(txData);
-      alert("Transaction info updated successfully!");
-    } catch (err: any) {
-      console.error(err);
-      alert("Update failed: " + err.message);
-    }
-  };
-
   const updateRoi = () => {
     // In a real app this would happen daily via cron job. Here we just trigger it manually or on mount.
     // For prototype we'll just simulate a tiny ROI bump.
@@ -1229,17 +1218,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (error) {
       console.error("Failed to update bank details in Supabase", error);
       alert('Failed to save bank details. ' + error.message);
-      // Revert optimistic update
-      fetchData();
       return false;
     } else {
-      // Force a fetch to ensure sync but don't alert to avoid interrupting flow
-      fetchData();
       return true;
     }
   };
 
-  const updateAvatar = (avatarBase64: string) => {
+  const updateAvatar = async (avatarBase64: string) => {
     if (!currentUser) return;
     localStorage.setItem('userAvatar', avatarBase64);
     setUsers((prev) =>
@@ -1248,9 +1233,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setCurrentUser((prev) =>
       prev ? { ...prev, avatar: avatarBase64 } : prev
     );
+    await supabase.from('users').update({ avatar: avatarBase64 }).eq('id', currentUser.id);
   };
 
-  const updatePhone = (phone: string) => {
+  const updatePhone = async (phone: string) => {
     if (!currentUser) return;
     setUsers((prev) =>
       prev.map((u) => (u.id === currentUser.id ? { ...u, phone } : u))
@@ -1258,10 +1244,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setCurrentUser((prev) =>
       prev ? { ...prev, phone } : prev
     );
+    await supabase.from('users').update({ phone }).eq('id', currentUser.id);
   };
 
-  const updatePassword = (password: string) => {
+  const updatePassword = async (password: string) => {
     if (!currentUser) return;
+    
+    const { error } = await supabase.from('users').update({ password }).eq('id', currentUser.id);
+    if (error) {
+      console.error("Failed to update password:", error);
+      alert("Failed to update password: " + error.message);
+      return;
+    }
+
     setUsers((prev) =>
       prev.map((u) => (u.id === currentUser.id ? { ...u, password } : u))
     );
@@ -1270,7 +1265,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     );
   };
 
-  const updateBalanceAlertThreshold = (threshold: number) => {
+  const updateBalanceAlertThreshold = async (threshold: number) => {
     if (!currentUser) return;
     setUsers((prev) =>
       prev.map((u) => (u.id === currentUser.id ? { ...u, balanceAlertThreshold: threshold } : u))
@@ -1278,21 +1273,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setCurrentUser((prev) =>
       prev ? { ...prev, balanceAlertThreshold: threshold } : prev
     );
+    await supabase.from('users').update({ balanceAlertThreshold: threshold }).eq('id', currentUser.id);
   };
 
-  const adminResetUserPassword = (userId: string, newPassword?: string) => {
+  const adminResetUserPassword = async (userId: string, newPassword?: string) => {
+    const passwordValue = newPassword === undefined || newPassword === "" ? null : newPassword;
     setUsers((prev) =>
       prev.map((u) => {
         if (u.id === userId) {
-          if (newPassword === undefined || newPassword === "") {
+          if (!passwordValue) {
              const { password, ...rest } = u;
              return rest as User;
           }
-          return { ...u, password: newPassword };
+          return { ...u, password: passwordValue };
         }
         return u;
       })
     );
+    await supabase.from('users').update({ password: passwordValue }).eq('id', userId);
   };
 
   const adminUpdateUserBalance = async (userId: string, delta: number) => {
@@ -1498,7 +1496,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         createInvestment,
         approveTransaction,
         rejectTransaction,
-        updateTransactionAdminInfo,
         updateRoi,
         updateGlobalWithdrawalLimit,
         updateUserWithdrawalLimit,
