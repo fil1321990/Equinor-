@@ -95,6 +95,7 @@ export interface User {
   email: string;
   phone?: string;
   password?: string;
+  mustChangePassword?: boolean;
   role: UserRole;
   balance: number;
   referralCode: string;
@@ -138,7 +139,7 @@ interface AppContextType extends AppState {
   login: (email: string, password?: string) => void;
   logout: () => void;
   sendChatMessage: (text: string, toUserId?: string) => void;
-  requestDeposit: (amount: number, reference: string) => void;
+  requestDeposit: (amount: number, reference: string, systemBankDetails?: any, userBankDetails?: any) => void;
   requestWithdrawal: (
     amount: number,
     bankDetails: { bankName: string; accountNumber: string; accountName?: string },
@@ -552,7 +553,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     updateSetting('carouselImages', next);
   };
 
-  const login = async (rawIdentifier: string, password?: string) => {
+  const login = async (rawIdentifier: string, password?: string): Promise<{success: boolean, mustChangePassword?: boolean, user?: User}> => {
     const identifier = rawIdentifier.trim().replace(/\s+/g, '');
     let user = null;
     
@@ -560,15 +561,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const isEmail = identifier.includes('@');
     const { data, error } = await supabase.from('users').select('*').eq(isEmail ? 'email' : 'phone', identifier).single();
     if (data) {
-       user = { ...data, disabled: data.disabled || data.role === 'disabled' };
+       user = { ...data, disabled: data.disabled || data.role === 'disabled' } as User;
        setUsers(prev => {
-         const existing = prev.findIndex(u => u.id === user.id);
+         const existing = prev.findIndex(u => u.id === user!.id);
          if (existing !== -1) {
            const newUsers = [...prev];
-           newUsers[existing] = user;
+           newUsers[existing] = user!;
            return newUsers;
          }
-         return [...prev, user];
+         return [...prev, user!];
        });
     } else {
        // Fallback to local cache only if Supabase fails (e.g. offline)
@@ -591,31 +592,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           };
           const { data } = await supabase.from('users').insert(newUser).select().single();
           if (data) {
-             user = data;
-             setUsers(prev => [...prev, data]);
+             user = data as User;
+             setUsers(prev => [...prev, data as User]);
           }
        }
     }
 
     if (!user) {
       alert("User not found.");
-      return;
+      return { success: false };
     }
     if (user.disabled || user.role === 'disabled') {
       alert("Your account has been disabled. Please contact support.");
-      return;
+      return { success: false };
     }
     if (!user.password && password) {
       // If password was cleared by admin, the next password they enter becomes their new password
       await supabase.from('users').update({ password }).eq('id', user.id);
       user.password = password;
-      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, password } : u));
+      setUsers(prev => prev.map(u => u.id === user!.id ? { ...u, password } : u));
     } else if (user.password !== password) {
       alert("Incorrect password.");
-      return;
+      return { success: false };
     }
+    
+    if (user.mustChangePassword) {
+      return { success: true, mustChangePassword: true, user };
+    }
+    
     setCurrentUser(user);
     window.location.hash = '';
+    return { success: true, user };
   };
 
   const signup = async (rawIdentifier: string, password?: string, referralCode?: string) => {
@@ -664,7 +671,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     window.location.hash = '#/login';
   };
 
-  const requestDeposit = async (amount: number, reference: string) => {
+  const requestDeposit = async (amount: number, reference: string, systemBankDetails?: any, userBankDetails?: any) => {
     if (!currentUser) return;
     
     const localTxId = Math.random().toString();
@@ -675,7 +682,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       amount,
       status: "pending" as TransactionStatus,
       date: new Date().toISOString(),
-      bankDetails: { reference },
+      bankDetails: { reference, systemBankDetails, userBankDetails },
     };
     
     // Optimistic insert to ensure it reflects instantly locally
@@ -686,7 +693,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       type: "deposit" as TransactionType,
       amount,
       status: "pending" as TransactionStatus,
-      bankDetails: { reference },
+      bankDetails: { reference, systemBankDetails, userBankDetails },
     };
     const { data, error } = await supabase.from('transactions').insert(newTx).select().single();
     if (error) {
@@ -1285,12 +1292,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
              const { password, ...rest } = u;
              return rest as User;
           }
-          return { ...u, password: passwordValue };
+          return { ...u, password: passwordValue, mustChangePassword: true };
         }
         return u;
       })
     );
-    await supabase.from('users').update({ password: passwordValue }).eq('id', userId);
+    await supabase.from('users').update({ password: passwordValue, mustChangePassword: !!passwordValue }).eq('id', userId);
   };
 
   const adminUpdateUserBalance = async (userId: string, delta: number) => {

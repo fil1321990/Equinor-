@@ -67,6 +67,7 @@ import { VIP_LEVELS, EQUITY_EXCHANGE_TIERS, VIP_MEMBER_EXCLUSIVE_TIERS } from ".
 import Confetti from "react-confetti";
 
 import { playNotificationSound } from "./utils/audio";
+import { supabase } from "./supabase";
 import imgPurchaseSuccess from './assets/images/equinor_purchase_success_1782199177262.jpg';
 import imgRewardUnlocked from './assets/images/equinor_reward_unlocked_1782199192098.jpg';
 import imgYouWon from './assets/images/equinor_you_won_1782199202549.jpg';
@@ -138,7 +139,7 @@ const StampCountdown = ({ targetDate }: { targetDate: string }) => {
     <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
       {/* Stamp Circle */}
       <div className="relative z-10 flex items-center justify-center transform -rotate-12">
-        <svg viewBox="0 0 100 100" className="w-[110px] h-[110px] drop-shadow-[0_4px_8px_rgba(0,0,0,0.3)]">
+        <svg viewBox="0 0 100 100" className="w-[220px] h-[220px] drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
           {/* White gear teeth using stroke */}
           <circle cx="50" cy="50" r="45" fill="#ffffff" />
           <circle cx="50" cy="50" r="47" fill="none" stroke="#ffffff" strokeWidth="6" strokeDasharray="5 4.84" />
@@ -697,8 +698,8 @@ function MainApp() {
   const [newProductQuota, setNewProductQuota] = useState("0");
   const [newProductType, setNewProductType] = useState<"general"|"vip"|"special">("general");
   const [newProductImageUrl, setNewProductImageUrl] = useState("");
-  const [newProductPromoUnlock, setNewProductPromoUnlock] = useState("");
-  const [newProductPromoClosing, setNewProductPromoClosing] = useState("");
+  const [newProductPromoUnlock, setNewProductPromoUnlock] = useState({ d: "", h: "", m: "", s: "" });
+  const [newProductPromoClosing, setNewProductPromoClosing] = useState({ d: "", h: "", m: "", s: "" });
   const [newDepositAccountBank, setNewDepositAccountBank] = useState("Opay");
   const [newDepositAccountName, setNewDepositAccountName] = useState("");
   const [newDepositAccountNumber, setNewDepositAccountNumber] = useState("");
@@ -712,6 +713,8 @@ function MainApp() {
   const [copiedCode, setCopiedCode] = useState(false);
   const [loginIdentifier, setLoginIdentifier] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [forcePasswordChangeUser, setForcePasswordChangeUser] = useState<any>(null);
+  const [newForcedPassword, setNewForcedPassword] = useState("");
   const [isRegistering, setIsRegistering] = useState(() => {
     const path = window.location.pathname;
     const hash = window.location.hash;
@@ -936,7 +939,7 @@ function MainApp() {
     if (depositAmount) {
       setIsProcessing(true);
       setTimeout(() => {
-        requestDeposit(Number(depositAmount));
+        requestDeposit(Number(depositAmount), "", undefined, currentUser?.bankDetails);
         setDepositAmount("");
         setIsProcessing(false);
         setActiveModal(null);
@@ -1055,7 +1058,77 @@ function MainApp() {
     return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
   };
 
+  const handleLoginSubmit = async () => {
+    if (!loginIdentifier || !loginPassword) {
+      alert("Please fill in phone number and password.");
+      return;
+    }
+    const res = await login(loginIdentifier, loginPassword);
+    if (res?.mustChangePassword && res?.user) {
+      setForcePasswordChangeUser(res.user);
+    }
+  };
+
+  const handleForcePasswordChange = async () => {
+    if (!newForcedPassword) {
+      alert("Please enter a new password.");
+      return;
+    }
+    if (newForcedPassword === loginPassword) {
+      alert("New password cannot be the same as the temporary password reset by admin.");
+      return;
+    }
+    await supabase.from('users').update({ password: newForcedPassword, mustChangePassword: false }).eq('id', forcePasswordChangeUser.id);
+    
+    // Quick reload / clear to prompt user to login with new password
+    alert("Password updated successfully! Please log in with your new password.");
+    setForcePasswordChangeUser(null);
+    setLoginPassword("");
+    setNewForcedPassword("");
+  };
+
   if (!currentUser) {
+    if (forcePasswordChangeUser) {
+      return (
+        <div className="h-[100dvh] md:min-h-screen bg-[#0A0E2E] flex justify-center items-center md:py-4 relative font-sans overflow-hidden">
+          <div className="w-full max-w-[480px] h-full md:h-[95vh] bg-[#0A0E2E] md:rounded-[2.5rem] overflow-hidden shadow-2xl relative border-0 md:border-[6px] border-[#1a1e4e]/50 flex flex-col pt-12">
+            <div className="absolute top-[-20%] left-[-10%] w-[140%] h-[60%] bg-gradient-to-b from-[#6B2EFF]/20 to-transparent rounded-[100%] blur-2xl pointer-events-none" />
+            
+            <div className="flex items-center justify-between px-4 z-10">
+              <button className="p-2" onClick={() => setForcePasswordChangeUser(null)}>
+                <ChevronLeft className="w-6 h-6 text-white" />
+              </button>
+              <span className="text-white font-medium">Update Password</span>
+              <div className="w-10"></div>
+            </div>
+            
+            <div className="flex-1 px-8 pt-12 flex flex-col z-10">
+              <div className="mb-12">
+                <h1 className="text-white text-3xl font-bold mb-2">Change Required</h1>
+                <p className="text-white/60">An admin reset your password. You must set a new password before logging in.</p>
+              </div>
+              
+              <div className="flex-1 flex flex-col space-y-4">
+                <input 
+                  type="password" 
+                  placeholder="New Password"
+                  value={newForcedPassword}
+                  onChange={e => setNewForcedPassword(e.target.value)}
+                  className="w-full bg-[#1a1e4e]/30 border border-white/10 rounded-2xl px-4 py-4 text-white placeholder-white/30 focus:outline-none focus:border-[#6B2EFF]"
+                />
+                <button 
+                  onClick={handleForcePasswordChange}
+                  className="w-full bg-[#6B2EFF] text-white py-4 rounded-full font-bold text-lg mt-8 active:scale-95 transition-transform"
+                >
+                  Save New Password
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     if (authRoute === 'admin') {
       return (
         <div className="h-[100dvh] md:min-h-screen bg-[#0A0E2E] flex justify-center items-center md:py-4 relative font-sans overflow-hidden">
@@ -1079,7 +1152,7 @@ function MainApp() {
               <button 
                 onClick={() => {
                   if (!loginIdentifier || !loginPassword) return alert("Enter credentials");
-                  login(loginIdentifier, loginPassword);
+                  handleLoginSubmit();
                 }}
                 className="w-full bg-[#6B2EFF] text-white py-4 rounded-full font-bold text-lg mt-4 active:scale-95 transition-transform"
               >
@@ -1284,7 +1357,7 @@ function MainApp() {
                   alert("Please fill in phone number and password.");
                   return;
                 }
-                login(loginIdentifier, loginPassword);
+                handleLoginSubmit();
               }}
               className="w-full bg-[#6B2EFF] text-white py-4 rounded-full font-bold text-lg mt-8 active:scale-95 transition-transform"
             >
@@ -2380,12 +2453,11 @@ function MainApp() {
                       
                       const calculatedDailyReturn = getDailyIncome(mockInv, currentUser, users, investments);
                       const totalIncome = calculatedDailyReturn * plan.days;
-                      
                       return (
-                        <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-sm overflow-hidden flex flex-col">
+                        <div key={plan.id} className="relative bg-[#D3D5DA] rounded-[24px] mb-6 shadow-md overflow-hidden flex flex-col p-1.5 border-4 border-[#0F1B2D]/5">
                           {/* Image Header wrapper */}
-                          <div className="px-3.5 pt-3.5 w-full">
-                            <div className={`relative w-full aspect-[16/9] rounded-[18px] ${isVipTeam ? 'bg-gradient-to-r from-red-900 to-black' : 'bg-gradient-to-br from-[#1F2937] to-[#111827]'} flex items-center justify-center overflow-hidden`}>
+                          <div className="w-full relative">
+                            <div className={`relative w-full aspect-[16/9] rounded-[20px] ${isVipTeam ? 'bg-gradient-to-r from-red-900 to-black' : 'bg-gradient-to-br from-[#1F2937] to-[#111827]'} flex items-center justify-center overflow-hidden`}>
                               {plan.imageUrl ? (
                                 <img src={plan.imageUrl} alt={plan.name} className="w-full h-full object-cover" />
                               ) : isVipTeam ? (
@@ -2408,7 +2480,7 @@ function MainApp() {
                               )}
                               
                               {/* Tags overlay */}
-                              <div className="absolute top-0 right-0 bg-[#F97316] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
+                              <div className="absolute top-0 right-0 bg-gradient-to-r from-[#F97316] to-[#F59E0B] text-white text-[10px] font-bold px-4 py-1.5 rounded-bl-[16px] z-20 shadow-md leading-none uppercase tracking-widest">HOT</div>
                               
                               {/* EM BREVE overlay */}
                               {isPromoLocked && plan.promotionalUnlockDate && (
@@ -2420,8 +2492,8 @@ function MainApp() {
                           </div>
                           
                           {/* Below Image Row */}
-                          <div className="px-4 pt-3 flex justify-between items-center h-[32px]">
-                            <span className="bg-[#FFECEC] text-[#FF4D4F] px-3 py-1 rounded-full font-bold text-[11px]">
+                          <div className="px-4 pt-4 flex justify-between items-center h-[32px]">
+                            <span className="bg-[#FFECEC] text-[#FF4D4F] px-3 py-1 rounded-full font-bold text-[12px]">
                               T+{plan.tPlusDays || 1}
                             </span>
                             
@@ -2433,10 +2505,13 @@ function MainApp() {
                           </div>
 
                           {/* Product details row */}
-                          <div className="px-4 py-3 flex justify-between items-center">
+                          <div className="px-4 py-3 flex justify-between items-start mt-1">
                             <div className="flex flex-col">
-                              <h3 className="font-bold text-[#1C1C1E] text-[16px] max-w-[160px] leading-tight mb-1">{plan.name}</h3>
-                              <span className="text-[#FF3B30] font-bold text-[22px] leading-none tracking-tight">₦{plan.min.toLocaleString()}</span>
+                              <h3 className="font-semibold text-[#1E293B] text-[18px] max-w-[160px] leading-tight mb-1">{plan.name}</h3>
+                              <span className="text-[#D32F2F] font-bold text-[22px] leading-none tracking-tight mt-1">₦{plan.min.toLocaleString()}</span>
+                              <div className="text-[#6E6B7B] text-[11px] leading-snug mt-1 max-w-[180px]">
+                                VIP equity exchange program. Distributed after each 1-day cycle.
+                              </div>
                             </div>
                             
                             <button 
@@ -2630,10 +2705,10 @@ function MainApp() {
                     const totalIncome = calculatedDailyReturn * plan.days;
                     
                     return (
-                      <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-sm overflow-hidden flex flex-col">
+                      <div key={plan.id} className="relative bg-[#D3D5DA] rounded-[24px] mb-6 shadow-md overflow-hidden flex flex-col p-1.5 border-4 border-[#0F1B2D]/5">
                         {/* Image Header wrapper */}
-                        <div className="px-3.5 pt-3.5 w-full">
-                          <div className={`relative w-full aspect-[16/9] rounded-[18px] bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center overflow-hidden`}>
+                        <div className="w-full relative">
+                          <div className={`relative w-full aspect-[16/9] rounded-[20px] bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center overflow-hidden`}>
                             {plan.imageUrl ? (
                               <img src={plan.imageUrl} alt={plan.name} className="w-full h-full object-cover" />
                             ) : (
@@ -2647,7 +2722,7 @@ function MainApp() {
                             )}
   
                             {/* Tags overlay */}
-                            <div className="absolute top-0 right-0 bg-[#F97316] text-white text-[10px] font-bold px-3 py-1 rounded-bl-[12px] z-20 shadow-sm leading-none uppercase tracking-widest">HOT</div>
+                            <div className="absolute top-0 right-0 bg-gradient-to-r from-[#F97316] to-[#F59E0B] text-white text-[10px] font-bold px-4 py-1.5 rounded-bl-[16px] z-20 shadow-md leading-none uppercase tracking-widest">HOT</div>
                             
                             {/* EM BREVE overlay */}
                             {isPromoLocked && plan.promotionalUnlockDate && (
@@ -2659,8 +2734,8 @@ function MainApp() {
                         </div>
                         
                         {/* Below Image Row */}
-                        <div className="px-4 pt-3 flex justify-between items-center h-[32px]">
-                          <span className="bg-[#FFECEC] text-[#FF4D4F] px-3 py-1 rounded-full font-bold text-[11px]">
+                        <div className="px-4 pt-4 flex justify-between items-center h-[32px]">
+                          <span className="bg-[#FFECEC] text-[#FF4D4F] px-3 py-1 rounded-full font-bold text-[12px]">
                             T+{plan.tPlusDays || 1}
                           </span>
                           
@@ -2672,10 +2747,10 @@ function MainApp() {
                         </div>
 
                         {/* Product details row */}
-                        <div className="px-4 py-3 flex justify-between items-center">
+                        <div className="px-4 py-3 flex justify-between items-center mt-1">
                           <div className="flex flex-col">
-                            <h3 className="font-bold text-[#1C1C1E] text-[16px] max-w-[160px] leading-tight mb-1">{plan.name}</h3>
-                            <span className="text-[#FF3B30] font-bold text-[22px] leading-none tracking-tight">₦{plan.min.toLocaleString()}</span>
+                            <h3 className="font-semibold text-[#1E293B] text-[18px] max-w-[160px] leading-tight mb-1">{plan.name}</h3>
+                            <span className="text-[#D32F2F] font-bold text-[22px] leading-none tracking-tight mt-1">₦{plan.min.toLocaleString()}</span>
                           </div>
                           
                           <button 
@@ -2934,6 +3009,13 @@ function MainApp() {
                         const minutesLeft = Math.floor((msUntilNext / 1000 / 60) % 60);
                         const secondsLeft = Math.floor((msUntilNext / 1000) % 60);
                         
+                        const expiryRemainingMs = Math.max(0, invEnd.getTime() - invNow.getTime());
+                        const expYears = Math.floor(expiryRemainingMs / (1000 * 60 * 60 * 24 * 365));
+                        const expDays = Math.floor((expiryRemainingMs % (1000 * 60 * 60 * 24 * 365)) / (1000 * 60 * 60 * 24));
+                        const expHours = Math.floor((expiryRemainingMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        const expMinutes = Math.floor((expiryRemainingMs % (1000 * 60 * 60)) / (1000 * 60));
+                        const expSeconds = Math.floor((expiryRemainingMs % (1000 * 60)) / 1000);
+                        
                         const readingElapsedMs = Math.min(currentElapsedMs, maxElapsedCycleMs);
                         const dailyIncome = getDailyIncome(inv, currentUser, users, investments);
                         const profitAccrued = (readingElapsedMs / invMsInADay) * dailyIncome;
@@ -2979,17 +3061,21 @@ function MainApp() {
                                     <span className="text-[11px] text-[#6B7280] font-medium">Start:</span>
                                     <span className="text-[12px] text-[#111827] font-semibold">{new Date(inv.startDate).toLocaleString([], {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute:'2-digit'})}</span>
                                   </div>
-                                  <div className="flex justify-between items-end">
+                                  <div className="flex justify-between items-end mt-2">
                                     <div className="flex flex-col">
                                       <span className="text-[11px] text-[#6B7280] font-medium">End:</span>
                                       <span className="text-[12px] text-[#111827] font-semibold">{new Date(invEnd).toLocaleString([], {year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute:'2-digit'})}</span>
                                     </div>
                                     {!isExpired && (
-                                      <div className="flex items-center gap-1.5 shrink-0">
-                                        <div className="bg-black text-white font-bold text-[11px] w-7 h-7 rounded flex items-center justify-center">{daysLeft.toString().padStart(2, '0')}d</div>
-                                        <div className="bg-black text-white font-bold text-[11px] w-7 h-7 rounded flex items-center justify-center">{hoursLeft.toString().padStart(2, '0')}h</div>
-                                        <div className="bg-black text-white font-bold text-[11px] w-7 h-7 rounded flex items-center justify-center">{minutesLeft.toString().padStart(2, '0')}m</div>
-                                        <div className="bg-black text-white font-bold text-[11px] w-7 h-7 rounded flex items-center justify-center">{secondsLeft.toString().padStart(2, '0')}s</div>
+                                      <div className="flex flex-col items-end gap-1">
+                                        <div className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded-full">Expires In</div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          {expYears > 0 && <div className="bg-emerald-500 text-white font-bold text-[10px] w-6 h-6 rounded flex items-center justify-center">{expYears}y</div>}
+                                          <div className="bg-emerald-500 text-white font-bold text-[10px] w-6 h-6 rounded flex items-center justify-center">{expDays.toString().padStart(2, '0')}d</div>
+                                          <div className="bg-emerald-500 text-white font-bold text-[10px] w-6 h-6 rounded flex items-center justify-center">{expHours.toString().padStart(2, '0')}h</div>
+                                          <div className="bg-emerald-500 text-white font-bold text-[10px] w-6 h-6 rounded flex items-center justify-center">{expMinutes.toString().padStart(2, '0')}m</div>
+                                          <div className="bg-emerald-500 text-white font-bold text-[10px] w-6 h-6 rounded flex items-center justify-center">{expSeconds.toString().padStart(2, '0')}s</div>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -3419,19 +3505,29 @@ function MainApp() {
                               setNewProductType(p.type as any);
                               setNewProductImageUrl(p.imageUrl || "");
                               
-                              let unlockHours = "";
+                              let unlockD = "", unlockH = "", unlockM = "", unlockS = "";
                               if (p.promotionalUnlockDate) {
                                 const diff = new Date(p.promotionalUnlockDate).getTime() - Date.now();
-                                if (diff > 0) unlockHours = (diff / (1000 * 60 * 60)).toFixed(2);
+                                if (diff > 0) {
+                                  unlockD = Math.floor(diff / (1000 * 60 * 60 * 24)).toString();
+                                  unlockH = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)).toString();
+                                  unlockM = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)).toString();
+                                  unlockS = Math.floor((diff % (1000 * 60)) / 1000).toString();
+                                }
                               }
-                              setNewProductPromoUnlock(unlockHours);
+                              setNewProductPromoUnlock({ d: unlockD, h: unlockH, m: unlockM, s: unlockS });
                               
-                              let closingHours = "";
+                              let closingD = "", closingH = "", closingM = "", closingS = "";
                               if (p.promoClosingDate) {
                                 const diff = new Date(p.promoClosingDate).getTime() - Date.now();
-                                if (diff > 0) closingHours = (diff / (1000 * 60 * 60)).toFixed(2);
+                                if (diff > 0) {
+                                  closingD = Math.floor(diff / (1000 * 60 * 60 * 24)).toString();
+                                  closingH = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)).toString();
+                                  closingM = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)).toString();
+                                  closingS = Math.floor((diff % (1000 * 60)) / 1000).toString();
+                                }
                               }
-                              setNewProductPromoClosing(closingHours);
+                              setNewProductPromoClosing({ d: closingD, h: closingH, m: closingM, s: closingS });
                               setActiveModal("editProduct");
                             }}
                             className="flex-1 bg-white/10 hover:bg-white/20 text-white py-1.5 rounded-lg text-xs font-bold transition-colors"
@@ -3777,10 +3873,36 @@ function MainApp() {
                           </div>
                         </div>
                       )}
-                      {tx.type === "deposit" && tx.bankDetails?.reference && (
-                        <div className="mt-2 bg-blue-50 p-3 rounded-xl border border-blue-100">
-                          <div className="text-xs text-blue-400 font-bold uppercase mb-1">Payment Reference</div>
-                          <div className="text-sm font-semibold text-blue-900">{tx.bankDetails.reference}</div>
+                      {tx.type === "deposit" && (
+                        <div className="mt-2 flex flex-col gap-2">
+                          {tx.bankDetails?.systemBankDetails && (
+                            <div className="bg-blue-50 p-3 rounded-xl border border-blue-100">
+                              <div className="text-xs text-blue-500 font-bold uppercase mb-1 flex justify-between items-center">
+                                <span>System Receiving Bank</span>
+                              </div>
+                              <div className="text-sm font-semibold text-blue-900">{tx.bankDetails.systemBankDetails.bankName}</div>
+                              <div className="flex justify-between items-center mt-1">
+                                <div className="text-sm font-bold text-blue-800">{tx.bankDetails.systemBankDetails.accountName}</div>
+                              </div>
+                              <div className="text-sm font-mono tracking-widest mt-1 text-blue-900">{tx.bankDetails.systemBankDetails.accountNumber}</div>
+                            </div>
+                          )}
+                          {tx.bankDetails?.userBankDetails && (
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                              <div className="text-xs text-slate-500 font-bold uppercase mb-1 flex justify-between items-center">
+                                <span>User Sender Bank Info</span>
+                              </div>
+                              <div className="text-sm font-semibold">{tx.bankDetails.userBankDetails.bankName}</div>
+                              <div className="text-sm font-bold text-slate-800 mt-1">{tx.bankDetails.userBankDetails.accountName}</div>
+                              <div className="text-sm font-mono tracking-widest mt-1">{tx.bankDetails.userBankDetails.accountNumber}</div>
+                            </div>
+                          )}
+                          {tx.bankDetails?.reference && (
+                            <div className="bg-slate-100 p-3 rounded-xl border border-slate-200">
+                              <div className="text-xs text-slate-500 font-bold uppercase mb-1">Payment Reference</div>
+                              <div className="text-sm font-semibold text-slate-800">{tx.bankDetails.reference}</div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -3845,6 +3967,32 @@ function MainApp() {
                                  <div className="text-[10px] text-[#00D4FF] font-bold tracking-wider">ID: {users.find(u => u.id === tx.userId)?.referralCode || 'N/A'}</div>
                                </div>
                                <div className="font-mono text-[10px] text-emerald-300 mt-1 tracking-wider bg-black/20 py-1 px-1.5 rounded">{tx.bankDetails?.accountNumber || users.find(u => u.id === tx.userId)?.bankDetails?.accountNumber || 'N/A'}</div>
+                            </div>
+                          )}
+                          {tx.type === "deposit" && (
+                            <div className="bg-white/5 p-2 rounded-lg text-xs flex flex-col gap-1 mt-1 border border-white/5">
+                              {tx.bankDetails?.systemBankDetails && (
+                                <div className="border-b border-white/5 pb-1">
+                                  <div className="text-[10px] text-blue-400 font-bold uppercase">System Receiving Bank</div>
+                                  <div className="font-semibold text-white/80">{tx.bankDetails.systemBankDetails.bankName}</div>
+                                  <div className="font-bold text-white/90">{tx.bankDetails.systemBankDetails.accountName}</div>
+                                  <div className="font-mono text-[10px] text-emerald-300 tracking-wider bg-black/20 py-0.5 px-1 rounded inline-block mt-0.5">{tx.bankDetails.systemBankDetails.accountNumber}</div>
+                                </div>
+                              )}
+                              {tx.bankDetails?.userBankDetails && (
+                                <div className="border-b border-white/5 pb-1">
+                                  <div className="text-[10px] text-slate-400 font-bold uppercase">User Sender Bank</div>
+                                  <div className="font-semibold text-white/80">{tx.bankDetails.userBankDetails.bankName}</div>
+                                  <div className="font-bold text-white/90">{tx.bankDetails.userBankDetails.accountName}</div>
+                                  <div className="font-mono text-[10px] text-emerald-300 tracking-wider bg-black/20 py-0.5 px-1 rounded inline-block mt-0.5">{tx.bankDetails.userBankDetails.accountNumber}</div>
+                                </div>
+                              )}
+                              {tx.bankDetails?.reference && (
+                                <div>
+                                  <div className="text-[10px] text-slate-400 font-bold uppercase">Payment Reference</div>
+                                  <div className="font-semibold text-white/80">{tx.bankDetails.reference}</div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -5533,7 +5681,7 @@ function MainApp() {
                             setPaymentProcessingState(null);
                             const amt = Number(depositAmount);
                             if (amt > 0) {
-                              requestDeposit(amt, depositReference);
+                              requestDeposit(amt, depositReference, { bankName: 'USDT', accountNumber: 'TRC20 Wallet', accountName: 'Equinor USDT' }, currentUser?.bankDetails);
                             } else {
                               alert("Please enter a valid deposit amount.");
                             }
@@ -5664,7 +5812,8 @@ function MainApp() {
                         setPaymentProcessingState(null);
                         const amt = Number(depositAmount);
                         if (amt > 0) {
-                          requestDeposit(amt, depositReference);
+                          const targetAccount = systemDepositAccounts[depositCheckoutAccountIndex];
+                          requestDeposit(amt, depositReference, targetAccount, currentUser?.bankDetails);
                         } else {
                           alert("Please enter a valid deposit amount.");
                         }
@@ -6137,8 +6286,8 @@ function MainApp() {
                         maxQuota: Number(newProductQuota),
                         type: newProductType,
                         imageUrl: newProductImageUrl,
-                        promotionalUnlockDate: newProductPromoUnlock ? new Date(Date.now() + Number(newProductPromoUnlock) * 60 * 60 * 1000).toISOString() : undefined,
-                        promoClosingDate: newProductPromoClosing ? new Date(Date.now() + Number(newProductPromoClosing) * 60 * 60 * 1000).toISOString() : undefined
+                        promotionalUnlockDate: getOffsetMs(newProductPromoUnlock) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoUnlock)).toISOString() : undefined,
+                        promoClosingDate: getOffsetMs(newProductPromoClosing) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoClosing)).toISOString() : undefined
                       });
                       setNewProductName("");
                       setNewProductTitle("EQUINOR");
@@ -6292,28 +6441,24 @@ function MainApp() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Promotional Unlock Time (Hours, Optional)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 24"
-                    step="0.01"
-                    value={newProductPromoUnlock}
-                    onChange={(e) => setNewProductPromoUnlock(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">If set, users cannot buy this product until this many hours from now.</p>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Promotional Unlock Time (Optional)</label>
+                  <div className="flex gap-2">
+                    <input type="number" placeholder="Days" value={newProductPromoUnlock.d} onChange={(e) => setNewProductPromoUnlock({...newProductPromoUnlock, d: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                    <input type="number" placeholder="Hrs" value={newProductPromoUnlock.h} onChange={(e) => setNewProductPromoUnlock({...newProductPromoUnlock, h: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                    <input type="number" placeholder="Min" value={newProductPromoUnlock.m} onChange={(e) => setNewProductPromoUnlock({...newProductPromoUnlock, m: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                    <input type="number" placeholder="Sec" value={newProductPromoUnlock.s} onChange={(e) => setNewProductPromoUnlock({...newProductPromoUnlock, s: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">If set, users cannot buy this product until this countdown finishes.</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Promo Countdown (Hours, Optional)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 48"
-                    step="0.01"
-                    value={newProductPromoClosing}
-                    onChange={(e) => setNewProductPromoClosing(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">If set, product disappears after this many hours from now.</p>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Promo Countdown (Optional)</label>
+                  <div className="flex gap-2">
+                    <input type="number" placeholder="Days" value={newProductPromoClosing.d} onChange={(e) => setNewProductPromoClosing({...newProductPromoClosing, d: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                    <input type="number" placeholder="Hrs" value={newProductPromoClosing.h} onChange={(e) => setNewProductPromoClosing({...newProductPromoClosing, h: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                    <input type="number" placeholder="Min" value={newProductPromoClosing.m} onChange={(e) => setNewProductPromoClosing({...newProductPromoClosing, m: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                    <input type="number" placeholder="Sec" value={newProductPromoClosing.s} onChange={(e) => setNewProductPromoClosing({...newProductPromoClosing, s: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">If set, product disappears after this countdown finishes.</p>
                 </div>
                 <button
                   type="submit"
@@ -6367,8 +6512,8 @@ function MainApp() {
                         maxQuota: Number(newProductQuota),
                         type: newProductType,
                         imageUrl: newProductImageUrl,
-                        promotionalUnlockDate: newProductPromoUnlock ? new Date(Date.now() + Number(newProductPromoUnlock) * 60 * 60 * 1000).toISOString() : undefined,
-                        promoClosingDate: newProductPromoClosing ? new Date(Date.now() + Number(newProductPromoClosing) * 60 * 60 * 1000).toISOString() : undefined
+                        promotionalUnlockDate: getOffsetMs(newProductPromoUnlock) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoUnlock)).toISOString() : undefined,
+                        promoClosingDate: getOffsetMs(newProductPromoClosing) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoClosing)).toISOString() : undefined
                       });
                       setNewProductName("");
                       setNewProductTitle("EQUINOR");
@@ -6522,28 +6667,24 @@ function MainApp() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Promotional Unlock Time (Hours, Optional)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 24"
-                    step="0.01"
-                    value={newProductPromoUnlock}
-                    onChange={(e) => setNewProductPromoUnlock(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">If set, users cannot buy this product until this many hours from now.</p>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Promotional Unlock Time (Optional)</label>
+                  <div className="flex gap-2">
+                    <input type="number" placeholder="Days" value={newProductPromoUnlock.d} onChange={(e) => setNewProductPromoUnlock({...newProductPromoUnlock, d: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                    <input type="number" placeholder="Hrs" value={newProductPromoUnlock.h} onChange={(e) => setNewProductPromoUnlock({...newProductPromoUnlock, h: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                    <input type="number" placeholder="Min" value={newProductPromoUnlock.m} onChange={(e) => setNewProductPromoUnlock({...newProductPromoUnlock, m: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                    <input type="number" placeholder="Sec" value={newProductPromoUnlock.s} onChange={(e) => setNewProductPromoUnlock({...newProductPromoUnlock, s: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">If set, users cannot buy this product until this countdown finishes.</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Promo Countdown (Hours, Optional)</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 48"
-                    step="0.01"
-                    value={newProductPromoClosing}
-                    onChange={(e) => setNewProductPromoClosing(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">If set, product disappears after this many hours from now.</p>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Promo Countdown (Optional)</label>
+                  <div className="flex gap-2">
+                    <input type="number" placeholder="Days" value={newProductPromoClosing.d} onChange={(e) => setNewProductPromoClosing({...newProductPromoClosing, d: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                    <input type="number" placeholder="Hrs" value={newProductPromoClosing.h} onChange={(e) => setNewProductPromoClosing({...newProductPromoClosing, h: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                    <input type="number" placeholder="Min" value={newProductPromoClosing.m} onChange={(e) => setNewProductPromoClosing({...newProductPromoClosing, m: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                    <input type="number" placeholder="Sec" value={newProductPromoClosing.s} onChange={(e) => setNewProductPromoClosing({...newProductPromoClosing, s: e.target.value})} className="w-1/4 bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-center text-[#0A0E2E] font-medium" />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">If set, product disappears after this countdown finishes.</p>
                 </div>
                 <button
                   type="submit"
@@ -7359,6 +7500,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     return (this as any).props.children;
   }
 }
+
+const getOffsetMs = (obj: { d: string, h: string, m: string, s: string }) => {
+  if (!obj.d && !obj.h && !obj.m && !obj.s) return 0;
+  return ((Number(obj.d) || 0) * 24 * 60 * 60 + (Number(obj.h) || 0) * 60 * 60 + (Number(obj.m) || 0) * 60 + (Number(obj.s) || 0)) * 1000;
+};
 
 export default function App() {
   return (
