@@ -139,7 +139,7 @@ const StampCountdown = ({ targetDate }: { targetDate: string }) => {
     <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
       {/* Stamp Circle */}
       <div className="relative z-10 flex items-center justify-center transform -rotate-12">
-        <svg viewBox="0 0 100 100" className="w-[220px] h-[220px] drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+        <svg viewBox="0 0 100 100" className="w-[130px] h-[130px] drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
           {/* White gear teeth using stroke */}
           <circle cx="50" cy="50" r="45" fill="#ffffff" />
           <circle cx="50" cy="50" r="47" fill="none" stroke="#ffffff" strokeWidth="6" strokeDasharray="5 4.84" />
@@ -638,6 +638,11 @@ function MainApp() {
   const [fundingTab, setFundingTab] = useState<"all" | "deposit" | "withdrawal">("all");
   const [txSearch, setTxSearch] = useState("");
   const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [userFilterVipLevel, setUserFilterVipLevel] = useState<string>("all");
+  const [userFilterHasActiveInvestments, setUserFilterHasActiveInvestments] = useState<string>("all");
+  const [userFilterRegisteredAfter, setUserFilterRegisteredAfter] = useState("");
+  const [userFilterRegisteredBefore, setUserFilterRegisteredBefore] = useState("");
+  const [showUserFilters, setShowUserFilters] = useState(false);
   const [txFilterStatus, setTxFilterStatus] = useState<"all" | "pending" | "completed" | "failed">("all");
   const [txFilterDate, setTxFilterDate] = useState<"all" | "today" | "week" | "month">("all");
   const [depositAmount, setDepositAmount] = useState("");
@@ -696,6 +701,7 @@ function MainApp() {
   const [newProductDays, setNewProductDays] = useState("30");
   const [newProductTPlusDays, setNewProductTPlusDays] = useState("1");
   const [newProductQuota, setNewProductQuota] = useState("0");
+  const [newProductDescription, setNewProductDescription] = useState("");
   const [newProductType, setNewProductType] = useState<"general"|"vip"|"special">("general");
   const [newProductImageUrl, setNewProductImageUrl] = useState("");
   const [newProductPromoUnlock, setNewProductPromoUnlock] = useState({ d: "", h: "", m: "", s: "" });
@@ -2411,7 +2417,7 @@ function MainApp() {
                     </div>
                   ))}
                 </div>
-              ) : products.filter(p => p.type === productTab).filter(p => !p.promoClosingDate || new Date(p.promoClosingDate).getTime() > Date.now()).length === 0 ? (
+              ) : products.filter(p => (p.type || 'general').toLowerCase() === productTab.toLowerCase()).length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center pb-32">
                   <div className="relative w-48 h-48 flex items-center justify-center mb-6 mt-12">
                     <EquinorStar className="w-24 h-24 text-black/10" />
@@ -2419,7 +2425,7 @@ function MainApp() {
                 </div>
               ) : (
                 <div className="px-5 space-y-4">
-                  {products.filter(p => p.type === productTab).filter(p => !p.promoClosingDate || new Date(p.promoClosingDate).getTime() > Date.now()).map((plan) => {
+                  {products.filter(p => (p.type || 'general').toLowerCase() === productTab.toLowerCase()).map((plan) => {
                     let cost = plan.min;
                     let roi = plan.roi;
                     let get24h = 0;
@@ -2482,13 +2488,18 @@ function MainApp() {
                               {/* Tags overlay */}
                               <div className="absolute top-0 right-0 bg-gradient-to-r from-[#F97316] to-[#F59E0B] text-white text-[10px] font-bold px-4 py-1.5 rounded-bl-[16px] z-20 shadow-md leading-none uppercase tracking-widest">HOT</div>
                               
-                              {/* EM BREVE overlay */}
+                              {/* EM BREVE overlay (darkened image) */}
                               {isPromoLocked && plan.promotionalUnlockDate && (
-                                <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center">
-                                  <StampCountdown targetDate={plan.promotionalUnlockDate} />
-                                </div>
+                                <div className="absolute inset-0 bg-black/40 z-10 rounded-[20px]" />
                               )}
                             </div>
+                            
+                            {/* Relocated EM BREVE stamp overlapping image bottom */}
+                            {isPromoLocked && plan.promotionalUnlockDate && (
+                              <div className="absolute bottom-[-15px] left-1/2 -translate-x-1/2 z-50 flex items-center justify-center pointer-events-none scale-[1.15]">
+                                <StampCountdown targetDate={plan.promotionalUnlockDate} />
+                              </div>
+                            )}
                           </div>
                           
                           {/* Below Image Row */}
@@ -2506,12 +2517,9 @@ function MainApp() {
 
                           {/* Product details row */}
                           <div className="px-4 py-3 flex justify-between items-start mt-1">
-                            <div className="flex flex-col">
-                              <h3 className="font-semibold text-[#1E293B] text-[18px] max-w-[160px] leading-tight mb-1">{plan.name}</h3>
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <h3 className="font-semibold text-[#1E293B] text-[18px] leading-tight mb-1 truncate">{plan.name}</h3>
                               <span className="text-[#D32F2F] font-bold text-[22px] leading-none tracking-tight mt-1">₦{plan.min.toLocaleString()}</span>
-                              <div className="text-[#6E6B7B] text-[11px] leading-snug mt-1 max-w-[180px]">
-                                VIP equity exchange program. Distributed after each 1-day cycle.
-                              </div>
                             </div>
                             
                             <button 
@@ -2557,22 +2565,22 @@ function MainApp() {
 
                           {/* Stats Grid Bottom Section */}
                           <div className="px-4 pb-4">
-                            <div className="bg-[#F8F9FA] rounded-[12px] p-3 grid grid-cols-2 gap-y-2 gap-x-2">
-                              <div className="flex justify-between items-center pr-3">
-                                <span className="text-[#6B7280] text-[12px]">Total income:</span>
-                                <span className="text-[#1C1C1E] font-medium text-[13px]">₦{totalIncome.toLocaleString()}</span>
+                            <div className="bg-[#F8F9FA] rounded-[12px] py-2.5 px-3 grid grid-cols-2 gap-y-3 gap-x-1">
+                              <div className="flex items-center whitespace-nowrap">
+                                <span className="text-[#6B7280] text-[11px]">Total income:</span>
+                                <span className="text-[#1C1C1E] font-medium text-[12px] ml-1">₦{totalIncome.toLocaleString()}</span>
                               </div>
-                              <div className="flex justify-between items-center pl-3">
-                                <span className="text-[#6B7280] text-[12px]">Quota:</span>
-                                <span className="text-[#1C1C1E] font-medium text-[13px]">{plan.maxQuota || '∞'}</span>
+                              <div className="flex items-center justify-end whitespace-nowrap">
+                                <span className="text-[#6B7280] text-[11px]">Quota:</span>
+                                <span className="text-[#1C1C1E] font-medium text-[12px] ml-1">{plan.maxQuota || '∞'}</span>
                               </div>
-                              <div className="flex justify-between items-center pr-3">
-                                <span className="text-[#6B7280] text-[12px]">Cycle:</span>
-                                <span className="text-[#1C1C1E] font-medium text-[13px]">{plan.days} Days</span>
+                              <div className="flex items-center whitespace-nowrap">
+                                <span className="text-[#6B7280] text-[11px]">Cycle:</span>
+                                <span className="text-[#1C1C1E] font-medium text-[12px] ml-1">{plan.days} Days</span>
                               </div>
-                              <div className="flex justify-between items-center pl-3">
-                                <span className="text-[#6B7280] text-[12px]">Daily income:</span>
-                                <span className="text-[#1C1C1E] font-medium text-[13px]">₦{calculatedDailyReturn.toLocaleString()}</span>
+                              <div className="flex items-center justify-end whitespace-nowrap">
+                                <span className="text-[#6B7280] text-[11px]">Daily income:</span>
+                                <span className="text-[#1C1C1E] font-medium text-[12px] ml-1">₦{calculatedDailyReturn.toLocaleString()}</span>
                               </div>
                             </div>
                           </div>
@@ -2597,11 +2605,16 @@ function MainApp() {
                               
                               {/* EM BREVE overlay */}
                               {isPromoLocked && plan.promotionalUnlockDate && (
-                                <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center">
-                                  <StampCountdown targetDate={plan.promotionalUnlockDate} />
-                                </div>
+                                <div className="absolute inset-0 bg-black/40 z-10 rounded-[18px]" />
                               )}
                             </div>
+                            
+                            {/* Relocated EM BREVE stamp overlapping image bottom */}
+                            {isPromoLocked && plan.promotionalUnlockDate && (
+                              <div className="absolute bottom-[-15px] left-1/2 -translate-x-1/2 z-50 flex items-center justify-center pointer-events-none scale-[1.15]">
+                                <StampCountdown targetDate={plan.promotionalUnlockDate} />
+                              </div>
+                            )}
                           </div>
                           
                           {/* Below Image Row */}
@@ -2619,9 +2632,9 @@ function MainApp() {
 
                           {/* Product details row */}
                           <div className="px-4 py-3 flex justify-between items-start">
-                            <div className="flex flex-col">
-                              <h3 className="font-bold text-[#1C1C1E] text-[16px] max-w-[160px] leading-tight mb-1">{plan.name}</h3>
-                              <div className="text-[#6E6B7B] text-[11px] leading-snug mt-1 max-w-[180px]">
+                            <div className="flex flex-col flex-1 pr-2 min-w-0">
+                              <h3 className="font-bold text-[#1C1C1E] text-[16px] leading-tight mb-1 truncate">{plan.name}</h3>
+                              <div className="text-[#6E6B7B] text-[11px] leading-snug mt-1">
                                 VIP equity exchange program. Distributed after each 1-day cycle, min ₦ {cost.toLocaleString()}.
                               </div>
                             </div>
@@ -2680,14 +2693,14 @@ function MainApp() {
 
                           {/* Stats Grid Bottom Section */}
                           <div className="px-4 pb-4">
-                            <div className="bg-[#F8F9FA] rounded-[12px] p-3 grid grid-cols-2 gap-y-2 gap-x-2">
-                              <div className="flex justify-between items-center pr-3">
-                                <span className="text-[#6B7280] text-[12px]">24H Returns:</span>
-                                <span className="text-[#1C1C1E] font-medium text-[13px]">₦{get24h.toLocaleString()}</span>
+                            <div className="bg-[#F8F9FA] rounded-[12px] py-2.5 px-3 grid grid-cols-2 gap-y-3 gap-x-1">
+                              <div className="flex items-center whitespace-nowrap">
+                                <span className="text-[#6B7280] text-[11px]">24H Returns:</span>
+                                <span className="text-[#1C1C1E] font-medium text-[12px] ml-1">₦{get24h.toLocaleString()}</span>
                               </div>
-                              <div className="flex justify-between items-center pl-3">
-                                <span className="text-[#6B7280] text-[12px]">Cycle:</span>
-                                <span className="text-[#1C1C1E] font-medium text-[13px]">1 Days</span>
+                              <div className="flex items-center justify-end whitespace-nowrap">
+                                <span className="text-[#6B7280] text-[11px]">Cycle:</span>
+                                <span className="text-[#1C1C1E] font-medium text-[12px] ml-1">1 Days</span>
                               </div>
                             </div>
                           </div>
@@ -2726,11 +2739,16 @@ function MainApp() {
                             
                             {/* EM BREVE overlay */}
                             {isPromoLocked && plan.promotionalUnlockDate && (
-                              <div className="absolute inset-0 bg-black/40 z-10 flex items-center justify-center">
-                                <StampCountdown targetDate={plan.promotionalUnlockDate} />
-                              </div>
+                              <div className="absolute inset-0 bg-black/40 z-10 rounded-[20px]" />
                             )}
                           </div>
+                          
+                          {/* Relocated EM BREVE stamp overlapping image bottom */}
+                          {isPromoLocked && plan.promotionalUnlockDate && (
+                            <div className="absolute bottom-[-15px] left-1/2 -translate-x-1/2 z-50 flex items-center justify-center pointer-events-none scale-[1.15]">
+                              <StampCountdown targetDate={plan.promotionalUnlockDate} />
+                            </div>
+                          )}
                         </div>
                         
                         {/* Below Image Row */}
@@ -2748,8 +2766,8 @@ function MainApp() {
 
                         {/* Product details row */}
                         <div className="px-4 py-3 flex justify-between items-center mt-1">
-                          <div className="flex flex-col">
-                            <h3 className="font-semibold text-[#1E293B] text-[18px] max-w-[160px] leading-tight mb-1">{plan.name}</h3>
+                          <div className="flex flex-col flex-1 min-w-0">
+                            <h3 className="font-semibold text-[#1E293B] text-[18px] leading-tight mb-1 truncate">{plan.name}</h3>
                             <span className="text-[#D32F2F] font-bold text-[22px] leading-none tracking-tight mt-1">₦{plan.min.toLocaleString()}</span>
                           </div>
                           
@@ -2782,22 +2800,22 @@ function MainApp() {
 
                         {/* Stats Grid Bottom Section */}
                         <div className="px-4 pb-4">
-                          <div className="bg-[#F8F9FA] rounded-[12px] p-3 grid grid-cols-2 gap-y-2 gap-x-2">
-                            <div className="flex justify-between items-center pr-3">
-                              <span className="text-[#6B7280] text-[12px]">Total income:</span>
-                              <span className="text-[#1C1C1E] font-medium text-[13px]">₦{totalIncome.toLocaleString()}</span>
+                          <div className="bg-[#F8F9FA] rounded-[12px] py-2.5 px-3 grid grid-cols-2 gap-y-3 gap-x-1">
+                            <div className="flex items-center whitespace-nowrap">
+                              <span className="text-[#6B7280] text-[11px]">Total income:</span>
+                              <span className="text-[#1C1C1E] font-medium text-[12px] ml-1">₦{totalIncome.toLocaleString()}</span>
                             </div>
-                            <div className="flex justify-between items-center pl-3">
-                              <span className="text-[#6B7280] text-[12px]">Quota:</span>
-                              <span className="text-[#1C1C1E] font-medium text-[13px]">{plan.maxQuota || '∞'}</span>
+                            <div className="flex items-center justify-end whitespace-nowrap">
+                              <span className="text-[#6B7280] text-[11px]">Quota:</span>
+                              <span className="text-[#1C1C1E] font-medium text-[12px] ml-1">{plan.maxQuota || '∞'}</span>
                             </div>
-                            <div className="flex justify-between items-center pr-3">
-                              <span className="text-[#6B7280] text-[12px]">Cycle:</span>
-                              <span className="text-[#1C1C1E] font-medium text-[13px]">{plan.days} Days</span>
+                            <div className="flex items-center whitespace-nowrap">
+                              <span className="text-[#6B7280] text-[11px]">Cycle:</span>
+                              <span className="text-[#1C1C1E] font-medium text-[12px] ml-1">{plan.days} Days</span>
                             </div>
-                            <div className="flex justify-between items-center pl-3">
-                              <span className="text-[#6B7280] text-[12px]">Daily income:</span>
-                              <span className="text-[#1C1C1E] font-medium text-[13px]">₦{calculatedDailyReturn.toLocaleString()}</span>
+                            <div className="flex items-center justify-end whitespace-nowrap">
+                              <span className="text-[#6B7280] text-[11px]">Daily income:</span>
+                              <span className="text-[#1C1C1E] font-medium text-[12px] ml-1">₦{calculatedDailyReturn.toLocaleString()}</span>
                             </div>
                           </div>
                         </div>
@@ -3199,8 +3217,16 @@ function MainApp() {
                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                        </button>
                     </div>
-                    <div className="flex items-center gap-1.5 shadow-lg">
-                      <RankBadge rankName={VIP_LEVELS[currentUser.vipLevelIndex || 0].name} size={32} />
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <RankBadge rankName={VIP_LEVELS[currentUser.vipLevelIndex || 0].name} size={32} className="drop-shadow-lg" />
+                      <div className="flex flex-col">
+                        <span className="text-white text-[13px] font-black italic tracking-wide drop-shadow-md leading-none">
+                          {VIP_LEVELS[currentUser.vipLevelIndex || 0].name}
+                        </span>
+                        <span className="text-white/70 text-[10px] font-bold uppercase tracking-wider mt-0.5">
+                          Current Tier
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -3497,6 +3523,7 @@ function MainApp() {
                               setEditingProduct(p);
                               setNewProductName(p.name);
                               setNewProductTitle(p.title || "EQUINOR");
+                              setNewProductDescription(p.description || "");
                               setNewProductRoi(p.roi.toString());
                               setNewProductMin(p.min.toString());
                               setNewProductDays(p.days.toString());
@@ -3579,24 +3606,113 @@ function MainApp() {
                 <div className="p-4 border-b border-white/10 flex justify-between items-center text-sm">
                   <h3 className="text-white font-bold uppercase tracking-wider">Manage Users</h3>
                 </div>
-                <div className="p-4 border-b border-white/10">
-                  <input
-                    type="text"
-                    placeholder="Search by ID, Phone, or Name..."
-                    onChange={(e) => setUserSearchQuery(e.target.value)}
-                    value={userSearchQuery}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-[#7B2FFF]"
-                  />
+                <div className="p-4 border-b border-white/10 flex flex-col gap-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Search by ID, Phone, or Name..."
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      value={userSearchQuery}
+                      className="flex-1 bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-[#7B2FFF]"
+                    />
+                    <button 
+                      onClick={() => setShowUserFilters(!showUserFilters)}
+                      className={`px-3 py-2 rounded-xl border flex items-center justify-center transition-colors ${showUserFilters ? 'bg-[#7B2FFF] border-[#7B2FFF] text-white' : 'bg-white/5 border-white/20 text-white/70'}`}
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  {showUserFilters && (
+                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-white/5">
+                      <div>
+                        <label className="block text-[10px] text-white/60 mb-1 uppercase tracking-wider font-bold">VIP Level</label>
+                        <select 
+                          value={userFilterVipLevel}
+                          onChange={(e) => setUserFilterVipLevel(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs"
+                        >
+                          <option value="all">All Levels</option>
+                          {VIP_LEVELS.map((level, i) => (
+                            <option key={i} value={i.toString()}>{level.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-white/60 mb-1 uppercase tracking-wider font-bold">Active Inv.</label>
+                        <select 
+                          value={userFilterHasActiveInvestments}
+                          onChange={(e) => setUserFilterHasActiveInvestments(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs"
+                        >
+                          <option value="all">Any</option>
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-white/60 mb-1 uppercase tracking-wider font-bold">Reg. After</label>
+                        <input 
+                          type="date"
+                          value={userFilterRegisteredAfter}
+                          onChange={(e) => setUserFilterRegisteredAfter(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs color-scheme-dark"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-white/60 mb-1 uppercase tracking-wider font-bold">Reg. Before</label>
+                        <input 
+                          type="date"
+                          value={userFilterRegisteredBefore}
+                          onChange={(e) => setUserFilterRegisteredBefore(e.target.value)}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs color-scheme-dark"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="p-2 space-y-2 max-h-[300px] overflow-y-auto scrollbar-hide">
                   {users.filter(u => {
                     if (u.role === "admin") return false;
+                    
+                    // Search Query Filter
                     const q = userSearchQuery.toLowerCase();
-                    return u.id.toLowerCase().includes(q) || 
+                    const matchesSearch = q === "" || 
+                           u.id.toLowerCase().includes(q) || 
                            (u.referralCode && u.referralCode.toLowerCase().includes(q)) ||
                            (u.phone && u.phone.toLowerCase().includes(q)) ||
                            (u.email && u.email.toLowerCase().includes(q)) ||
                            (u.name && u.name.toLowerCase().includes(q));
+                    
+                    if (!matchesSearch) return false;
+
+                    // VIP Filter
+                    if (userFilterVipLevel !== "all" && (u.vipLevelIndex || 0).toString() !== userFilterVipLevel) return false;
+
+                    // Active Investments Filter
+                    if (userFilterHasActiveInvestments !== "all") {
+                      const hasActive = investments.some(inv => inv.userId === u.id && inv.status === 'active');
+                      if (userFilterHasActiveInvestments === "yes" && !hasActive) return false;
+                      if (userFilterHasActiveInvestments === "no" && hasActive) return false;
+                    }
+
+                    // Date Filters
+                    if (userFilterRegisteredAfter) {
+                      const uDate = new Date(u.registeredAt || 0);
+                      const filterDate = new Date(userFilterRegisteredAfter);
+                      if (uDate < filterDate) return false;
+                    }
+                    if (userFilterRegisteredBefore) {
+                      const uDate = new Date(u.registeredAt || 0);
+                      const filterDate = new Date(userFilterRegisteredBefore);
+                      // Set to end of day
+                      filterDate.setHours(23, 59, 59, 999);
+                      if (uDate > filterDate) return false;
+                    }
+
+                    return true;
                   }).map(u => (
                     <div key={u.id} className="flex flex-col bg-white/5 p-3 rounded-xl border border-white/5 gap-2">
                       <div className="flex justify-between items-start">
@@ -4956,6 +5072,12 @@ function MainApp() {
                 </button>
               </div>
               <div className="w-full py-6 px-6 bg-[#F9FAFB] flex flex-col space-y-4">
+                {equinorSelectedPlan.description && (
+                  <div className="flex flex-col space-y-1 mb-2">
+                    <span className="text-gray-500 text-[12px] font-semibold uppercase tracking-wider">Description</span>
+                    <span className="text-gray-800 text-[13px] leading-relaxed break-words whitespace-pre-wrap bg-white p-3 rounded-lg border border-gray-100">{equinorSelectedPlan.description}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500 text-[14px]">Project</span>
                   <span className="text-gray-900 font-semibold text-[14px]">{equinorSelectedPlan.name}</span>
@@ -6279,6 +6401,7 @@ function MainApp() {
                       addProduct({
                         name: newProductName,
                         title: newProductTitle,
+                        description: newProductDescription,
                         roi: Number(newProductRoi),
                         min: Number(newProductMin),
                         days: Number(newProductDays),
@@ -6291,6 +6414,7 @@ function MainApp() {
                       });
                       setNewProductName("");
                       setNewProductTitle("EQUINOR");
+                      setNewProductDescription("");
                       setNewProductRoi("");
                       setNewProductMin("");
                       setNewProductDays("30");
@@ -6329,6 +6453,15 @@ function MainApp() {
                     onChange={(e) => setNewProductName(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
                     placeholder="e.g. Starter VIP"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Description</label>
+                  <textarea
+                    value={newProductDescription}
+                    onChange={(e) => setNewProductDescription(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium resize-none h-24"
+                    placeholder="Enter product description..."
                   />
                 </div>
                 <div>
@@ -6505,6 +6638,7 @@ function MainApp() {
                       editProduct(editingProduct.id, {
                         name: newProductName,
                         title: newProductTitle,
+                        description: newProductDescription,
                         roi: Number(newProductRoi),
                         min: Number(newProductMin),
                         days: Number(newProductDays),
@@ -6517,6 +6651,7 @@ function MainApp() {
                       });
                       setNewProductName("");
                       setNewProductTitle("EQUINOR");
+                      setNewProductDescription("");
                       setNewProductRoi("");
                       setNewProductMin("");
                       setNewProductDays("30");
@@ -6555,6 +6690,15 @@ function MainApp() {
                     onChange={(e) => setNewProductName(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
                     placeholder="e.g. Starter VIP"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Description</label>
+                  <textarea
+                    value={newProductDescription}
+                    onChange={(e) => setNewProductDescription(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium resize-none h-24"
+                    placeholder="Enter product description..."
                   />
                 </div>
                 <div>

@@ -11,8 +11,9 @@ export function getDailyIncome(
     ? Number(investment.fixedDailyReturn)
     : Number(investment.amount || 0) * (Number(investment.expectedRoi || 0) / 100);
 
-  if (investment.planName === "VIP Member Exclusive Project" && user) {
-    const userLevelName = VIP_LEVELS[user.vipLevelIndex || 0]?.name || "VIP0";
+  if (investment.planName === "VIP Member Exclusive Project") {
+    let userLevelName = user ? (VIP_LEVELS[user.vipLevelIndex || 0]?.name || "VIP0") : "VIP0";
+    if (userLevelName === "VIP0") userLevelName = "VIP1"; // Show at least VIP1 rates for preview/UI
     dailyIncome = VIP_MEMBER_EXCLUSIVE_TIERS[userLevelName]?.dailyIncome || 0;
   }
 
@@ -31,7 +32,7 @@ export function getDailyIncome(
     for (const subInv of subordinateInvestments) {
       const subUser = allUsers.find(u => u.id === subInv.userId);
       if (subInv.planName === "VIP team exclusive project") {
-         subordinateTotalDailyIncome += subInv.fixedDailyReturn || 300;
+         subordinateTotalDailyIncome += subInv.fixedDailyReturn != null ? subInv.fixedDailyReturn : (subInv.amount || 0) * ((subInv.expectedRoi || 0) / 100);
       } else {
          subordinateTotalDailyIncome += getDailyIncome(subInv, subUser, [], []);
       }
