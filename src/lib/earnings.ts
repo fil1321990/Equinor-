@@ -17,28 +17,27 @@ export function getDailyIncome(
     dailyIncome = VIP_MEMBER_EXCLUSIVE_TIERS[userLevelName]?.dailyIncome || 0;
   }
 
-  if (investment.planName === "VIP team exclusive project" && user) {
+  if (investment.planName === "VIP Team Exclusive Project" && user && investment.id !== "mock") {
     const aLevelSubordinateUids = allUsers
       .filter((u) => u.referredBy === user.referralCode)
       .map((u) => u.id);
-
     let subordinateTotalDailyIncome = 0;
-    
+        
     // Calculate total daily income of all A-level subordinates
     const subordinateInvestments = allInvestments.filter(
       (inv) => aLevelSubordinateUids.includes(inv.userId) && inv.status === 'active'
     );
-    
+        
     for (const subInv of subordinateInvestments) {
       const subUser = allUsers.find(u => u.id === subInv.userId);
-      if (subInv.planName === "VIP team exclusive project") {
+      if (subInv.planName === "VIP Team Exclusive Project") {
          subordinateTotalDailyIncome += subInv.fixedDailyReturn != null ? subInv.fixedDailyReturn : (subInv.amount || 0) * ((subInv.expectedRoi || 0) / 100);
       } else {
          subordinateTotalDailyIncome += getDailyIncome(subInv, subUser, [], []);
       }
     }
     const bonus = subordinateTotalDailyIncome * 0.01;
-    dailyIncome += bonus;
+    dailyIncome = bonus;
   }
 
   return dailyIncome;

@@ -140,7 +140,7 @@ interface AppContextType extends AppState {
   login: (email: string, password?: string) => void;
   logout: () => void;
   sendChatMessage: (text: string, toUserId?: string) => void;
-  requestDeposit: (amount: number, reference: string, systemBankDetails?: any, userBankDetails?: any) => void;
+  requestDeposit: (amount: number, reference: string, systemBankDetails?: any, userBankDetails?: any) => Promise<{success: boolean, error?: string}>;
   requestWithdrawal: (
     amount: number,
     bankDetails: { bankName: string; accountNumber: string; accountName?: string },
@@ -482,6 +482,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const { data, error } = await supabase.from('products').insert(product).select().single();
     if (!error && data) {
        setProducts((prev) => [...prev, data]);
+    } else {
+       console.error("Failed to add product", error);
+       alert("Failed to add product: " + (error?.message || "Unknown error"));
     }
   };
 
@@ -672,8 +675,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     window.location.hash = '#/login';
   };
 
-  const requestDeposit = async (amount: number, reference: string, systemBankDetails?: any, userBankDetails?: any) => {
-    if (!currentUser) return;
+  const requestDeposit = async (amount: number, reference: string, systemBankDetails?: any, userBankDetails?: any): Promise<{success: boolean, error?: string}> => {
+    if (!currentUser) return { success: false, error: "Not logged in" };
     
     const localTxId = Math.random().toString();
     const tempTx = {
@@ -702,11 +705,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       alert("Failed to submit deposit: " + error.message);
       // Rollback
       setTransactions((prev) => prev.filter(t => t.id !== localTxId));
-      return;
+      return { success: false, error: error.message };
     }
     if (data) {
       setTransactions((prev) => prev.map(t => t.id === localTxId ? data : t));
     }
+    return { success: true };
   };
 
   const requestWithdrawal = async (
@@ -1423,7 +1427,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         ...dbRecord
       };
       setIncomeRecords(prev => [newRecord, ...prev]);
-      const { error: incErr1 } = await supabase.from('incomeRecords').insert(newRecord);
+      const { error: incErr1 } = await supabase.from('incomeRecords').insert(dbRecord);
       if (incErr1) console.error("claimTask incomeRecords insert err:", incErr1);
     }
 
@@ -1474,7 +1478,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         ...dbRecord
       };
       setIncomeRecords(prev => [newRecord, ...prev]);
-      const { error: incErr2 } = await supabase.from('incomeRecords').insert(newRecord);
+      const { error: incErr2 } = await supabase.from('incomeRecords').insert(dbRecord);
       if (incErr2) console.error("addBalance incomeRecords insert err:", incErr2);
     }
 
