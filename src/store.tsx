@@ -482,9 +482,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const { data, error } = await supabase.from('products').insert(product).select().single();
     if (!error && data) {
        setProducts((prev) => [...prev, data]);
-    } else {
-       console.error("Failed to add product", error);
-       alert("Failed to add product: " + (error?.message || "Unknown error"));
     }
   };
 
@@ -501,6 +498,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (!error) {
       setProducts((prev) => prev.filter((p) => p.id !== id));
+    } else {
+      console.error("Delete error:", error);
+      alert("Failed to delete product: " + error.message);
     }
   };
 
