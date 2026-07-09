@@ -14,11 +14,11 @@ supabase.rpc('query', {
     timestamp timestamp with time zone,
     read boolean DEFAULT false
   );
-  ALTER TABLE chat_messages DISABLE ROW LEVEL SECURITY;
+  ALTER TABLE chat_messages DISABLE ROW LEVEL SECURITY; ALTER TABLE products DISABLE ROW LEVEL SECURITY;
   do $$
   begin
-    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'chat_messages') then
-      alter publication supabase_realtime add table chat_messages;
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'chat_messages' -- this check is enough to ensure we run it once) then
+      alter publication supabase_realtime add table chat_messages, users, transactions, investments, products, commissions, "incomeRecords", system_deposit_accounts;
     end if;
   end;
   $$;

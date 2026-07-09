@@ -9,7 +9,7 @@ export function getDailyIncome(
 ): number {
   let dailyIncome = investment.fixedDailyReturn != null 
     ? Number(investment.fixedDailyReturn)
-    : Number(investment.amount || 0) * (Number(investment.expectedRoi || 0) / 100);
+    : (Number(investment.amount || 0) * (Number(investment.expectedRoi || 0) / 100)) / (investment.total_duration_days || 1);
 
   if (investment.planName === "VIP Member Exclusive Project") {
     let userLevelName = user ? (VIP_LEVELS[user.vipLevelIndex || 0]?.name || "VIP0") : "VIP0";

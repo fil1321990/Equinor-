@@ -57,7 +57,8 @@ import {
   Send,
   CheckCircle2,
   Banknote,
-  ImagePlus
+  ImagePlus,
+  AlertTriangle,
 } from "lucide-react";
 import { AppProvider, useAppStore } from "./store";
 import { getDailyIncome } from "./lib/earnings";
@@ -190,11 +191,11 @@ const StampCountdown = ({ targetDate }: { targetDate: string }) => {
       <div className="relative z-10 flex items-center justify-center transform -rotate-12">
         <svg viewBox="0 0 100 100" className="w-[130px] h-[130px] drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
           {/* White gear teeth using stroke */}
-          <circle cx="50" cy="50" r="45" fill="#ffffff" />
-          <circle cx="50" cy="50" r="47" fill="none" stroke="#ffffff" strokeWidth="6" strokeDasharray="5 4.84" />
+          <circle cx="50" cy="50" r="45" fill="rgba(255,255,255,0.4)" />
+          <circle cx="50" cy="50" r="47" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="6" strokeDasharray="5 4.84" />
           
           {/* Inner gray center */}
-          <circle cx="50" cy="50" r="39" fill="#E5E7EB" />
+          <circle cx="50" cy="50" r="39" fill="rgba(229,231,235,0.5)" />
           
           {/* Thin white inner ring */}
           <circle cx="50" cy="50" r="35" fill="none" stroke="#ffffff" strokeWidth="1.5" />
@@ -214,7 +215,7 @@ const StampCountdown = ({ targetDate }: { targetDate: string }) => {
           {/* Diagonal Ribbon */}
           <g transform="rotate(25 50 50)">
             {/* Ribbon background */}
-            <rect x="0" y="38" width="100" height="24" fill="#000000" />
+            <rect x="0" y="38" width="100" height="24" fill="rgba(0,0,0,0.5)" />
             {/* Ribbon text */}
             <text x="50" y="55" fill="#ffffff" fontSize="13" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle" letterSpacing="0.5">EM BREVE</text>
           </g>
@@ -515,7 +516,7 @@ function MainApp() {
 
   useEffect(() => {
     if (currentUser?.disabled || currentUser?.role === 'disabled') {
-      alert("Your account has been disabled. Please contact support.");
+      triggerVisualNotification("alert", "Notice", "Your account has been disabled. Please contact support.");
       logout();
     }
   }, [currentUser?.disabled, currentUser?.role, logout]);
@@ -534,6 +535,8 @@ function MainApp() {
   useEffect(() => {
     localStorage.setItem("app_activeTab", activeTab);
   }, [activeTab]);
+  const [stagedCollections, setStagedCollections] = useState<string[]>([]);
+  const [stagedInvId, setStagedInvId] = useState<string | null>(null);
   const [orderTab, setOrderTab] = useState<"general" | "special" | "expired">("general");
   const [productTab, setProductTab] = useState<"general" | "vip" | "special">("general");
   const [activeTeamTab, setActiveTeamTab] = useState<"A" | "B" | "C">("A");
@@ -543,7 +546,7 @@ function MainApp() {
     if (activeTab === "order" || activeTab === "product") {
       refreshProducts();
     }
-  }, [activeTab, orderTab, productTab, refreshProducts]);
+  }, [activeTab, orderTab, productTab]);
 
 
   
@@ -602,16 +605,17 @@ function MainApp() {
     const interval = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(interval);
   }, []);
-  const [activeModal, setActiveModal] = useState<null | "deposit" | "withdraw" | "bankDetails" | "about" | "convidar" | "levelUp" | "setup" | "setupPhone" | "setupPassword" | "setupAlertThreshold" | "addProduct" | "editProduct" | "fundingDetails" | "commissionRecord" | "incomeRecord" | "redemptionCode" | "redemptionReward" | "purchaseSuccess" | "contact" | "equinorConfirm" | "buyProduct" | "sysAnnouncement" | "download" | "addDepositAccount" | "depositCheckout" | "successAnimated" | "visualNotification">(
+  const [activeModal, setActiveModal] = useState<null | "deposit" | "withdraw" | "acceptJoy" | "bankDetails" | "about" | "convidar" | "levelUp" | "setup" | "setupPhone" | "setupPassword" | "setupAlertThreshold" | "addProduct" | "editProduct" | "fundingDetails" | "commissionRecord" | "incomeRecord" | "redemptionCode" | "redemptionReward" | "purchaseSuccess" | "contact" | "equinorConfirm" | "buyProduct" | "sysAnnouncement" | "download" | "addDepositAccount" | "depositCheckout" | "successAnimated" | "visualNotification">(
     null,
   );
   
-  type VisualNotificationType = 'purchase_success' | 'reward_unlocked' | 'you_won' | 'try_again' | 'insufficient_balance';
+  type VisualNotificationType = 'purchase_success' | 'reward_unlocked' | 'you_won' | 'try_again' | 'insufficient_balance' | 'alert';
+  const [showVisualNotification, setShowVisualNotification] = useState(false);
   const [notificationData, setNotificationData] = useState<{type: VisualNotificationType, title: string, subtitle: string, amount?: number}>({ type: 'purchase_success', title: '', subtitle: '' });
 
   const triggerVisualNotification = (type: VisualNotificationType, title: string, subtitle: string, amount?: number) => {
     setNotificationData({ type, title, subtitle, amount });
-    setActiveModal("visualNotification");
+    setShowVisualNotification(true);
     if (type === 'purchase_success' || type === 'reward_unlocked' || type === 'you_won') {
        playNotificationSound('success');
     } else {
@@ -722,6 +726,7 @@ function MainApp() {
   }, [currentUser, announcement, announcementSeen, activeModal]);
   const [selectedProductToBuy, setSelectedProductToBuy] = useState<any | null>(null);
   const [buyingQuantity, setBuyingQuantity] = useState("1");
+  const [localAnnouncement, setLocalAnnouncement] = useState(announcement || "");
   const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false);
   const [fundingTab, setFundingTab] = useState<"all" | "deposit" | "withdrawal">("all");
   const [txSearch, setTxSearch] = useState("");
@@ -784,7 +789,10 @@ function MainApp() {
   const [banksList, setBanksList] = useState<{code: string, name: string}[]>([]);
   const [newProductName, setNewProductName] = useState("");
   const [newProductTitle, setNewProductTitle] = useState("EQUINOR");
+  const [newProductTitleColor, setNewProductTitleColor] = useState("#1E293B");
+  const [newProductTitleSize, setNewProductTitleSize] = useState("18");
   const [newProductRoi, setNewProductRoi] = useState("");
+  const [newProductFixedDaily, setNewProductFixedDaily] = useState("");
   const [newProductMin, setNewProductMin] = useState("");
   const [newProductDays, setNewProductDays] = useState("30");
   const [newProductTPlusDays, setNewProductTPlusDays] = useState("1");
@@ -798,6 +806,12 @@ function MainApp() {
   const [newDepositAccountName, setNewDepositAccountName] = useState("");
   const [newDepositAccountNumber, setNewDepositAccountNumber] = useState("");
   const [depositCheckoutTimer, setDepositCheckoutTimer] = useState(1800);
+  useEffect(() => {
+    if (depositCheckoutTimer > 0 && activeModal === "depositCheckout") {
+      const timer = setTimeout(() => setDepositCheckoutTimer(t => t - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [depositCheckoutTimer, activeModal]);
   const [depositCheckoutAccountIndex, setDepositCheckoutAccountIndex] = useState(0);
   const [depositCheckoutStep, setDepositCheckoutStep] = useState<1|2|3>(1);
   const [isLoadingProductTypes, setIsLoadingProductTypes] = useState(false);
@@ -1059,12 +1073,12 @@ function MainApp() {
 
     const amountNum = Number(withdrawAmount);
     if (amountNum < 6000) {
-      alert("Minimum withdrawal is ₦6,000");
+      triggerVisualNotification("alert", "Notice", "Minimum withdrawal is ₦6,000");
       return;
     }
     
     if (!currentUser?.bankDetails) {
-      alert("Please add your bank details first.");
+      triggerVisualNotification("alert", "Notice", "Please add your bank details first.");
       return;
     }
 
@@ -1104,14 +1118,14 @@ function MainApp() {
       setTimeout(() => setShowConfetti(false), 5000);
     } catch (err: any) {
       console.error(err);
-      alert("Failed to submit withdrawal request.");
+      triggerVisualNotification("alert", "Notice", "Failed to submit withdrawal request.");
       setIsProcessing(false);
       setWithdrawAmount("");
       setActiveModal(null);
     }
   };
 
-  const handleInvest = (
+  const handleInvest = async (
     planName: string,
     min: number,
     roi: number,
@@ -1119,28 +1133,45 @@ function MainApp() {
     productType: "general" | "vip" | "special",
     fixedDailyReturn?: number,
     tPlusDays?: number,
-    quantity?: number
+    quantity?: number,
+    totalDurationDays?: number,
+    payoutCycleDays?: number
   ) => {
     if (!currentUser) return;
     
     const userVipLevel = VIP_LEVELS[currentUser.vipLevelIndex || 0];
     if (productType === "vip" && userVipLevel.levelIndex === 0) {
-      alert(`This is a VIP product. You must be at least VIP1 to invest.`);
+      triggerVisualNotification("alert", "Notice", `This is a VIP product. You must be at least VIP1 to invest.`);
       return;
     }
 
+    if (planName.toLowerCase() === "vip member exclusive project") {
+      if (userVipLevel.levelIndex < 3) {
+        triggerVisualNotification("alert", "Notice", "You must be at least VIP3 to activate the VIP Member Exclusive Project.");
+        return;
+      }
+    }
     if (planName.toLowerCase() === "vip team exclusive project") {
       const aLevelSubordinates = users.filter(u => u.referredBy === currentUser.referralCode).length;
       if (aLevelSubordinates < 30) {
-        alert("You need at least 30 team members to purchase the VIP Team Exclusive Project.");
+        triggerVisualNotification("alert", "Notice", "You need at least 30 team members to purchase the VIP Team Exclusive Project.");
         return;
       }
     }
 
+    // Also check quota for the specific product
+    const product = products.find(p => p.name === planName);
+    if (product && product.maxQuota > 0) {
+      const userBoughtCount = investments.filter(inv => inv.userId === currentUser?.id && inv.planName === planName).reduce((sum, inv) => sum + (inv.quantity || 1), 0);
+      if (userBoughtCount + (quantity || 1) > product.maxQuota) {
+        triggerVisualNotification("alert", "Notice", "You will exceed the maximum quota for this product.");
+        return;
+      }
+    }
     if (planName.toLowerCase() === "vip member exclusive project" || planName.toLowerCase() === "vip team exclusive project") {
       const hasPurchased = investments.some(inv => inv.userId === currentUser.id && inv.planName === planName);
       if (hasPurchased) {
-        alert("You have already reached the quota for this project.");
+        triggerVisualNotification("alert", "Notice", "You have already reached the quota for this project.");
         return;
       }
     }
@@ -1151,8 +1182,16 @@ function MainApp() {
       triggerVisualNotification("insufficient_balance", "INSUFFICIENT BALANCE", "Please recharge your account");
       return;
     }
-    createInvestment(planName, totalAmount, roi, days, fixedDailyReturn, tPlusDays, quantity);
-    triggerVisualNotification("purchase_success", "PURCHASE SUCCESSFUL", "Thank you for choosing Equinor", totalAmount);
+    setIsProcessing(true);
+    try {
+      const res = await createInvestment(planName, totalAmount, roi, days, fixedDailyReturn, tPlusDays, quantity, totalDurationDays, payoutCycleDays);
+      if (res && res.success) {
+        setActiveModal(null);
+        triggerVisualNotification("purchase_success", "PURCHASE SUCCESSFUL", "Thank you for choosing Equinor", totalAmount);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const formatOfferDate = (dateString: string) => {
@@ -1162,11 +1201,12 @@ function MainApp() {
 
   const handleLoginSubmit = async () => {
     if (!loginIdentifier || !loginPassword) {
-      alert("Please fill in phone number and password.");
+      triggerVisualNotification("alert", "Notice", "Please fill in phone number and password.");
       return;
     }
     setIsLoggingIn(true);
     try {
+      await new Promise(r => setTimeout(r, 1500));
       const res = await login(loginIdentifier, loginPassword);
       if (res?.mustChangePassword && res?.user) {
         setForcePasswordChangeUser(res.user);
@@ -1178,17 +1218,17 @@ function MainApp() {
 
   const handleForcePasswordChange = async () => {
     if (!newForcedPassword) {
-      alert("Please enter a new password.");
+      triggerVisualNotification("alert", "Notice", "Please enter a new password.");
       return;
     }
     if (newForcedPassword === loginPassword) {
-      alert("New password cannot be the same as the temporary password reset by admin.");
+      triggerVisualNotification("alert", "Notice", "New password cannot be the same as the temporary password reset by admin.");
       return;
     }
     await supabase.from('users').update({ password: newForcedPassword, mustChangePassword: false }).eq('id', forcePasswordChangeUser.id);
     
     // Quick reload / clear to prompt user to login with new password
-    alert("Password updated successfully! Please log in with your new password.");
+    triggerVisualNotification("alert", "Notice", "Password updated successfully! Please log in with your new password.");
     setForcePasswordChangeUser(null);
     setLoginPassword("");
     setNewForcedPassword("");
@@ -1268,7 +1308,7 @@ function MainApp() {
               />
               <button 
                 onClick={() => {
-                  if (!loginIdentifier || !loginPassword) return alert("Enter credentials");
+                  if (!loginIdentifier || !loginPassword) return triggerVisualNotification("alert", "Notice", "Enter credentials");
                   handleLoginSubmit();
                 }}
                 className="w-full bg-[#6B2EFF] text-white py-4 rounded-full font-bold text-lg mt-4 active:scale-95 transition-transform"
@@ -1362,24 +1402,30 @@ function MainApp() {
               </div>
 
               <button 
-                onClick={() => {
+                onClick={async () => {
                   if (!registerForm.agreed) {
-                    alert("Please read and agree to the Privacy agreement.");
+                    triggerVisualNotification("alert", "Notice", "Please read and agree to the Privacy agreement.");
                     return;
                   }
                   if (!registerForm.phone || !registerForm.password) {
-                    alert("Please fill in phone number and password.");
+                    triggerVisualNotification("alert", "Notice", "Please fill in phone number and password.");
                     return;
                   }
                   if (registerForm.password !== registerForm.confirmParams) {
-                    alert("Passwords do not match.");
+                    triggerVisualNotification("alert", "Notice", "Passwords do not match.");
                     return;
                   }
                   if (!registerForm.invitationCode || registerForm.invitationCode.trim() === '') {
-                    alert("Please enter the invitation code.");
+                    triggerVisualNotification("alert", "Notice", "Please enter the invitation code.");
                     return;
                   }
-                  signup(registerForm.phone, registerForm.password, registerForm.invitationCode);
+                  setIsLoggingIn(true);
+                  try {
+                    await new Promise(r => setTimeout(r, 1500));
+                    await signup(registerForm.phone, registerForm.password, registerForm.invitationCode);
+                  } finally {
+                    setIsLoggingIn(false);
+                  }
                 }}
                 className="w-full bg-[#6B2EFF] text-white py-4 rounded-full font-bold text-lg mt-8 active:scale-95 transition-transform"
               >
@@ -1471,7 +1517,7 @@ function MainApp() {
             <button 
               onClick={() => {
                 if (!loginIdentifier || !loginPassword) {
-                  alert("Please fill in phone number and password.");
+                  triggerVisualNotification("alert", "Notice", "Please fill in phone number and password.");
                   return;
                 }
                 handleLoginSubmit();
@@ -1654,11 +1700,11 @@ function MainApp() {
                       <button 
                         onClick={() => {
                           if (!task.done) {
-                            alert("Task not completed yet.");
+                            triggerVisualNotification("alert", "Notice", "Task not completed yet.");
                             return;
                           }
                           claimTask(task.id, task.reward);
-                          alert(`Successfully claimed ₦${task.reward} bonus!`);
+                          triggerVisualNotification("alert", "Notice", `Successfully claimed ₦${task.reward} bonus!`);
                         }}
                         className={`${task.done ? 'bg-[#7B2FF7]' : 'bg-gray-400'} text-white px-4 py-1.5 rounded-full text-[12px] font-bold whitespace-nowrap active:scale-95 transition-transform shadow-sm`}
                       >
@@ -2530,8 +2576,10 @@ function MainApp() {
                 </div>
               ) : products.filter((p: any) => {
                 const pType = (p.product_type || p.type || 'general').toLowerCase();
-                const isVip = p.is_vip === true || pType === 'vip';
+                const pName = (p.name || '').toLowerCase();
+                const isVip = p.is_vip === true || pType === 'vip' || (p.category && p.category.toLowerCase() === 'vip') || pName.includes('vip') || pName.includes('eq equity exchange project');
                 const isActive = p.status ? p.status === 'active' : true;
+                if (p.promoClosingDate && new Date(p.promoClosingDate).getTime() < Date.now()) return false;
                 if (!isActive) return false;
                 if (productTab === 'special') return pType === 'special' || isVip;
                 if (productTab === 'vip') return isVip;
@@ -2546,8 +2594,10 @@ function MainApp() {
                 <div className="px-5 space-y-4">
                   {products.filter((p: any) => {
                   const pType = (p.product_type || p.type || 'general').toLowerCase();
-                  const isVip = p.is_vip === true || pType === 'vip' || (p.category && p.category.toLowerCase() === 'vip');
+                  const pName = (p.name || '').toLowerCase();
+                  const isVip = p.is_vip === true || pType === 'vip' || (p.category && p.category.toLowerCase() === 'vip') || pName.includes('vip') || pName.includes('eq equity exchange project');
                   const isActive = p.status ? p.status === 'active' : (p.is_active !== false);
+                  if (p.promoClosingDate && new Date(p.promoClosingDate).getTime() < Date.now()) return false;
                   if (!isActive) return false;
                   if (productTab === 'special') return pType === 'special' || isVip;
                   if (productTab === 'vip') return isVip;
@@ -2567,7 +2617,7 @@ function MainApp() {
                       promoTimerString = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
                     }
 
-                    if (plan.type === 'vip' && plan.name === 'Equinor Equity Exchange Project' && currentUser) {
+                    if (plan.type === 'vip' && plan.name === 'EQ Equity exchange project' && currentUser) {
                       const userVipName = VIP_LEVELS[currentUser.vipLevelIndex || 0].name;
                       const tier = EQUITY_EXCHANGE_TIERS[userVipName] || EQUITY_EXCHANGE_TIERS["VIP1"];
                       cost = tier.cost;
@@ -2580,12 +2630,13 @@ function MainApp() {
                       const mockInv = {
                         planName: plan.name,
                         amount: plan.min,
-                        expectedRoi: plan.roi,
-                        fixedDailyReturn: plan.fixedDailyReturn,
+  expectedRoi: plan.roi,
+  fixedDailyReturn: plan.fixedDailyReturn,
+  total_duration_days: plan.total_duration_days || plan.days,
                       } as import('./store').Investment;
                       
                       const calculatedDailyReturn = getDailyIncome(mockInv, currentUser, users, investments);
-                      const totalIncome = calculatedDailyReturn * (plan.cycle || plan.days);
+                      const totalIncome = calculatedDailyReturn * (plan.total_duration_days || plan.days || 1);
                       return (
                         <div key={plan.id} className="relative bg-[#F8F9FF] rounded-[20px] mb-6 shadow-sm overflow-hidden flex flex-col p-4">
                           {/* Image Header wrapper */}
@@ -2645,14 +2696,14 @@ function MainApp() {
                           {/* Product details row */}
                           <div className="py-3 flex justify-between items-start mt-1">
                             <div className="flex flex-col flex-1 min-w-0 pr-2">
-                              <h3 className="font-bold text-[#1E293B] text-[18px] leading-tight mb-1 truncate">{plan.name}</h3>
+                              {(() => { let t: any = { color: "#1E293B", size: "18" }; try { const parsed = JSON.parse(plan.title || ""); if (parsed && parsed.text) t = parsed; } catch(e) {} return <h3 className="font-bold leading-tight mb-1 truncate" style={{ color: t.color, fontSize: t.size + 'px' }}>{plan.name}</h3>; })()}
                               <span className="text-[#D32F2F] font-black text-[22px] leading-none tracking-tight mt-1">₦{plan.min.toLocaleString()}</span>
                             </div>
                             
                             <button 
                               onClick={() => {
                                 if (isPromoLocked) {
-                                  alert("This product is currently locked for a promotional period.");
+                                  triggerVisualNotification("alert", "Notice", "This product is currently locked for a promotional period.");
                                   return;
                                 }
                                 if (!currentUser) return;
@@ -2662,21 +2713,27 @@ function MainApp() {
                                 }
 
                                 if (plan.type === "vip" && VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex === 0) {
-                                  alert("This is a VIP product. You must be at least VIP1 to invest.");
+                                  triggerVisualNotification("alert", "Notice", "This is a VIP product. You must be at least VIP1 to invest.");
                                   return;
                                 }
                                 
+                                if (plan.name.toLowerCase() === 'vip member exclusive project') {
+                                  if (VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex < 3) {
+                                    triggerVisualNotification("alert", "Notice", "You must be at least VIP3 to activate the VIP Member Exclusive Project.");
+                                    return;
+                                  }
+                                }
                                 if (isVipTeam) {
                                   const aLevelSubordinates = users.filter(u => u.referredBy === currentUser.referralCode).length;
                                   if (aLevelSubordinates < 30) {
-                                    alert("You need at least 30 team members to purchase the VIP Team Exclusive Project.");
+                                    triggerVisualNotification("alert", "Notice", "You need at least 30 team members to purchase the VIP Team Exclusive Project.");
                                     return;
                                   }
                                 }
                                 
-                                const hasPurchased = investments.some(inv => inv.userId === currentUser.id && inv.planName === plan.name);
-                                if (hasPurchased) {
-                                  alert("You have already reached the quota for this project.");
+                                const userBoughtCount = investments.filter(inv => inv.userId === currentUser.id && inv.planName === plan.name).reduce((sum, inv) => sum + (inv.quantity || 1), 0);
+                                if (plan.maxQuota > 0 && userBoughtCount >= plan.maxQuota) {
+                                  triggerVisualNotification("alert", "Notice", "You have already reached the maximum quota for this project.");
                                   return;
                                 }
                                 
@@ -2698,12 +2755,19 @@ function MainApp() {
                                 <span className="text-[#5B5FEF] font-black text-[12px] ml-1">₦{totalIncome.toLocaleString()}</span>
                               </div>
                               <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
-                                <span className="text-[#5B5FEF]/80 text-[11px]">Quota:</span>
-                                <span className="text-[#5B5FEF] font-black text-[12px] ml-1">{plan.maxQuota || '∞'}</span>
+                                {(() => {
+    const userBoughtCount = investments.filter(inv => inv.userId === currentUser?.id && inv.planName === plan.name).reduce((sum, inv) => sum + (inv.quantity || 1), 0);
+    return (
+      <>
+        <span className="text-[#5B5FEF]/80 text-[11px]">Quota:</span>
+        <span className="text-[#5B5FEF] font-black text-[12px] ml-1">{plan.maxQuota ? `${userBoughtCount}/${plan.maxQuota}` : '∞'}</span>
+      </>
+    );
+  })()}
                               </div>
                               <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
                                 <span className="text-[#5B5FEF]/80 text-[11px]">Cycle:</span>
-                                <span className="text-[#5B5FEF] font-black text-[12px] ml-1">{plan.cycle || plan.days} Days</span>
+                                <span className="text-[#5B5FEF] font-black text-[12px] ml-1">{plan.total_duration_days || plan.days} Days</span>
                               </div>
                               <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
                                 <span className="text-[#5B5FEF]/80 text-[11px]">Daily income:</span>
@@ -2715,7 +2779,7 @@ function MainApp() {
                       );
                     }
 
-                    if (plan.type === 'vip' && plan.name === 'Equinor Equity Exchange Project') {
+                    if (plan.type === 'vip' && plan.name === 'EQ Equity exchange project') {
                       return (
                         <div key={plan.id} className="relative bg-white rounded-[20px] mb-4 shadow-sm overflow-hidden flex flex-col">
                           {/* Image Header wrapper */}
@@ -2760,19 +2824,19 @@ function MainApp() {
                           {/* Product details row */}
                           <div className="py-3 flex justify-between items-start mt-1">
                             <div className="flex flex-col flex-1 min-w-0 pr-2">
-                              <h3 className="font-bold text-[#1E293B] text-[18px] leading-tight mb-1 truncate">{plan.name}</h3>
+                              {(() => { let t: any = { color: "#1E293B", size: "18" }; try { const parsed = JSON.parse(plan.title || ""); if (parsed && parsed.text) t = parsed; } catch(e) {} return <h3 className="font-bold leading-tight mb-1 truncate" style={{ color: t.color, fontSize: t.size + 'px' }}>{plan.name}</h3>; })()}
                               <span className="text-[#D32F2F] font-black text-[22px] leading-none tracking-tight mt-1">₦{cost.toLocaleString()}</span>
                             </div>
                             
                             <button 
                               onClick={() => {
                                 if (isPromoLocked) {
-                                  alert("This product is currently locked for a promotional period.");
+                                  triggerVisualNotification("alert", "Notice", "This product is currently locked for a promotional period.");
                                   return;
                                 }
                                 const amount = Number(equinorInputAmount) || cost;
                                 if (amount < cost) {
-                                  alert(`Minimum amount is ₦${cost.toLocaleString()}`);
+                                  triggerVisualNotification("alert", "Notice", `Minimum amount is ₦${cost.toLocaleString()}`);
                                   return;
                                 }
                                 if (!currentUser) return;
@@ -2782,7 +2846,7 @@ function MainApp() {
                                 }
 
                                 if (plan.type === "vip" && VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex === 0) {
-                                  alert("This is a VIP product. You must be at least VIP1 to invest.");
+                                  triggerVisualNotification("alert", "Notice", "This is a VIP product. You must be at least VIP1 to invest.");
                                   return;
                                 }
 
@@ -2801,7 +2865,7 @@ function MainApp() {
                             <div className="flex flex-col">
                               <span className="text-gray-500 text-xs font-semibold uppercase tracking-wider mb-2 flex items-center gap-2">
                                 Enter Amount (Min ₦{cost.toLocaleString()})
-                                {plan.maxQuota ? <span className="text-[#0052FF] text-[9px] font-bold tracking-wider bg-blue-50 px-1.5 py-0.5 rounded uppercase">Quota: {plan.maxQuota}</span> : null}
+                                {plan.maxQuota ? <span className="text-[#0052FF] text-[9px] font-bold tracking-wider bg-blue-50 px-1.5 py-0.5 rounded uppercase">Quota: {investments.filter(inv => inv.userId === currentUser?.id && inv.planName === plan.name).reduce((sum, inv) => sum + (inv.quantity || 1), 0)}/{plan.maxQuota}</span> : null}
                               </span>
                               <div className="border border-gray-200 focus-within:border-[#8A63FF] rounded-[10px] px-3 py-2 transition-colors flex items-center bg-[#F8F9FA]">
                                 <span className="text-gray-500 font-bold mr-1">₦</span>
@@ -2825,7 +2889,7 @@ function MainApp() {
                               </div>
                               <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
                                 <span className="text-[#5B5FEF]/80 text-[11px]">Cycle:</span>
-                                <span className="text-[#5B5FEF] font-medium text-[12px] ml-1">1 Days</span>
+                                <span className="text-[#5B5FEF] font-medium text-[12px] ml-1">{plan.total_duration_days || plan.days} Days</span>
                               </div>
                             </div>
                           </div>
@@ -2836,11 +2900,12 @@ function MainApp() {
                     const mockInv = {
                       planName: plan.name,
                       amount: plan.min,
-                      expectedRoi: plan.roi,
-                      fixedDailyReturn: plan.fixedDailyReturn,
+  expectedRoi: plan.roi,
+  fixedDailyReturn: plan.fixedDailyReturn,
+  total_duration_days: plan.total_duration_days || plan.days,
                     } as import('./store').Investment;
                     const calculatedDailyReturn = getDailyIncome(mockInv, currentUser, users, investments);
-                    const totalIncome = calculatedDailyReturn * (plan.cycle || plan.days);
+                    const totalIncome = calculatedDailyReturn * (plan.total_duration_days || plan.days || 1);
                     
                     return (
                       <div key={plan.id} className="relative bg-[#F8F9FF] rounded-[20px] mb-6 shadow-sm overflow-hidden flex flex-col p-4">
@@ -2892,14 +2957,14 @@ function MainApp() {
                         {/* Product details row */}
                         <div className="py-3 flex justify-between items-center mt-1">
                           <div className="flex flex-col flex-1 min-w-0 pr-2">
-                            <h3 className="font-bold text-[#1E293B] text-[18px] leading-tight mb-1 truncate">{plan.name}</h3>
+                            {(() => { let t: any = { color: "#1E293B", size: "18" }; try { const parsed = JSON.parse(plan.title || ""); if (parsed && parsed.text) t = parsed; } catch(e) {} return <h3 className="font-bold leading-tight mb-1 truncate" style={{ color: t.color, fontSize: t.size + 'px' }}>{plan.name}</h3>; })()}
                             <span className="text-[#D32F2F] font-black text-[22px] leading-none tracking-tight mt-1">₦{plan.min.toLocaleString()}</span>
                           </div>
                           
                           <button 
                             onClick={() => {
                               if (isPromoLocked) {
-                                alert("This product is currently locked for a promotional period.");
+                                triggerVisualNotification("alert", "Notice", "This product is currently locked for a promotional period.");
                                 return;
                               }
                               if (!currentUser) return;
@@ -2909,7 +2974,7 @@ function MainApp() {
                               }
 
                               if (plan.type === "vip" && VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex === 0) {
-                                alert("This is a VIP product. You must be at least VIP1 to invest.");
+                                triggerVisualNotification("alert", "Notice", "This is a VIP product. You must be at least VIP1 to invest.");
                                 return;
                               }
                               
@@ -2931,12 +2996,19 @@ function MainApp() {
                               <span className="text-[#5B5FEF] font-black text-[12px] ml-1">₦{totalIncome.toLocaleString()}</span>
                             </div>
                             <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
-                              <span className="text-[#5B5FEF]/80 text-[11px]">Quota:</span>
-                              <span className="text-[#5B5FEF] font-black text-[12px] ml-1">{plan.maxQuota || '∞'}</span>
+                              {(() => {
+    const userBoughtCount = investments.filter(inv => inv.userId === currentUser?.id && inv.planName === plan.name).reduce((sum, inv) => sum + (inv.quantity || 1), 0);
+    return (
+      <>
+        <span className="text-[#5B5FEF]/80 text-[11px]">Quota:</span>
+        <span className="text-[#5B5FEF] font-black text-[12px] ml-1">{plan.maxQuota ? `${userBoughtCount}/${plan.maxQuota}` : '∞'}</span>
+      </>
+    );
+  })()}
                             </div>
                             <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
                               <span className="text-[#5B5FEF]/80 text-[11px]">Cycle:</span>
-                              <span className="text-[#5B5FEF] font-black text-[12px] ml-1">{plan.cycle || plan.days} Days</span>
+                              <span className="text-[#5B5FEF] font-black text-[12px] ml-1">{plan.total_duration_days || plan.days} Days</span>
                             </div>
                             <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
                               <span className="text-[#5B5FEF]/80 text-[11px]">Daily income:</span>
@@ -2966,14 +3038,13 @@ function MainApp() {
               const lastCollected = inv.lastCollectedDate ? new Date(inv.lastCollectedDate) : startDate;
               const msInADay = 1000 * 3600 * 24;
               
-              const tPlusDays = inv.tPlusDays || 1;
+              const tPlusDays = inv.payout_cycle_days || inv.tPlusDays || 1;
               const msInCycle = msInADay * tPlusDays;
               const currentElapsedMs = Math.max(0, now.getTime() - lastCollected.getTime());
               const timeToCollectMs = Math.min(Math.min(currentElapsedMs, msInCycle), endDate.getTime() - lastCollected.getTime());
               
               const isCycleComplete = currentElapsedMs >= msInCycle || now.getTime() >= endDate.getTime();
-              
-              if (isCycleComplete) {
+              if (isCycleComplete && stagedCollections.includes(inv.id)) {
                 const dailyIncome = getDailyIncome(inv, currentUser, users, investments);
                 const profitAccrued = (timeToCollectMs / msInADay) * dailyIncome;
                 
@@ -3003,13 +3074,14 @@ function MainApp() {
               let selectedCount = 0;
               let totalAmountCollected = 0;
               for (const inv of activeInvestments) {
+                if (!stagedCollections.includes(inv.id)) continue;
                 const invNow = new Date();
                 const invStart = new Date(inv.startDate);
                 const invEnd = new Date(inv.endDate);
                 const invLastCollected = inv.lastCollectedDate ? new Date(inv.lastCollectedDate) : invStart;
                 
                 const invMsInADay = 1000 * 3600 * 24;
-                const tPlusDays = inv.tPlusDays || 1;
+                const tPlusDays = inv.payout_cycle_days || inv.tPlusDays || 1;
                 const msInCycle = invMsInADay * tPlusDays;
                 
                 const currentElapsed = Math.max(0, invNow.getTime() - invLastCollected.getTime());
@@ -3025,11 +3097,14 @@ function MainApp() {
                 }
               }
               if (selectedCount > 0) {
+                setStagedCollections([]);
                 setSuccessAnimType("general");
-                setSuccessAnimTitle("Income Collected!");
+                setSuccessAnimTitle("Added to balance successful");
                 setSuccessAnimMessage("All accrued profits collected successfully into your balance.");
                 setSuccessAnimAmount(totalAmountCollected);
                 setActiveModal("successAnimated");
+                setShowConfetti(true);
+                setTimeout(() => setShowConfetti(false), 5000);
               } else {
                 addNotification("Info", "No new profits to collect.", "info");
               }
@@ -3082,222 +3157,204 @@ function MainApp() {
                       )}
                     </button>
                   )}
-
                   {/* Tab Navigation */}
                   <div className="flex w-full gap-2 mb-4 shrink-0 z-10">
-                    {(["general", "special", "expired"] as const).map(tab => {
+                    {(['general', 'special', 'expired'] as const).map(tab => {
                       const isActive = orderTab === tab;
                       return (
                         <button
                           key={tab}
-                          onClick={() => setOrderTab(tab as any)}
-                          className={`flex-1 py-2 text-[14px] relative focus:outline-none transition-all ${
-                            isActive ? "text-white font-bold" : "text-gray-500 font-medium hover:text-gray-400"
-                          }`}
+                          onClick={() => setOrderTab(tab)}
+                          className={`flex-1 py-1.5 rounded-full text-[12px] font-bold transition-colors ${isActive ? 'bg-[#1A1A1A] text-white' : 'bg-white text-[#1A1A1A] border border-gray-200'}`}
                         >
-                          <span className="capitalize">{tab}</span>
-                          {isActive && (
-                            <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/2 h-[3px] bg-[#B84CF6] rounded-t-full shadow-[0_0_8px_rgba(138,99,255,0.6)]" />
-                          )}
+                          {tab === 'general' ? 'General' : tab === 'special' ? 'Special' : 'Expired'}
                         </button>
                       );
                     })}
                   </div>
-
-                  <div className="flex-1 overflow-y-auto w-full relative pb-[140px] flex flex-col custom-scrollbar">
-
-                    <div className="flex-1 w-full relative z-10 space-y-4">
-                    {isLoadingOrders ? (
-                      <div className="w-full space-y-4">
-                        {[1, 2, 3].map((i) => (
-                          <div key={i} className="bg-white rounded-[16px] mb-4 shadow-[0_4px_20px_rgba(0,0,0,0.1)] overflow-hidden">
-                            <div className="w-full h-[140px] sm:h-[160px] bg-slate-200 animate-pulse"></div>
-                            <div className="p-4 flex flex-col gap-3">
-                              <div className="flex justify-between items-center">
-                                <div className="h-5 w-12 bg-slate-200 rounded-full animate-pulse"></div>
-                                <div className="h-5 w-24 bg-slate-200 rounded animate-pulse"></div>
-                              </div>
-                              <div className="h-6 w-3/4 bg-slate-200 rounded animate-pulse my-2"></div>
-                              <div className="grid grid-cols-2 gap-3 mt-1">
-                                <div className="h-16 bg-slate-200 rounded-[12px] animate-pulse"></div>
-                                <div className="h-16 bg-slate-200 rounded-[12px] animate-pulse"></div>
-                                <div className="h-16 bg-slate-200 rounded-[12px] animate-pulse"></div>
-                                <div className="h-16 bg-slate-200 rounded-[12px] animate-pulse"></div>
-                              </div>
-                              <div className="h-12 w-full bg-slate-200 rounded-[12px] animate-pulse mt-2"></div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : filteredInvestments.length === 0 ? (
+                  <div className="flex-1 overflow-y-auto w-full pb-32 scrollbar-hide">
+                    {filteredInvestments.length === 0 ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center -mt-20">
                         <EquinorStar className="w-24 h-24 text-white/20 mb-4" />
                       </div>
                     ) : (
                       filteredInvestments.map(inv => {
+                        const product = products.find(p => p.name === inv.planName) as any;
                         const invNow = new Date();
                         const invStart = new Date(inv.startDate);
                         const invEnd = new Date(inv.endDate);
                         const invLastCollected = inv.lastCollectedDate ? new Date(inv.lastCollectedDate) : invStart;
                         const invMsInADay = 1000 * 3600 * 24;
-                        const invCycleLength = Math.round((invEnd.getTime() - invStart.getTime()) / invMsInADay);
-                        
+
                         const isExpired = invNow >= invEnd || inv.status === 'completed';
-                        
-                        const tPlusDays = inv.tPlusDays || 1;
+
+                        const tPlusDays = inv.payout_cycle_days || inv.tPlusDays || 1;
                         const maxElapsedCycleMs = Math.min(tPlusDays * invMsInADay, invEnd.getTime() - invLastCollected.getTime());
                         const currentElapsedMs = Math.max(0, invNow.getTime() - invLastCollected.getTime());
-                        
+
                         const msUntilNext = Math.max(0, maxElapsedCycleMs - currentElapsedMs);
                         const daysLeft = Math.floor(msUntilNext / invMsInADay);
                         const hoursLeft = Math.floor((msUntilNext / (1000 * 60 * 60)) % 24);
                         const minutesLeft = Math.floor((msUntilNext / 1000 / 60) % 60);
                         const secondsLeft = Math.floor((msUntilNext / 1000) % 60);
-                        
+
                         const expiryRemainingMs = Math.max(0, invEnd.getTime() - invNow.getTime());
                         const expYears = Math.floor(expiryRemainingMs / (1000 * 60 * 60 * 24 * 365));
                         const expDays = Math.floor((expiryRemainingMs % (1000 * 60 * 60 * 24 * 365)) / (1000 * 60 * 60 * 24));
                         const expHours = Math.floor((expiryRemainingMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                         const expMinutes = Math.floor((expiryRemainingMs % (1000 * 60 * 60)) / (1000 * 60));
                         const expSeconds = Math.floor((expiryRemainingMs % (1000 * 60)) / 1000);
-                        
+
                         const readingElapsedMs = Math.min(currentElapsedMs, maxElapsedCycleMs);
                         const dailyIncome = getDailyIncome(inv, currentUser, users, investments);
                         const profitAccrued = (readingElapsedMs / invMsInADay) * dailyIncome;
-                        
+
                         const timeToCollectMs = Math.min(Math.min(currentElapsedMs, maxElapsedCycleMs), invEnd.getTime() - invLastCollected.getTime());
                         const isCycleComplete = currentElapsedMs >= maxElapsedCycleMs;
-                        const canCollect = inv.status === "active" && isCycleComplete;
-                        const product = products.find(p => p.name === inv.planName);
-                        
-                                                return (
-                          <div key={inv.id} className="relative bg-[#F8F9FF] rounded-[16px] mb-3 shadow-sm p-3 w-full">
-                            {/* 1. Full-width hero image, 10px rounded. */}
-                            <div className="w-full h-[90px] rounded-[10px] overflow-hidden mb-2 bg-slate-800">
-                              {product?.imageUrl ? (
-                                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
-                              ) : inv.planName.toLowerCase() === 'vip team exclusive project' ? (
-                                <div className="w-full h-full bg-gradient-to-r from-red-900 to-black flex items-center justify-center relative">
-                                  <div className="flex flex-col items-center justify-center z-10">
-                                    <span className="text-[#FBBF24] font-black text-2xl tracking-widest drop-shadow-lg scale-y-110">VIP</span>
-                                    <span className="text-white font-bold tracking-[0.3em] text-[10px] mt-0.5">GROUP</span>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="w-full h-full bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center">
-                                   <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#FBBF24] to-[#F59E0B] flex items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.6)]">
-                                     <span className="text-white font-bold text-lg tracking-tighter">VIP</span>
-                                   </div>
-                                </div>
-                              )}
-                            </div>
+                        const canCollect = inv.status === 'active' && isCycleComplete;
 
-                            {/* 2. Row: Left "T+7" pill #FFE5E5 text #FF4444. Right product code + barcode. */}
-                            <div className="flex justify-between items-center mb-1.5">
-                              <div className="bg-[#FFE5E5] text-[#FF4444] px-2 py-0.5 rounded-full text-[11px] font-bold">
-                                T+{inv.tPlusDays || 1}
-                              </div>
-                              <div className="flex items-center gap-1 opacity-60">
-                                <span className="text-[11px] font-mono text-[#1A1A1A]">CP{new Date(inv.startDate).getTime().toString().slice(-6)}</span>
-                                <Barcode className="w-5 h-3 text-black" strokeWidth={1.5} />
-                              </div>
-                            </div>
+                        return (
+                          
+<div key={inv.id} className="relative bg-[#F8F9FF] rounded-[16px] mb-3 shadow-sm p-4 w-full">
+  {/* 1. Full-width hero image */}
+  <div className="w-full h-[80px] rounded-[12px] overflow-hidden mb-3 bg-slate-800">
+    {product?.imageUrl ? (
+      <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+    ) : inv.planName.toLowerCase() === 'vip team exclusive project' ? (
+      <div className="w-full h-full bg-gradient-to-r from-red-900 to-black flex items-center justify-center relative">
+        <div className="flex flex-col items-center justify-center z-10">
+          <span className="text-[#FBBF24] font-black text-2xl tracking-widest drop-shadow-lg scale-y-110">VIP</span>
+          <span className="text-white font-bold tracking-[0.3em] text-[10px] mt-0.5">GROUP</span>
+        </div>
+      </div>
+    ) : (
+      <div className="w-full h-full bg-gradient-to-br from-[#1F2937] to-[#111827] flex items-center justify-center">
+         <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#FBBF24] to-[#F59E0B] flex items-center justify-center shadow-[0_0_20px_rgba(245,158,11,0.6)]">
+           <span className="text-white font-bold text-lg tracking-tighter">VIP</span>
+         </div>
+      </div>
+    )}
+  </div>
 
-                            {/* 3. Title & Price row */}
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="flex flex-col min-w-0 pr-2">
-                                <h3 className="font-bold text-[15px] text-[#1A1A1A] leading-tight mb-0.5 truncate">{inv.planName}</h3>
-                                <div className="text-[10px] text-[#666666] leading-tight flex flex-col gap-0.5 mt-0.5">
-                                  <span>Start: {new Date(inv.startDate).toLocaleDateString()} {new Date(inv.startDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                  <span>End: {new Date(inv.endDate).toLocaleDateString()} {new Date(inv.endDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                                </div>
-                              </div>
-                              <div className="flex flex-col items-end shrink-0">
-                                <span className="text-[#5B5FEF]/70 text-[10px]">Price</span>
-                                <span className="text-[#5B5FEF] font-bold text-[13px] leading-tight">₦{inv.amount.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</span>
-                              </div>
-                            </div>
+  {/* 2. Top Row: Left "T+7" pill, Right: Price */}
+  <div className="flex justify-between items-center mb-2">
+    <div className="bg-[#FFE5E5] text-[#FF4444] px-2 py-0.5 rounded-[4px] text-[12px] font-medium">
+      T+{inv.payout_cycle_days || inv.tPlusDays || 1}
+    </div>
+    <div className="flex flex-col items-end">
+      <span className="text-[15px] font-bold text-[#1A1A1A]">Price: ₦{inv.amount.toLocaleString()}</span>
+    </div>
+  </div>
 
-                            {/* 4. Countdown: 4 black boxes #1A1A1A with white text " Day: HH : MM : SS", 6px radius. */}
-                            <div className="flex items-center gap-1 mb-2 h-6">
-                              {!canCollect && !isExpired && (
-                                <>
-                                  <div className="bg-[#1A1A1A] text-white rounded-[6px] px-1.5 py-0.5 flex items-center justify-center text-[11px] font-bold min-w-[28px] whitespace-nowrap">{daysLeft} D</div>
-                                  <div className="text-[#1A1A1A] font-bold text-[11px]">:</div>
-                                  <div className="bg-[#1A1A1A] text-white rounded-[6px] px-1.5 py-0.5 flex items-center justify-center text-[11px] font-bold min-w-[24px] whitespace-nowrap">{hoursLeft.toString().padStart(2, '0')}</div>
-                                  <div className="text-[#1A1A1A] font-bold text-[11px]">:</div>
-                                  <div className="bg-[#1A1A1A] text-white rounded-[6px] px-1.5 py-0.5 flex items-center justify-center text-[11px] font-bold min-w-[24px] whitespace-nowrap">{minutesLeft.toString().padStart(2, '0')}</div>
-                                  <div className="text-[#1A1A1A] font-bold text-[11px]">:</div>
-                                  <div className="bg-[#1A1A1A] text-white rounded-[6px] px-1.5 py-0.5 flex items-center justify-center text-[11px] font-bold min-w-[24px] whitespace-nowrap">{secondsLeft.toString().padStart(2, '0')}</div>
-                                </>
-                              )}
-                            </div>
+  {/* 3. Title & Start/End Time Block */}
+  <div className="flex flex-col mb-1">
+    {(() => { let t: any = { color: "#1A1A1A", size: "18" }; try { const product = products.find(p => p.name === inv.planName) as any; if (product) { const parsed = JSON.parse(product.title || ""); if (parsed && parsed.text) t = parsed; } } catch(e) {} return <h3 className="font-bold leading-tight mb-1" style={{ color: t.color, fontSize: t.size + 'px' }}>{inv.planName}</h3>; })()}
+    <div className="flex flex-col gap-0">
+      <div className="flex items-center gap-1">
+        <span className="text-[12px] text-[#666666]">StartTime:</span>
+        <span className="text-[12px] font-medium text-[#1A1A1A]">{new Date(inv.startDate).toLocaleDateString()} {new Date(inv.startDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="text-[12px] text-[#666666]">EndTime:</span>
+        <span className="text-[12px] font-medium text-[#1A1A1A]">{new Date(inv.endDate).toLocaleDateString()} {new Date(inv.endDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+      </div>
+    </div>
+  </div>
 
-                            {/* 5. 3 stat pills #E8E9FF */}
-                            <div className="grid grid-cols-3 gap-1.5 mb-3">
-                              <div className="bg-[#E8E9FF] rounded-[6px] py-1 px-1 flex flex-col items-center justify-center text-center">
-                                <div className="text-[#5B5FEF] font-bold text-[11px]">₦{dailyIncome.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-                                <div className="text-[#5B5FEF]/70 text-[9px]">Daily</div>
-                              </div>
-                              <div className="bg-[#E8E9FF] rounded-[6px] py-1 px-1 flex flex-col items-center justify-center text-center">
-                                <div className="text-[#5B5FEF] font-bold text-[11px]">{invCycleLength} d</div>
-                                <div className="text-[#5B5FEF]/70 text-[9px]">Cycle</div>
-                              </div>
-                              <div className="bg-[#E8E9FF] rounded-[6px] py-1 px-1 flex flex-col items-center justify-center text-center">
-                                <div className="text-[#5B5FEF] font-bold text-[11px]">₦{(dailyIncome * invCycleLength).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-                                <div className="text-[#5B5FEF]/70 text-[9px]">Total</div>
-                              </div>
-                            </div>
+  {/* Duration Timer (Circles) Right-aligned */}
+  <div className="flex justify-end mb-2">
+    {!isExpired ? (
+      <div className="flex items-center gap-1">
+        {expYears > 0 && <div className="bg-black text-white rounded-full w-7 h-7 flex items-center justify-center text-[10px] font-bold">{expYears}Y</div>}
+        {Math.floor(expDays/30) > 0 && <div className="bg-black text-white rounded-full w-7 h-7 flex items-center justify-center text-[10px] font-bold">{Math.floor(expDays/30)}M</div>}
+        <div className="bg-black text-white rounded-full w-7 h-7 flex items-center justify-center text-[10px] font-bold">{expDays%30}d</div>
+        <div className="bg-black text-white rounded-full w-7 h-7 flex items-center justify-center text-[10px] font-bold">{expHours.toString().padStart(2, '0')}h</div>
+        <div className="bg-black text-white rounded-full w-7 h-7 flex items-center justify-center text-[10px] font-bold">{expMinutes.toString().padStart(2, '0')}m</div>
+        <div className="bg-black text-white rounded-full w-7 h-7 flex items-center justify-center text-[10px] font-bold">{expSeconds.toString().padStart(2, '0')}s</div>
+      </div>
+    ) : (
+      <div className="h-[28px]"></div>
+    )}
+  </div>
 
-                            {/* 7. Bottom: Left "Profit +₦1249.445" red #FF4444 bold. Right disabled "Get" button #E8E9FF text #A0A0A0 24px radius. */}
-                            <div className="flex justify-between items-center">
-                              <div className="text-[#FF4444] font-bold text-[15px]">
-                                Profit +₦{profitAccrued.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+  {/* T+ Collection Countdown */}
+  <div className="flex justify-between items-center mb-3">
+    <div className="text-[12px] font-semibold text-[#1A1A1A]">Collection In:</div>
+    <div className="flex items-center gap-[2px]">
+      {!canCollect && !isExpired ? (
+        <>
+          {daysLeft > 0 && (
+            <>
+              <div className="bg-[#10B981] text-white rounded-[4px] px-1.5 h-[28px] flex items-center justify-center text-[12px] font-bold">{daysLeft}</div>
+              <div className="text-[#10B981] font-medium text-[12px] px-0.5">d</div>
+            </>
+          )}
+          <div className="bg-[#10B981] text-white rounded-[4px] w-[26px] h-[28px] flex items-center justify-center text-[12px] font-bold">{hoursLeft.toString().padStart(2, '0')}</div>
+          <div className="text-[#10B981] font-medium text-[10px] px-0.5">:</div>
+          <div className="bg-[#10B981] text-white rounded-[4px] w-[26px] h-[28px] flex items-center justify-center text-[12px] font-bold">{minutesLeft.toString().padStart(2, '0')}</div>
+          <div className="text-[#10B981] font-medium text-[10px] px-0.5">:</div>
+          <div className="bg-[#10B981] text-white rounded-[4px] w-[26px] h-[28px] flex items-center justify-center text-[12px] font-bold">{secondsLeft.toString().padStart(2, '0')}</div>
+        </>
+      ) : (
+        <span className="text-[#10B981] font-bold text-[12px]">Ready</span>
+      )}
+    </div>
+  </div>
+
+  {/* 4. 3 stat pills */}
+  <div className="grid grid-cols-3 gap-[8px] mb-4">
+    <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center">
+      <div className="text-[#5B5FEF] font-semibold text-[15px]">₦{dailyIncome.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+      <div className="text-[#5B5FEF] text-[12px] whitespace-nowrap">Daily income</div>
+    </div>
+    <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center">
+      <div className="text-[#5B5FEF] font-semibold text-[15px]">{inv.total_duration_days || inv.days || Math.round((invEnd.getTime() - invStart.getTime()) / (1000 * 3600 * 24))} Days</div>
+      <div className="text-[#5B5FEF] text-[12px] whitespace-nowrap">Cycle</div>
+    </div>
+    <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center">
+      <div className="text-[#5B5FEF] font-semibold text-[15px]">₦{(dailyIncome * (inv.total_duration_days || inv.days || Math.round((invEnd.getTime() - invStart.getTime()) / (1000 * 3600 * 24)))).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+      <div className="text-[#5B5FEF] text-[12px] whitespace-nowrap">Total return</div>
+    </div>
+  </div>
+
+  {/* 5. Profit Row */}
+
+                            <div className="flex justify-between items-center bg-white rounded-[12px] p-[12px] shadow-sm border border-gray-100">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[#1A1A1A] font-medium text-[14px]">Profit</span>
+                                <span className="text-[#FF4444] font-bold text-[18px]">
+                                  +₦{profitAccrued.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                </span>
                               </div>
                               
                               {canCollect ? (
-                                <button 
-                                  disabled={collectingIds[inv.id]}
-                                  onClick={async () => {
-                                     setCollectingIds(prev => ({ ...prev, [inv.id]: true }));
-                                     const res = await collectEarnings(inv.id, true);
-                                     if (res && res.success) {
-                                       setSuccessAnimType("general");
-                                       setSuccessAnimTitle("Income Collected!");
-                                       setSuccessAnimMessage(`Profits for ${inv.planName} collected successfully.`);
-                                       setSuccessAnimAmount(res.amount || null);
-                                       setActiveModal("successAnimated");
-                                     } else {
-                                       if (res && res.message) {
-                                         addNotification("Info", res.message, "info");
-                                       }
-                                     }
-                                     setTimeout(() => {
-                                       setCollectingIds(prev => { const n = {...prev}; delete n[inv.id]; return n; });
-                                     }, 1000);
+                                <button
+                                  disabled={stagedCollections.includes(inv.id)}
+                                  onClick={() => {
+                                     setActiveModal("acceptJoy");
+                                     setStagedInvId(inv.id);
                                   }}
-                                  className={`bg-[#FF4444] text-white px-5 py-2 rounded-[20px] font-bold text-[13px] ${collectingIds[inv.id] ? 'opacity-80 scale-95' : 'active:scale-95'}`}
+                                  className={`bg-[#FF4444] text-white px-8 py-2 rounded-[24px] font-semibold text-[16px] ${stagedCollections.includes(inv.id) ? 'opacity-80 scale-95' : 'active:scale-95'}`}
                                 >
-                                  {collectingIds[inv.id] ? "..." : "Get"}
+                                  {stagedCollections.includes(inv.id) ? "Collected" : "Get"}
                                 </button>
                               ) : isExpired ? (
-                                <div className="bg-[#E8E9FF] text-[#A0A0A0] px-5 py-2 rounded-[20px] font-bold text-[13px]">
+                                <div className="bg-[#E8E9FF] text-[#A0A0A0] px-8 py-2 rounded-[24px] font-semibold text-[16px]">
                                   {inv.status === 'completed' ? 'Completed' : 'Expired'}
                                 </div>
                               ) : (
-                                <button className="bg-[#E8E9FF] text-[#A0A0A0] px-5 py-2 rounded-[20px] font-bold text-[13px] cursor-not-allowed">
+                                <button className="bg-[#E8E9FF] text-[#A0A0A0] px-8 py-2 rounded-[24px] font-semibold text-[16px] cursor-not-allowed">
                                   Get
                                 </button>
                               )}
                             </div>
                           </div>
-                        )
+                        );
                       })
                     )}
                   </div>
                 </div>
               </div>
-             </div>
             );
           })()}
 
@@ -3326,7 +3383,7 @@ function MainApp() {
                        Main ID: {currentUser.referralCode}
                        <button onClick={() => {
                           navigator.clipboard.writeText(currentUser.referralCode);
-                          alert("ID Copied!");
+                          triggerVisualNotification("alert", "Notice", "ID Copied!");
                        }} className="text-white/60 active:scale-95">
                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                        </button>
@@ -3519,11 +3576,11 @@ function MainApp() {
                       type="text" 
                       placeholder="Enter announcement text... (leave empty to clear)"
                       className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-[#7B2FFF]"
-                      value={announcement || ""}
-                      onChange={(e) => setAnnouncement(e.target.value || null)}
+                      value={localAnnouncement}
+                      onChange={(e) => setLocalAnnouncement(e.target.value)}
                     />
                     <button 
-                      onClick={() => alert('Announcement saved')}
+                      onClick={() => { setAnnouncement(localAnnouncement || null); triggerVisualNotification("alert", "Notice", 'Announcement saved'); }}
                       className="bg-[#7B2FFF] text-white px-4 py-2 rounded-lg text-sm font-bold active:scale-95 transition-transform"
                     >
                       Save
@@ -3534,7 +3591,10 @@ function MainApp() {
                   onClick={() => {
                     setNewProductName("");
                     setNewProductTitle("EQUINOR");
+                      setNewProductTitleColor("#1E293B");
+                      setNewProductTitleSize("18");
                     setNewProductRoi("");
+                        setNewProductFixedDaily("");
                     setNewProductMin("");
                     setNewProductDays("30");
                     setNewProductTPlusDays("1");
@@ -3636,7 +3696,11 @@ function MainApp() {
                             onClick={() => {
                               setEditingProduct(p);
                               setNewProductName(p.name);
-                              setNewProductTitle(p.title || "EQUINOR");
+                              let parsedTitle: any = { text: p.title || "EQUINOR", color: "#1E293B", size: "18" };
+                              try { const parsed = JSON.parse(p.title); if (parsed && parsed.text) parsedTitle = parsed; } catch(e) {}
+                              setNewProductTitle(parsedTitle.text || "EQUINOR");
+                              setNewProductTitleColor(parsedTitle.color || "#1E293B");
+                              setNewProductTitleSize(parsedTitle.size?.toString() || "18");
                               setNewProductDescription(p.description || "");
                               setNewProductRoi(p.roi.toString());
                               setNewProductMin(p.min.toString());
@@ -3853,7 +3917,7 @@ function MainApp() {
                             const newPass = window.prompt(`Enter new password for ${u.name || u.phone} (leave empty to clear):`);
                             if (newPass !== null) {
                               await adminResetUserPassword(u.id, newPass);
-                              alert("Password reset successfully.");
+                              triggerVisualNotification("alert", "Notice", "Password reset successfully.");
                             }
                           }}
                           className="flex-1 bg-white/10 hover:bg-white/20 text-white py-1.5 rounded-lg text-[10px] font-bold transition-colors"
@@ -3867,9 +3931,9 @@ function MainApp() {
                               const delta = parseFloat(deltaStr);
                               if (!isNaN(delta)) {
                                 adminUpdateUserBalance(u.id, delta);
-                                alert("Balance updated successfully.");
+                                triggerVisualNotification("alert", "Notice", "Balance updated successfully.");
                               } else {
-                                alert("Invalid amount.");
+                                triggerVisualNotification("alert", "Notice", "Invalid amount.");
                               }
                             }
                           }}
@@ -3947,7 +4011,7 @@ function MainApp() {
                         className="flex-1 bg-white/5 border border-white/20 rounded-xl px-3 py-2 text-white placeholder-white/50 text-sm focus:outline-none focus:border-[#00D4FF] min-w-0"
                       />
                       <button 
-                        onClick={() => {
+                        onClick={async () => {
                           const amt = Number(newRedemptionAmount);
                           const min = Number(newRedemptionMin);
                           const max = Number(newRedemptionMax);
@@ -3959,7 +4023,7 @@ function MainApp() {
                             for (let i = 0; i < 6; i++) {
                               code += chars.charAt(Math.floor(Math.random() * chars.length));
                             }
-                            addProduct({
+                            const success = await addProduct({
                               name: code,
                               title: '[]',
                               type: 'redemption_code',
@@ -3969,10 +4033,12 @@ function MainApp() {
                               tPlusDays: valid, // validityMinutes
                               maxQuota: max
                             });
-                            setNewRedemptionAmount("");
-                            setAdminGeneratedCode(code);
+                            if (success) {
+                              setNewRedemptionAmount("");
+                              setAdminGeneratedCode(code);
+                            }
                           } else {
-                            alert("Please enter valid amounts (Max >= Min > 0, Validity > 0)");
+                            triggerVisualNotification("alert", "Notice", "Please enter valid amounts (Max >= Min > 0, Validity > 0)");
                           }
                         }}
                         className="shrink-0 bg-gradient-to-r from-[#7B2FF7] to-[#00D4FF] text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-transform"
@@ -3995,7 +4061,7 @@ function MainApp() {
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(adminGeneratedCode);
-                            alert("Code copied to clipboard!");
+                            triggerVisualNotification("alert", "Notice", "Code copied to clipboard!");
                           }}
                           className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-lg transition-colors active:scale-95 flex items-center gap-2"
                         >
@@ -4019,7 +4085,7 @@ function MainApp() {
                                 <button
                                   onClick={() => {
                                     navigator.clipboard.writeText(c.code);
-                                    alert("Code copied to clipboard!");
+                                    triggerVisualNotification("alert", "Notice", "Code copied to clipboard!");
                                   }}
                                   className="bg-white/10 hover:bg-white/20 text-white p-1.5 rounded transition-colors active:scale-95"
                                   title="Copy to clipboard"
@@ -4445,7 +4511,30 @@ function MainApp() {
           </div>
         </div>
 
-                {activeModal === "visualNotification" && (
+                
+        {activeModal === "acceptJoy" && (
+          <div className="absolute inset-0 z-[100] flex flex-col items-center justify-center p-4 bg-black/60 backdrop-blur-sm transition-opacity duration-200" onClick={() => setActiveModal(null)}>
+            <div className="relative w-full max-w-[320px] rounded-[24px] bg-white border border-gray-100 shadow-[0_20px_60px_rgba(0,0,0,0.2)] flex flex-col items-center p-6 animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+              <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+                <span className="text-green-500 text-3xl">🎉</span>
+              </div>
+              <h3 className="text-[20px] font-bold text-gray-900 mb-2 text-center">Accept Profit With Joy!</h3>
+              <p className="text-[15px] text-gray-600 text-center mb-6 leading-relaxed">Your profit is ready to be collected.</p>
+              <button 
+                onClick={() => {
+                  if (stagedInvId) {
+                    setStagedCollections(prev => [...prev, stagedInvId]);
+                  }
+                  setActiveModal(null);
+                }} 
+                className="w-full h-12 rounded-full bg-gradient-to-r from-[#7B2FFF] to-[#5B5FEF] text-white font-bold tracking-wide active:scale-95 transition-transform shadow-[0_4px_12px_rgba(123,47,255,0.3)]"
+              >
+                Accept
+              </button>
+            </div>
+          </div>
+        )}
+{showVisualNotification && (
           <div 
             className={`absolute inset-0 z-[100] flex flex-col items-center justify-center p-4 transition-opacity duration-200 ${notificationData.type === 'purchase_success' ? 'bg-[#0B0E2B]/60 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-sm'}`} 
             onClick={() => {
@@ -4456,7 +4545,16 @@ function MainApp() {
               }
             }}
           >
-            {notificationData.type === 'purchase_success' ? (
+            {notificationData.type === 'alert' ? (
+              <div className="relative w-full max-w-[320px] rounded-[24px] bg-white border border-gray-100 shadow-[0_20px_60px_rgba(0,0,0,0.2)] flex flex-col items-center p-6 animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+                <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+                  <AlertTriangle className="w-8 h-8 text-red-500" />
+                </div>
+                <h3 className="text-[20px] font-bold text-gray-900 mb-2 text-center">{notificationData.title}</h3>
+                <p className="text-[15px] text-gray-600 text-center mb-6 leading-relaxed">{notificationData.subtitle}</p>
+                <button onClick={() => setActiveModal(null)} className="w-full h-12 rounded-full bg-gray-900 text-white font-bold tracking-wide active:scale-95 transition-transform">Okay</button>
+              </div>
+             ) : notificationData.type === 'purchase_success' ? (
               <div 
                 className="relative w-full max-w-[340px] rounded-[24px] bg-gradient-to-b from-[#FFF0F5] to-[#FFFAFC] border-[2px] border-white shadow-[0_8px_24px_rgba(0,0,0,0.15)] flex flex-col items-center pt-8 pb-6 px-6 animate-in zoom-in-95 duration-300"
                 onClick={e => e.stopPropagation()}
@@ -4558,6 +4656,8 @@ function MainApp() {
                        const reward = getPrizeDrawReward(opp.amount);
                        claimTask(`prize_draw_${opp.id}`, reward);
                        triggerVisualNotification("you_won", "CONGRATULATIONS", `You won ₦${reward}`);
+                       setShowConfetti(true);
+                       setTimeout(() => setShowConfetti(false), 5000);
                     }}
                     className="aspect-[100/140] w-full rounded-[16px] bg-gradient-to-b from-[#00D4FF] to-[#7B2FFF] border-[2px] border-[#FFD600] flex flex-col items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.3)] active:scale-95 transition-transform overflow-hidden relative"
                     style={{ animation: `fadeIn 0.3s ease-out ${i * 0.05}s both` }}
@@ -4864,6 +4964,8 @@ function MainApp() {
                               playNotificationSound('chime');
                               setShowCongratsEffect(true);
                               setTimeout(() => setShowCongratsEffect(false), 2500);
+                              setShowConfetti(true);
+                              setTimeout(() => setShowConfetti(false), 5000);
                               const prodToUpdate = freshProducts.find(p => p.type === 'redemption_code' && p.name === code);
                               if (prodToUpdate) {
                                 const newClaimedBy = [...found.claimedBy, currentUser?.id || `guest-${Date.now()}`];
@@ -4942,6 +5044,8 @@ function MainApp() {
                         playNotificationSound('chime');
                         setShowCongratsEffect(true);
                         setTimeout(() => setShowCongratsEffect(false), 2500);
+                        setShowConfetti(true);
+                        setTimeout(() => setShowConfetti(false), 5000);
                         const prodToUpdate = freshProducts.find(p => p.type === 'redemption_code' && p.name === redemptionCode);
                         if (prodToUpdate) {
                           const newClaimedBy = [...found.claimedBy, currentUser?.id || `guest-${Date.now()}`];
@@ -5191,7 +5295,7 @@ function MainApp() {
                     />
                     <button 
                       onClick={() => {
-                        alert("Contact links saved successfully!");
+                        triggerVisualNotification("alert", "Notice", "Contact links saved successfully!");
                         setActiveModal(null);
                       }}
                       className="w-full mt-1 bg-gradient-to-r from-[#4DA8FF] to-[#7B2FFF] text-white py-3 rounded-[12px] font-bold shadow-lg active:scale-95 transition-transform"
@@ -5347,7 +5451,7 @@ function MainApp() {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-500 text-[14px]">Cycle</span>
-                  <span className="text-gray-900 font-semibold text-[14px]">{equinorSelectedPlan.days} Days</span>
+                  <span className="text-gray-900 font-semibold text-[14px]">{equinorSelectedPlan.total_duration_days || equinorSelectedPlan.days} Days</span>
                 </div>
               </div>
               <div className="w-full px-6 py-5 bg-white border-t border-gray-100 flex gap-3">
@@ -5358,14 +5462,15 @@ function MainApp() {
                   Cancel
                 </button>
                 <button 
-                  onClick={() => {
-                    handleInvest(equinorSelectedPlan.name, equinorSelectedPlan.buyAmount, equinorSelectedPlan.calculatedRoi, equinorSelectedPlan.days, equinorSelectedPlan.type, equinorSelectedPlan.fixedDailyReturn, equinorSelectedPlan.tPlusDays, Number(buyingQuantity));
+                  disabled={isProcessing}
+                  onClick={async () => {
+                    await handleInvest(equinorSelectedPlan.name, equinorSelectedPlan.buyAmount, equinorSelectedPlan.roi, equinorSelectedPlan.days || 30, equinorSelectedPlan.type, equinorSelectedPlan.fixedDailyReturn, equinorSelectedPlan.tPlusDays, Number(buyingQuantity), equinorSelectedPlan.total_duration_days || equinorSelectedPlan.days || 30, equinorSelectedPlan.payout_cycle_days || equinorSelectedPlan.tPlusDays || 1);
                     setOrderTab(equinorSelectedPlan.type === "vip" ? "special" : equinorSelectedPlan.type);
                     setActiveTab("order");
                   }}
-                  className="flex-1 py-3 rounded-full bg-[#7367F0] hover:bg-[#7367F0]/90 text-white font-semibold text-[15px] shadow-sm transform transition active:scale-95"
+                  className={`flex-1 py-3 rounded-full text-white font-semibold text-[15px] shadow-sm transform transition ${isProcessing ? 'bg-gray-400 scale-[0.98]' : 'bg-[#7367F0] hover:bg-[#7367F0]/90 active:scale-95'}`}
                 >
-                  Confirm
+                  {isProcessing ? "Processing..." : "Confirm"}
                 </button>
               </div>
             </div>
@@ -5492,11 +5597,11 @@ function MainApp() {
                 <button
                   onClick={() => {
                     if (!setupPhoneValue) {
-                      alert("Please enter a valid phone number.");
+                      triggerVisualNotification("alert", "Notice", "Please enter a valid phone number.");
                       return;
                     }
                     updatePhone(setupPhoneValue);
-                    alert("Cell phone updated successfully.");
+                    triggerVisualNotification("alert", "Notice", "Cell phone updated successfully.");
                     setActiveModal("setup");
                   }}
                   className="w-full h-[56px] rounded-full bg-[#A855F7] text-white font-bold text-[16px] shadow-[0_4px_14px_rgba(168,85,247,0.4)] active:scale-95 transition-transform"
@@ -5548,15 +5653,15 @@ function MainApp() {
                 <button
                   onClick={async () => {
                     if (currentUser?.password && setupOldPasswordValue !== currentUser.password) {
-                      alert("Incorrect old password.");
+                      triggerVisualNotification("alert", "Notice", "Incorrect old password.");
                       return;
                     }
                     if (!setupPasswordValue) {
-                      alert("Please enter a valid new password.");
+                      triggerVisualNotification("alert", "Notice", "Please enter a valid new password.");
                       return;
                     }
                     await updatePassword(setupPasswordValue);
-                    alert("Password updated successfully.");
+                    triggerVisualNotification("alert", "Notice", "Password updated successfully.");
                     setSetupOldPasswordValue("");
                     setSetupPasswordValue("");
                     setActiveModal("setup");
@@ -5637,7 +5742,7 @@ function MainApp() {
                   onClick={() => {
                     const thresholdNum = Number(setupAlertThresholdValue);
                     if (isNaN(thresholdNum) || thresholdNum < 0) {
-                      alert("Please enter a valid threshold greater than 0.");
+                      triggerVisualNotification("alert", "Notice", "Please enter a valid threshold greater than 0.");
                       return;
                     }
                     updateBalanceAlertThreshold(thresholdNum);
@@ -5966,7 +6071,7 @@ function MainApp() {
                     <button 
                       onClick={() => {
                         navigator.clipboard.writeText(adminUsdtAddress);
-                        alert("Address copied!");
+                        triggerVisualNotification("alert", "Notice", "Address copied!");
                       }}
                       className="bg-[#7B2FF7] text-white px-4 py-2 rounded-lg text-xs font-bold active:scale-95 transition-transform shrink-0"
                     >
@@ -6006,21 +6111,20 @@ function MainApp() {
                       triggerHaptic();
                       const amt = Number(depositAmount);
                       if (amt <= 0) {
-                        alert("Please enter a valid deposit amount.");
+                        triggerVisualNotification("alert", "Notice", "Please enter a valid deposit amount.");
                         return;
                       }
 
                       const finalReference = depositReference.trim() || `User ${currentUser?.referralCode || 'USDT Deposit'}`;
 
                       setIsProcessing(true);
+                      setPaymentProcessingState({ step: 1, message: "Verifying transaction on the blockchain..." });
                       const { success } = await requestDeposit(amt, finalReference, { bankName: 'USDT', accountNumber: 'TRC20 Wallet', accountName: 'Equinor USDT' }, currentUser?.bankDetails);
-                      
                       if (!success) {
+                        setPaymentProcessingState(null);
                         setIsProcessing(false);
                         return;
                       }
-
-                      setPaymentProcessingState({ step: 1, message: "Verifying transaction on the blockchain..." });
                       setTimeout(() => {
                         setPaymentProcessingState({ step: 2, message: "Confirming payment details..." });
                         setTimeout(() => {
@@ -6048,7 +6152,7 @@ function MainApp() {
                     onClick={() => {
                       triggerHaptic();
                       if (systemDepositAccounts.length === 0) {
-                        alert("No deposit accounts available. Please try again later or use USDT.");
+                        triggerVisualNotification("alert", "Notice", "No deposit accounts available. Please try again later or use USDT.");
                         return;
                       }
                       setDepositCheckoutTimer(1800);
@@ -6140,7 +6244,7 @@ function MainApp() {
                           onClick={() => {
                             navigator.clipboard.writeText(systemDepositAccounts[depositCheckoutAccountIndex % systemDepositAccounts.length]?.accountNumber);
                             setDepositCheckoutStep(2);
-                            alert("Account number copied! Please proceed to your banking app to complete the transfer.");
+                            triggerVisualNotification("alert", "Notice", "Account number copied! Please proceed to your banking app to complete the transfer.");
                           }}
                           className="px-6 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold active:scale-95 transition-transform shadow-md"
                         >
@@ -6176,22 +6280,21 @@ function MainApp() {
                   triggerHaptic();
                   const amt = Number(depositAmount);
                   if (amt <= 0) {
-                    alert("Please enter a valid deposit amount.");
+                    triggerVisualNotification("alert", "Notice", "Please enter a valid deposit amount.");
                     return;
                   }
 
                   const finalReference = depositReference.trim() || `User ${currentUser?.referralCode || 'Deposit'}`;
 
                   setIsProcessing(true);
+                  setPaymentProcessingState({ step: 1, message: "Verifying transaction with the bank..." });
                   const targetAccount = systemDepositAccounts[depositCheckoutAccountIndex % systemDepositAccounts.length];
                   const { success } = await requestDeposit(amt, finalReference, targetAccount, currentUser?.bankDetails);
-                  
                   if (!success) {
+                     setPaymentProcessingState(null);
                      setIsProcessing(false);
                      return;
                   }
-
-                  setPaymentProcessingState({ step: 1, message: "Verifying transaction with the bank..." });
                   setTimeout(() => {
                     setPaymentProcessingState({ step: 2, message: "Confirming account details..." });
                     setTimeout(() => {
@@ -6621,7 +6724,7 @@ function MainApp() {
                 
                 <button
                   onClick={() => {
-                    if (!newDepositAccountBank || !newDepositAccountName || !newDepositAccountNumber) return alert('Please fill all fields');
+                    if (!newDepositAccountBank || !newDepositAccountName || !newDepositAccountNumber) return triggerVisualNotification("alert", "Notice", 'Please fill all fields');
                     addSystemDepositAccount({
                       bankName: newDepositAccountBank,
                       accountName: newDepositAccountName,
@@ -6656,41 +6759,44 @@ function MainApp() {
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (newProductName && newProductRoi && newProductMin && newProductDays && newProductType) {
+                  if (newProductName && (newProductRoi || newProductFixedDaily) && newProductMin && newProductDays && newProductType) {
                     setIsProcessingProduct(true);
-                    setTimeout(() => {
-                      addProduct({
+                    setTimeout(async () => {
+                      const success = await addProduct({
                         name: newProductName,
-                        title: newProductTitle,
+                        title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize }),
                         description: newProductDescription,
-                        roi: Number(newProductRoi),
+                        roi: newProductFixedDaily ? (Number(newProductFixedDaily) * Number(newProductDays) / Number(newProductMin)) * 100 : Number(newProductRoi),
                         min: Number(newProductMin),
                         days: Number(newProductDays),
                         tPlusDays: Number(newProductTPlusDays),
                         maxQuota: Number(newProductQuota),
                         type: newProductType,
+                        fixedDailyReturn: newProductFixedDaily ? Number(newProductFixedDaily) : undefined,
                         imageUrl: newProductImageUrl,
                         promotionalUnlockDate: getOffsetMs(newProductPromoUnlock) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoUnlock)).toISOString() : undefined,
                         promoClosingDate: getOffsetMs(newProductPromoClosing) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoClosing)).toISOString() : undefined
                       });
-                      setNewProductName("");
-                      setNewProductTitle("EQUINOR");
-                      setNewProductDescription("");
-                      setNewProductRoi("");
-                      setNewProductMin("");
-                      setNewProductDays("30");
-                      setNewProductTPlusDays("1");
-                      setNewProductQuota("0");
-                      setNewProductType("general");
-                      setNewProductImageUrl("");
-                      setNewProductPromoUnlock("");
-                      setNewProductPromoClosing("");
                       setIsProcessingProduct(false);
-                      setActiveModal(null);
-                      // alert("Product added successfully!");
+                      if (success) {
+                        setNewProductName("");
+                        setNewProductTitle("EQUINOR");
+                        setNewProductDescription("");
+                        setNewProductRoi("");
+                        setNewProductMin("");
+                        setNewProductDays("30");
+                        setNewProductTPlusDays("1");
+                        setNewProductQuota("0");
+                        setNewProductType("general");
+                        setNewProductImageUrl("");
+                        setNewProductPromoUnlock("");
+                        setNewProductPromoClosing("");
+                        setActiveModal(null);
+                        // triggerVisualNotification("alert", "Notice", "Product added successfully!");
+                      }
                     }, 1200);
                   } else {
-                    alert("Please fill all fields");
+                    triggerVisualNotification("alert", "Notice", "Please fill all fields");
                   }
                 }}
                 className="space-y-4"
@@ -6716,6 +6822,27 @@ function MainApp() {
                     placeholder="e.g. Starter VIP"
                   />
                 </div>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Title Color</label>
+                    <input
+                      type="color"
+                      value={newProductTitleColor}
+                      onChange={(e) => setNewProductTitleColor(e.target.value)}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Title Size (px)</label>
+                    <input
+                      type="number"
+                      value={newProductTitleSize}
+                      onChange={(e) => setNewProductTitleSize(e.target.value)}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-[#0A0E2E] font-medium"
+                      placeholder="18"
+                    />
+                  </div>
+                </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Description</label>
                   <textarea
@@ -6726,14 +6853,24 @@ function MainApp() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Daily Return (ROI %)</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Profit Percentage (Total ROI %)</label>
                   <input
                     type="number"
-                    required
+                    required={!newProductFixedDaily}
                     value={newProductRoi}
                     onChange={(e) => setNewProductRoi(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
                     placeholder="e.g. 12"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Fixed Daily Income (Optional)</label>
+                  <input
+                    type="number"
+                    value={newProductFixedDaily}
+                    onChange={(e) => setNewProductFixedDaily(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
+                    placeholder="Overrides ROI if set"
                   />
                 </div>
                 <div>
@@ -6898,9 +7035,9 @@ function MainApp() {
                     setTimeout(() => {
                       editProduct(editingProduct.id, {
                         name: newProductName,
-                        title: newProductTitle,
+                        title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize }),
                         description: newProductDescription,
-                        roi: Number(newProductRoi),
+                        roi: newProductFixedDaily ? (Number(newProductFixedDaily) * Number(newProductDays) / Number(newProductMin)) * 100 : Number(newProductRoi),
                         min: Number(newProductMin),
                         days: Number(newProductDays),
                         tPlusDays: Number(newProductTPlusDays),
@@ -6927,7 +7064,7 @@ function MainApp() {
                       setEditingProduct(null);
                     }, 1200);
                   } else {
-                    alert("Please fill all fields");
+                    triggerVisualNotification("alert", "Notice", "Please fill all fields");
                   }
                 }}
                 className="space-y-4"
@@ -6953,6 +7090,27 @@ function MainApp() {
                     placeholder="e.g. Starter VIP"
                   />
                 </div>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Title Color</label>
+                    <input
+                      type="color"
+                      value={newProductTitleColor}
+                      onChange={(e) => setNewProductTitleColor(e.target.value)}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-2 py-1 cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Title Size (px)</label>
+                    <input
+                      type="number"
+                      value={newProductTitleSize}
+                      onChange={(e) => setNewProductTitleSize(e.target.value)}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-[#0A0E2E] font-medium"
+                      placeholder="18"
+                    />
+                  </div>
+                </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Description</label>
                   <textarea
@@ -6963,14 +7121,24 @@ function MainApp() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Daily Return (ROI %)</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Profit Percentage (Total ROI %)</label>
                   <input
                     type="number"
-                    required
+                    required={!newProductFixedDaily}
                     value={newProductRoi}
                     onChange={(e) => setNewProductRoi(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
                     placeholder="e.g. 12"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Fixed Daily Income (Optional)</label>
+                  <input
+                    type="number"
+                    value={newProductFixedDaily}
+                    onChange={(e) => setNewProductFixedDaily(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
+                    placeholder="Overrides ROI if set"
                   />
                 </div>
                 <div>
@@ -7229,7 +7397,7 @@ function MainApp() {
                     <button
                       onClick={async () => {
                         if (!bankAccountName || !bankAccountNumber || !selectedBankCode) {
-                          alert("Please fill out all fields.");
+                          triggerVisualNotification("alert", "Notice", "Please fill out all fields.");
                           return;
                         }
                         const bankNameStr = banksList.find((b) => b.code === selectedBankCode)?.name || "";
@@ -7726,12 +7894,12 @@ function MainApp() {
                           setIsUploadingChatImg(true);
                           const b64 = await processImageUpload(file);
                           if (currentUser?.role === 'admin' && !adminChatUserContext) {
-                            alert("Select a user to reply to!");
+                            triggerVisualNotification("alert", "Notice", "Select a user to reply to!");
                             return;
                           }
                           sendChatMessage('IMAGE:::' + b64, adminChatUserContext || undefined);
                         } catch (err) {
-                          alert("Failed to upload image.");
+                          triggerVisualNotification("alert", "Notice", "Failed to upload image.");
                         } finally {
                           setIsUploadingChatImg(false);
                           e.target.value = '';
@@ -7752,7 +7920,7 @@ function MainApp() {
                   onChange={(e) => setChatInput(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && chatInput.trim()) {
-                      if (currentUser?.role === 'admin' && !adminChatUserContext) return alert("Select a user to reply to!");
+                      if (currentUser?.role === 'admin' && !adminChatUserContext) return triggerVisualNotification("alert", "Notice", "Select a user to reply to!");
                       sendChatMessage(chatInput.trim(), adminChatUserContext || undefined);
                       setChatInput("");
                     }
@@ -7763,7 +7931,7 @@ function MainApp() {
                 <button
                   onClick={() => {
                     if (chatInput.trim()) {
-                      if (currentUser?.role === 'admin' && !adminChatUserContext) return alert("Select a user to reply to!");
+                      if (currentUser?.role === 'admin' && !adminChatUserContext) return triggerVisualNotification("alert", "Notice", "Select a user to reply to!");
                       sendChatMessage(chatInput.trim(), adminChatUserContext || undefined);
                       setChatInput("");
                     }
