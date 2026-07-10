@@ -1,35 +1,20 @@
 const fs = require('fs');
-let code = fs.readFileSync('src/App.tsx', 'utf-8');
+let code = fs.readFileSync('src/App.tsx', 'utf8');
 
 code = code.replace(
-  'const [notificationData, setNotificationData] = useState<{type: VisualNotificationType, title: string, subtitle: string, amount?: number}>({ type: \'purchase_success\', title: \'\', subtitle: \'\' });',
-  'const [showVisualNotification, setShowVisualNotification] = useState(false);\n  const [notificationData, setNotificationData] = useState<{type: VisualNotificationType, title: string, subtitle: string, amount?: number}>({ type: \'purchase_success\', title: \'\', subtitle: \'\' });'
-);
-
-code = code.replace(
-  'setActiveModal("visualNotification");',
-  'setShowVisualNotification(true);'
-);
-
-code = code.replace(
-  '{activeModal === "visualNotification" && (',
-  '{showVisualNotification && ('
-);
-
-code = code.replace(
-  `onClick={() => {
-              setActiveModal(null);
-              if (notificationData.type === 'purchase_success') {
-                setActiveTab("mine");
-              }
-            }}`,
+  /onClick=\{\(\) => \{\n\s*setActiveModal\(null\);\n\s*if \(notificationData\.type === 'purchase_success'\) \{\n\s*setOrderTab\("general"\);\n\s*setActiveTab\("order"\);\n\s*\}\n\s*\}\}/g,
   `onClick={() => {
               setShowVisualNotification(false);
               if (notificationData.type === 'purchase_success') {
-                setActiveTab("mine");
+                setOrderTab("general");
+                setActiveTab("order");
               }
             }}`
 );
 
+code = code.replace(
+  /<button onClick=\{\(\) => setActiveModal\(null\)\} className="w-full h-12 rounded-full bg-gray-900 text-white font-bold tracking-wide active:scale-95 transition-transform">Okay<\/button>/g,
+  `<button onClick={() => setShowVisualNotification(false)} className="w-full h-12 rounded-full bg-gray-900 text-white font-bold tracking-wide active:scale-95 transition-transform">Okay</button>`
+);
+
 fs.writeFileSync('src/App.tsx', code);
-console.log("Notification fixed.");

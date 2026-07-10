@@ -451,7 +451,7 @@ function MainApp() {
     requestDeposit,
     requestWithdrawal,
     createInvestment,
-    collectEarnings,
+    collectEarnings, batchCollectEarnings,
     updateBankDetails,
     updateAvatar,
     updatePhone,
@@ -981,13 +981,7 @@ function MainApp() {
       const bonus = BONUSES[newStreak as keyof typeof BONUSES];
       extraEarn += bonus;
       bonusMessage = ` Bonus claimed! +₦${bonus}`;
-      
-      // We will claim the bonus task id as well
-      await claimTask(getBonusTaskId(newStreak), bonus);
     }
-
-    // Call store to save the checkin and give the reward
-    await claimTask(getCheckinTaskId(today), 0);
 
     if (bonusMessage) {
       setToastMessage(`Checked in!${bonusMessage}`);
@@ -997,6 +991,14 @@ function MainApp() {
     setTimeout(() => {
       setToastMessage(null);
     }, 3000);
+
+    // Call store to save the checkin and give the reward
+    // Await checkin first so UI updates immediately for the checkmark
+    await claimTask(getCheckinTaskId(today), 0);
+
+    if (bonusMessage) {
+      await claimTask(getBonusTaskId(newStreak), extraEarn);
+    }
   };
 
   const checkinCellCount = firstDayWeekday + daysInMonth;
@@ -1102,11 +1104,16 @@ function MainApp() {
     
     setIsProcessing(true);
     try {
-      requestWithdrawal(amountNum, {
+      const res = await requestWithdrawal(amountNum, {
         bankName: userBankName,
         accountNumber: userAccountNum,
         accountName: userAccountName,
       });
+      if (!res?.success) {
+        triggerVisualNotification("alert", "Notice", res?.message || "Withdrawal failed");
+        setIsProcessing(false);
+        return;
+      }
       setIsProcessing(false);
       setWithdrawAmount("");
       setSuccessAnimType("withdraw");
@@ -2609,6 +2616,15 @@ function MainApp() {
                     
                     const promoDiff = plan.promotionalUnlockDate ? new Date(plan.promotionalUnlockDate).getTime() - Date.now() : 0;
                     const isPromoLocked = promoDiff > 0;
+                    const planQuota = plan.max_quota || plan.maxQuota || 0;
+                    const userBoughtCountForPlan = investments.filter(inv => inv.userId === currentUser?.id && inv.planName === plan.name && inv.status !== 'completed').reduce((sum, inv) => sum + (inv.quantity || 1), 0);
+                    const isQuotaReached = planQuota > 0 && userBoughtCountForPlan >= planQuota;
+                    const isSoldOut = planQuota > 0 && (plan.sold_count !== undefined && plan.sold_count >= planQuota);
+                    let buttonText = "Rush to buy";
+                    if (isPromoLocked) buttonText = "Locked";
+                    else if (isSoldOut) buttonText = "Sold Out";
+                    else if (isQuotaReached) buttonText = "Quota Reached";
+                    const isButtonDisabled = isPromoLocked || isQuotaReached || isSoldOut;
                     let promoTimerString = "";
                     if (isPromoLocked) {
                       const h = Math.floor(promoDiff / (1000 * 60 * 60));
@@ -2702,8 +2718,10 @@ function MainApp() {
                             
                             <button 
                               onClick={() => {
-                                if (isPromoLocked) {
-                                  triggerVisualNotification("alert", "Notice", "This product is currently locked for a promotional period.");
+                                if (isButtonDisabled) {
+                                  if (isPromoLocked) triggerVisualNotification("alert", "Notice", "This product is currently locked for a promotional period.");
+                                  else if (isSoldOut) triggerVisualNotification("alert", "Notice", "This product is sold out.");
+                                  else if (isQuotaReached) triggerVisualNotification("alert", "Notice", "You have already reached the maximum quota for this project.");
                                   return;
                                 }
                                 if (!currentUser) return;
@@ -2741,9 +2759,9 @@ function MainApp() {
                                 setBuyingQuantity("1");
                                 setActiveModal("equinorConfirm");
                               }}
-                              className={isPromoLocked ? "bg-slate-300 text-slate-500 px-6 py-2.5 rounded-[20px] font-bold text-[14px] cursor-not-allowed transform transition" : "bg-[#7B2FF7] text-white px-6 py-2.5 rounded-[20px] font-bold text-[14px] shadow-sm transform transition active:scale-95"}
+                              className={isButtonDisabled ? "bg-slate-300 text-slate-500 px-6 py-2.5 rounded-[20px] font-bold text-[14px] cursor-not-allowed transform transition" : "bg-[#7B2FF7] text-white px-6 py-2.5 rounded-[20px] font-bold text-[14px] shadow-sm transform transition active:scale-95"}
                             >
-                              {isPromoLocked ? "Locked" : "Rush to buy"}
+                              {buttonText}
                             </button>
                           </div>
 
@@ -2854,9 +2872,9 @@ function MainApp() {
                                 setBuyingQuantity("1");
                                 setActiveModal("equinorConfirm");
                               }}
-                              className={isPromoLocked ? "bg-slate-300 text-slate-500 px-6 py-2.5 rounded-[20px] font-bold text-[14px] cursor-not-allowed transform transition shrink-0 mt-1" : "bg-[#7B2FF7] text-white px-6 py-2.5 rounded-[20px] font-bold text-[14px] shadow-sm transform transition active:scale-95 shrink-0 mt-1"}
+                              className={isButtonDisabled ? "bg-slate-300 text-slate-500 px-6 py-2.5 rounded-[20px] font-bold text-[14px] cursor-not-allowed transform transition shrink-0 mt-1" : "bg-[#7B2FF7] text-white px-6 py-2.5 rounded-[20px] font-bold text-[14px] shadow-sm transform transition active:scale-95 shrink-0 mt-1"}
                             >
-                              {isPromoLocked ? "Locked" : "Rush to buy"}
+                              {buttonText}
                             </button>
                           </div>
 
@@ -2982,9 +3000,9 @@ function MainApp() {
                               setBuyingQuantity("1");
                               setActiveModal("equinorConfirm");
                             }}
-                            className={isPromoLocked ? "bg-slate-300 text-slate-500 px-6 py-2.5 rounded-[20px] font-black text-[14px] cursor-not-allowed transform transition" : "bg-[#7B2FF7] text-white px-6 py-2.5 rounded-[20px] font-black text-[14px] shadow-sm transform transition active:scale-95"}
+                            className={isButtonDisabled ? "bg-slate-300 text-slate-500 px-6 py-2.5 rounded-[20px] font-black text-[14px] cursor-not-allowed transform transition" : "bg-[#7B2FF7] text-white px-6 py-2.5 rounded-[20px] font-black text-[14px] shadow-sm transform transition active:scale-95"}
                           >
-                            {isPromoLocked ? "Locked" : "Rush to buy"}
+                            {buttonText}
                           </button>
                         </div>
 
@@ -3073,8 +3091,11 @@ function MainApp() {
             const handleGetAll = async () => {
               let selectedCount = 0;
               let totalAmountCollected = 0;
+              
+              const idsToCollect: string[] = [];
               for (const inv of activeInvestments) {
                 if (!stagedCollections.includes(inv.id)) continue;
+                
                 const invNow = new Date();
                 const invStart = new Date(inv.startDate);
                 const invEnd = new Date(inv.endDate);
@@ -3085,17 +3106,21 @@ function MainApp() {
                 const msInCycle = invMsInADay * tPlusDays;
                 
                 const currentElapsed = Math.max(0, invNow.getTime() - invLastCollected.getTime());
-                const timeToCollectMs = Math.min(Math.min(currentElapsed, msInCycle), invEnd.getTime() - invLastCollected.getTime());
                 
                 const isCycleComplete = currentElapsed >= msInCycle || invNow >= invEnd;
                 if (inv.status === "active" && isCycleComplete) {
-                  const res = await collectEarnings(inv.id, true);
-                  if (res && res.success && res.amount) {
-                    totalAmountCollected += res.amount;
-                  }
+                  idsToCollect.push(inv.id);
                   selectedCount++;
                 }
               }
+              
+              if (idsToCollect.length > 0) {
+                 const res = await batchCollectEarnings(idsToCollect);
+                 if (res && res.success && res.amount) {
+                   totalAmountCollected = res.amount;
+                 }
+              }
+
               if (selectedCount > 0) {
                 setStagedCollections([]);
                 setSuccessAnimType("general");
@@ -3301,20 +3326,30 @@ function MainApp() {
     </div>
   </div>
 
-  {/* 4. 3 stat pills */}
-  <div className="grid grid-cols-3 gap-[8px] mb-4">
-    <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center">
-      <div className="text-[#5B5FEF] font-semibold text-[15px]">₦{dailyIncome.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-      <div className="text-[#5B5FEF] text-[12px] whitespace-nowrap">Daily income</div>
+  {/* 4. 4 stat pills */}
+  <div className="grid grid-cols-4 gap-[4px] mb-4">
+    <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
+      <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[13px] truncate w-full">₦{dailyIncome.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+      <div className="text-[#5B5FEF] text-[9px] sm:text-[11px] whitespace-nowrap">Daily income</div>
     </div>
-    <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center">
-      <div className="text-[#5B5FEF] font-semibold text-[15px]">{inv.total_duration_days || inv.days || Math.round((invEnd.getTime() - invStart.getTime()) / (1000 * 3600 * 24))} Days</div>
-      <div className="text-[#5B5FEF] text-[12px] whitespace-nowrap">Cycle</div>
+    <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
+      <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[13px] truncate w-full">{inv.total_duration_days || inv.days || Math.round((invEnd.getTime() - invStart.getTime()) / (1000 * 3600 * 24))} D</div>
+      <div className="text-[#5B5FEF] text-[9px] sm:text-[11px] whitespace-nowrap">Cycle</div>
     </div>
-    <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center">
-      <div className="text-[#5B5FEF] font-semibold text-[15px]">₦{(dailyIncome * (inv.total_duration_days || inv.days || Math.round((invEnd.getTime() - invStart.getTime()) / (1000 * 3600 * 24)))).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-      <div className="text-[#5B5FEF] text-[12px] whitespace-nowrap">Total return</div>
+    <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
+      <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[13px] truncate w-full">₦{(dailyIncome * (inv.total_duration_days || inv.days || Math.round((invEnd.getTime() - invStart.getTime()) / (1000 * 3600 * 24)))).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+      <div className="text-[#5B5FEF] text-[9px] sm:text-[11px] whitespace-nowrap">Total return</div>
     </div>
+    {(() => {
+      const quota = product?.max_quota || product?.maxQuota || 0;
+      const userBoughtCount = investments.filter(i => i.userId === currentUser?.id && i.planName === inv.planName && i.status !== 'completed').reduce((sum, i) => sum + (i.quantity || 1), 0);
+      return (
+        <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
+          <div className="text-[#5B5FEF] font-semibold text-[12px] sm:text-[13px]">{quota === 0 ? '∞' : `${userBoughtCount}/${quota}`}</div>
+          <div className="text-[#5B5FEF] text-[9px] sm:text-[11px] whitespace-nowrap">Quota</div>
+        </div>
+      );
+    })()}
   </div>
 
   {/* 5. Profit Row */}
@@ -4538,7 +4573,7 @@ function MainApp() {
           <div 
             className={`absolute inset-0 z-[100] flex flex-col items-center justify-center p-4 transition-opacity duration-200 ${notificationData.type === 'purchase_success' ? 'bg-[#0B0E2B]/60 backdrop-blur-sm' : 'bg-black/80 backdrop-blur-sm'}`} 
             onClick={() => {
-              setActiveModal(null);
+              setShowVisualNotification(false);
               if (notificationData.type === 'purchase_success') {
                 setOrderTab("general");
                 setActiveTab("order");
@@ -4552,7 +4587,7 @@ function MainApp() {
                 </div>
                 <h3 className="text-[20px] font-bold text-gray-900 mb-2 text-center">{notificationData.title}</h3>
                 <p className="text-[15px] text-gray-600 text-center mb-6 leading-relaxed">{notificationData.subtitle}</p>
-                <button onClick={() => setActiveModal(null)} className="w-full h-12 rounded-full bg-gray-900 text-white font-bold tracking-wide active:scale-95 transition-transform">Okay</button>
+                <button onClick={() => setShowVisualNotification(false)} className="w-full h-12 rounded-full bg-gray-900 text-white font-bold tracking-wide active:scale-95 transition-transform">Okay</button>
               </div>
              ) : notificationData.type === 'purchase_success' ? (
               <div 
@@ -4605,9 +4640,7 @@ function MainApp() {
                 <div className="absolute inset-0 bg-gradient-to-t from-[#B20F24]/80 via-transparent to-black/30 pointer-events-none" />
                 
                 <button 
-                  onClick={() => {
-                    setActiveModal(null);
-                  }}
+                  onClick={() => setShowVisualNotification(false)}
                   className="absolute top-4 right-4 bg-black/40 hover:bg-[#B20F24] text-white rounded-full w-8 h-8 flex items-center justify-center backdrop-blur transition-colors"
                   style={{ zIndex: 10 }}
                 >
@@ -6144,9 +6177,7 @@ function MainApp() {
                       }, 1500)
                     }}
                     className="h-[48px] rounded-xl px-8 font-bold text-[15px] bg-blue-600 text-white active:scale-95 transition-transform shadow-md shadow-blue-600/30"
-                  >
-                    I Have Paid
-                  </button>
+                  >{isProcessing ? "Processing..." : "Confirm Payment"}</button>
                 ) : (
                   <button
                     onClick={() => {
@@ -6241,12 +6272,20 @@ function MainApp() {
                           {systemDepositAccounts[depositCheckoutAccountIndex % systemDepositAccounts.length]?.accountNumber}
                         </div>
                         <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(systemDepositAccounts[depositCheckoutAccountIndex % systemDepositAccounts.length]?.accountNumber);
+                          onClick={(e) => {
+                            const btn = e.currentTarget;
+                            navigator.clipboard.writeText(systemDepositAccounts[depositCheckoutAccountIndex % systemDepositAccounts.length]?.accountNumber || "").catch(() => {});
                             setDepositCheckoutStep(2);
-                            triggerVisualNotification("alert", "Notice", "Account number copied! Please proceed to your banking app to complete the transfer.");
+                            btn.innerText = "Copied!";
+                            btn.classList.add("bg-green-600");
+                            btn.classList.remove("bg-blue-600");
+                            setTimeout(() => {
+                              btn.innerText = "Copy";
+                              btn.classList.remove("bg-green-600");
+                              btn.classList.add("bg-blue-600");
+                            }, 2000);
                           }}
-                          className="px-6 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold active:scale-95 transition-transform shadow-md"
+                          className="px-6 w-[80px] bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold active:scale-95 transition-transform shadow-md"
                         >
                           Copy
                         </button>
@@ -6766,7 +6805,7 @@ function MainApp() {
                         name: newProductName,
                         title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize }),
                         description: newProductDescription,
-                        roi: newProductFixedDaily ? (Number(newProductFixedDaily) * Number(newProductDays) / Number(newProductMin)) * 100 : Number(newProductRoi),
+                        roi: newProductFixedDaily ? (((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100 : Number(newProductRoi),
                         min: Number(newProductMin),
                         days: Number(newProductDays),
                         tPlusDays: Number(newProductTPlusDays),
@@ -7037,7 +7076,7 @@ function MainApp() {
                         name: newProductName,
                         title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize }),
                         description: newProductDescription,
-                        roi: newProductFixedDaily ? (Number(newProductFixedDaily) * Number(newProductDays) / Number(newProductMin)) * 100 : Number(newProductRoi),
+                        roi: newProductFixedDaily ? (((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100 : Number(newProductRoi),
                         min: Number(newProductMin),
                         days: Number(newProductDays),
                         tPlusDays: Number(newProductTPlusDays),

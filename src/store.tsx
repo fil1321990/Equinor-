@@ -103,6 +103,8 @@ export interface Product {
   imageUrl?: string;
   tPlusDays?: number;
   maxQuota?: number;
+  max_quota?: number;
+  sold_count?: number;
   promotionalUnlockDate?: string;
   promoClosingDate?: string;
 }
@@ -448,14 +450,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsLoadingStore(false);
     };
     fetch();
-    interval = setInterval(fetch, 10000);
-    return () => clearInterval(interval);
+    interval = setInterval(fetch, 30000); // reduced frequency, rely on realtime
+
+    const channel = supabase.channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+        // Debounce the fetch slightly to allow batch updates
+        if ((window as any).dbFetchTimeout) clearTimeout((window as any).dbFetchTimeout);
+        (window as any).dbFetchTimeout = setTimeout(fetch, 500);
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const globalMutate = async (args?: any) => {
-    // just re-fetch
-    const data = await fetchAllData();
-    const { usersData, txData, invData, prodData, commData, incData, sysData, settingsData, chatData } = data;
+    if ((window as any).isMutating) {
+      if ((window as any).mutateQueue) clearTimeout((window as any).mutateQueue);
+      (window as any).mutateQueue = setTimeout(() => globalMutate(args), 600);
+      return;
+    }
+    (window as any).isMutating = true;
+    try {
+      await new Promise(r => setTimeout(r, 500));
+      const data = await fetchAllData();
+      const { usersData, txData, invData, prodData, commData, incData, sysData, settingsData, chatData } = data;
       if (usersData) {
         const mappedUsers = usersData.map(u => ({ ...u, disabled: u.disabled || u.role === 'disabled' }));
         setUsers(mappedUsers);
@@ -475,10 +496,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         setChatMessages(chatData);
         localStorage.setItem("chatMessages", JSON.stringify(chatData));
       }
+      if (settingsData) {
+        setGlobalWithdrawalLimit(settingsData.globalWithdrawalLimit ?? 5000000);
+        setManagerLink(settingsData.managerLink || "https://t.me/manager");
+        setGroupLink(settingsData.groupLink || "https://t.me/group");
+        _setAnnouncement(settingsData.announcement || null);
+        _setAdminUsdtAddress(settingsData.adminUsdtAddress || null);
+        _setPromoImage(settingsData.promoImage || null);
+        _setProductPromoCountdown(settingsData.productPromoCountdown || null);
+        _setAboutUsImage(settingsData.aboutUsImage || "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Equinor_logo.svg/1024px-Equinor_logo.svg.png");
+        _setCarouselImages(settingsData.carouselImages || [
+           "https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=800",
+           "https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?auto=format&fit=crop&q=80&w=800"
+        ]);
+      }
+    } finally {
+      (window as any).isMutating = false;
+    }
   };
-  
-
-  
 
   useEffect(() => {
     // Use Supabase realtime instead of aggressive polling
@@ -754,21 +789,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const requestWithdrawal = async (
     amount: number,
     bankDetails: { bankName: string; accountNumber: string; accountName?: string },
-  ) => {
-    if (!currentUser) return;
+  ): Promise<{ success: boolean; message?: string }> => {
+    if (!currentUser) return { success: false, message: "Not logged in" };
     if (currentUser.withdrawalRestricted) {
-      alert("Withdrawals are temporarily restricted for this account.");
-      return;
+      return { success: false, message: "Withdrawals are temporarily restricted for this account." };
     }
     if (amount > currentUser.balance) {
-      alert("Insufficient balance");
-      return;
+      return { success: false, message: "Insufficient balance" };
     }
-
     const { error } = await supabase.from('users').update({ balance: currentUser.balance - amount }).eq('id', currentUser.id);
     if (error) {
-       alert("Withdrawal failed");
-       return;
+       return { success: false, message: "Withdrawal failed" };
     }
 
     // Deduct pending requested withdrawal
@@ -819,6 +850,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     payout_cycle_days?: number
   ) => {
     if (!currentUser) return;
+
+    const product = products.find(p => p.name === planName);
+    if (product) {
+      const quota = product.max_quota || product.maxQuota || 0;
+      const soldCount = product.sold_count || 0;
+      if (quota > 0) {
+        const userBoughtCount = investments.filter(inv => inv.userId === currentUser.id && inv.planName === planName && inv.status !== 'expired').reduce((sum, inv) => sum + (inv.quantity || 1), 0);
+        if (userBoughtCount + (quantity || 1) > quota) {
+          alert(`You have reached the maximum purchase limit of ${quota} for this product`);
+          return;
+        }
+        if (soldCount >= quota) {
+          alert(`This product is sold out`);
+          return;
+        }
+      }
+    }
     
     if (amount > currentUser.balance) {
       alert("Insufficient balance for investment.");
@@ -917,7 +965,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     };
     
     const { data: invData } = await supabase.from('investments').insert(inv).select().single();
-    if (invData) setInvestments((prev) => [invData, ...prev]);
+    if (invData) {
+      setInvestments((prev) => [invData, ...prev]);
+      if (product) {
+        const newSoldCount = (product.sold_count || 0) + (quantity || 1);
+        await supabase.from('products').update({ sold_count: newSoldCount }).eq('id', product.id);
+        setProducts(prev => prev.map(p => p.id === product.id ? { ...p, sold_count: newSoldCount } : p));
+      }
+    }
     globalMutate('appData');
     return { success: true };
   };
@@ -1145,6 +1200,103 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const batchCollectEarnings = async (investmentIds: string[]): Promise<{ success: boolean; amount?: number }> => {
+    if (!currentUser) return { success: false };
+    
+    let totalToAdd = 0;
+    const invUpdates: any[] = [];
+    const incRecords: any[] = [];
+    
+    for (const investmentId of investmentIds) {
+      const investment = investments.find((inv) => inv.id === investmentId);
+      if (!investment || investment.userId !== currentUser.id || investment.status !== "active") continue;
+      
+      const now = new Date();
+      const startDate = new Date(investment.startDate);
+      const endDate = new Date(investment.endDate);
+      const lastCollected = investment.lastCollectedDate ? new Date(investment.lastCollectedDate) : startDate;
+      
+      const msInADay = 1000 * 3600 * 24;
+      const tPlusDays = investment.payout_cycle_days || investment.tPlusDays || 1;
+      const msInCycle = msInADay * tPlusDays;
+      
+      const currentElapsedMs = Math.max(0, now.getTime() - lastCollected.getTime());
+      const maxAllowedElapsed = Math.min(msInCycle, currentElapsedMs);
+      const timeToCollectMs = Math.min(maxAllowedElapsed, endDate.getTime() - lastCollected.getTime());
+      
+      const isCycleComplete = currentElapsedMs >= msInCycle || now.getTime() >= endDate.getTime();
+      if (!isCycleComplete) continue;
+      
+      const dailyIncome = getDailyIncome(investment, currentUser, users, investments);
+      const profitToCollect = (timeToCollectMs / msInADay) * dailyIncome;
+      
+      const newLastCollected = new Date(lastCollected.getTime() + timeToCollectMs);
+      const isFinished = newLastCollected.getTime() >= endDate.getTime();
+      
+      const newStatus = isFinished ? "completed" : "active";
+      const newDateStr = newLastCollected.toISOString();
+      const thisTotal = profitToCollect + (isFinished ? investment.amount : 0);
+      
+      if (thisTotal > 0) {
+        totalToAdd += thisTotal;
+        invUpdates.push({ id: investment.id, status: newStatus, lastCollectedDate: newDateStr });
+        incRecords.push({
+          userId: currentUser.id,
+          investmentId: investment.id,
+          planName: investment.planName,
+          amount: thisTotal,
+          date: now.toISOString()
+        });
+      }
+    }
+    
+    if (totalToAdd === 0) return { success: false };
+
+    // DB updates
+    try {
+      const { data: userData } = await supabase.from('users').select('balance').eq('id', currentUser.id).single();
+      const newBalance = Number(userData?.balance || 0) + totalToAdd;
+      const { error: err1 } = await supabase.from('users').update({ balance: newBalance }).eq('id', currentUser.id);
+      if (err1) console.error("Update users error:", err1);
+      
+      for (const update of invUpdates) {
+        const { error: err2 } = await supabase.from('investments').update({
+           status: update.status,
+           lastCollectedDate: update.lastCollectedDate
+        }).eq('id', update.id);
+        if (err2) console.error("Update inv error:", err2);
+      }
+      
+      if (incRecords.length > 0) {
+         const { error: err3 } = await supabase.from('incomeRecords').insert(incRecords);
+         if (err3) console.error("Insert inc error:", err3);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+
+    // Optimistic state updates
+    setInvestments((prev) => 
+       prev.map((inv) => {
+         const update = invUpdates.find(u => u.id === inv.id);
+         if (update) {
+           return { ...inv, status: update.status, lastCollectedDate: update.lastCollectedDate };
+         }
+         return inv;
+       })
+    );
+
+    setUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, balance: u.balance + totalToAdd } : u));
+    setCurrentUser(prev => prev ? { ...prev, balance: prev.balance + totalToAdd } : prev);
+    
+    if (incRecords.length > 0) {
+      setIncomeRecords(prev => [...incRecords.map(r => ({...r, id: Math.random().toString(36).substring(2, 9)})), ...prev]);
+    }
+    
+    globalMutate('appData');
+    return { success: true, amount: totalToAdd };
+  };
+
   const collectEarnings = async (investmentId: string, suppressAlert: boolean = false): Promise<{ success: boolean; amount?: number; message?: string }> => {
     if (!currentUser) return { success: false };
     const investment = investments.find((inv) => inv.id === investmentId);
@@ -1224,9 +1376,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         lastCollectedDate: newDateStr
       }).eq('id', investment.id);
 
-      const { data: userData } = await supabase.from('users').select('*').eq('id', currentUser.id).single();
-      const updatedBalance = Number(userData?.balance || currentUser.balance) + totalToAdd;
-      await supabase.from('users').update({ balance: updatedBalance }).eq('id', currentUser.id);
+      // Fetch latest balance and use it, but to prevent race conditions during batch processing, 
+      // we should use the rpc call if available, or just rely on the frontend state delta.
+      // But since we are awaiting each collectEarnings sequentially, we can fetch, but we might hit read replicas.
+      // Better approach: use currentUser.balance (which is synchronously updated via setCurrentUser).
+      // Since setCurrentUser updates the reference, currentUser inside this function closure is STALE!
+      // So we must fetch from the latest local state or use a Supabase RPC.
+      // For now, let's fetch from the latest `users` state if possible, but we don't have access to it directly in the async flow easily without a ref.
+      
+      const { data: userData } = await supabase.from('users').select('balance').eq('id', currentUser.id).single();
+      // Calculate based on the fetched data
+      const currentDbBalance = Number(userData?.balance || 0);
+      const updatedBalance = currentDbBalance + totalToAdd;
+      
+      const { error: updateError } = await supabase.from('users').update({ balance: updatedBalance }).eq('id', currentUser.id);
+      if (updateError) {
+         console.error("Failed to update balance:", updateError);
+      }
 
       if (totalToAdd > 0) {
         await supabase.from('incomeRecords').insert({
@@ -1569,6 +1735,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         updateContactLinks,
         disableUser,
         enableUser,
+        batchCollectEarnings,
         collectEarnings,
         updateBankDetails,
         updateAvatar,

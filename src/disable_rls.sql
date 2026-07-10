@@ -15,3 +15,5 @@ BEGIN;
   END IF;
   ALTER PUBLICATION supabase_realtime ADD TABLE users, transactions, investments, products, commissions, "incomeRecords", system_deposit_accounts, chat_messages;
 COMMIT;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS max_quota INT DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS sold_count INT DEFAULT 0;
