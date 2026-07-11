@@ -174,10 +174,7 @@ interface AppContextType extends AppState {
   logout: () => void;
   sendChatMessage: (text: string, toUserId?: string) => void;
   requestDeposit: (amount: number, reference: string, systemBankDetails?: any, userBankDetails?: any) => Promise<{success: boolean, error?: string}>;
-  requestWithdrawal: (
-    amount: number,
-    bankDetails: { bankName: string; accountNumber: string; accountName?: string },
-  ) => void;
+  requestWithdrawal: (amount: number, bankDetails: { bankName: string; accountNumber: string; accountName?: string }) => Promise<{ success: boolean; message?: string }>;
   createInvestment: (
     planName: string,
     amount: number,
@@ -456,7 +453,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
         // Debounce the fetch slightly to allow batch updates
         if ((window as any).dbFetchTimeout) clearTimeout((window as any).dbFetchTimeout);
-        (window as any).dbFetchTimeout = setTimeout(fetch, 500);
+        (window as any).dbFetchTimeout = setTimeout(fetch, 100);
       })
       .subscribe();
 
@@ -469,12 +466,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const globalMutate = async (args?: any) => {
     if ((window as any).isMutating) {
       if ((window as any).mutateQueue) clearTimeout((window as any).mutateQueue);
-      (window as any).mutateQueue = setTimeout(() => globalMutate(args), 600);
+      (window as any).mutateQueue = setTimeout(() => globalMutate(args), 100);
       return;
     }
     (window as any).isMutating = true;
     try {
-      await new Promise(r => setTimeout(r, 500));
+      
       const data = await fetchAllData();
       const { usersData, txData, invData, prodData, commData, incData, sysData, settingsData, chatData } = data;
       if (usersData) {
@@ -835,7 +832,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     if (data) {
       setTransactions((prev) => prev.map(t => t.id === localTxId ? data : t));
     }
-    alert("Withdrawal request submitted successfully and is pending Bank approval.");
+    return { success: true };
   };
 
   const createInvestment = async (
@@ -960,13 +957,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       startDate: new Date().toISOString(),
       endDate: new Date(Date.now() + 86400000 * finalDuration).toISOString(),
       status: "active" as const,
-      total_duration_days: finalDuration,
-      payout_cycle_days: finalCycle
     };
     
-    const { data: invData } = await supabase.from('investments').insert(inv).select().single();
-    if (invData) {
-      setInvestments((prev) => [invData, ...prev]);
+        // Strip the non-existent columns for Supabase insert
+    const strippedInv = { ...inv };
+    delete (strippedInv as any).total_duration_days;
+    delete (strippedInv as any).payout_cycle_days;
+
+    const { data: rawInvData, error: invError } = await supabase.from('investments').insert(strippedInv).select().single();
+    
+    if (invError) {
+      console.error("Supabase insert error:", invError);
+      
+      // Rollback balance deduction
+      await supabase.from('users').update({ balance: currentUser.balance }).eq('id', currentUser.id);
+      setCurrentUser((prev) => prev ? { ...prev, balance: prev.balance + amount } : prev);
+      
+      return { success: false, error: invError.message };
+    }
+    
+    if (rawInvData) {
+      const finalInvData = {
+        ...rawInvData, 
+        total_duration_days: finalDuration, 
+        payout_cycle_days: finalCycle
+      };
+      setInvestments((prev) => [finalInvData, ...prev]);
+      
       if (product) {
         const newSoldCount = (product.sold_count || 0) + (quantity || 1);
         await supabase.from('products').update({ sold_count: newSoldCount }).eq('id', product.id);

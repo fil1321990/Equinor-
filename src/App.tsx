@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
 console.log("App.tsx is loading...");
@@ -537,7 +537,8 @@ function MainApp() {
   }, [activeTab]);
   const [stagedCollections, setStagedCollections] = useState<string[]>([]);
   const [stagedInvId, setStagedInvId] = useState<string | null>(null);
-  const [orderTab, setOrderTab] = useState<"general" | "special" | "expired">("general");
+  const [stagedPayoutAmount, setStagedPayoutAmount] = useState<number>(0);
+  const [orderTab, setOrderTab] = useState<"general" | "vip" | "special">("general");
   const [productTab, setProductTab] = useState<"general" | "vip" | "special">("general");
   const [activeTeamTab, setActiveTeamTab] = useState<"A" | "B" | "C">("A");
 
@@ -576,16 +577,14 @@ function MainApp() {
   useEffect(() => {
     if (activeTab === "product") {
       setIsLoadingProducts(true);
-      const timer = setTimeout(() => setIsLoadingProducts(false), 800);
-      return () => clearTimeout(timer);
+      setIsLoadingProducts(false);
     }
   }, [activeTab, productTab]);
 
   useEffect(() => {
     if (activeTab === "order") {
       setIsLoadingOrders(true);
-      const timer = setTimeout(() => setIsLoadingOrders(false), 800);
-      return () => clearTimeout(timer);
+      setIsLoadingOrders(false);
     }
   }, [activeTab, orderTab]);
 
@@ -878,8 +877,7 @@ function MainApp() {
   useEffect(() => {
     if (activeModal === "bankDetails" && banksList.length === 0) {
       setIsLoadingBanks(true);
-      setTimeout(() => {
-        setBanksList([
+      setBanksList([
           { code: "044", name: "Access Bank" },
           { code: "011", name: "First Bank of Nigeria" },
           { code: "058", name: "Guaranty Trust Bank" },
@@ -891,21 +889,18 @@ function MainApp() {
           { code: "090267", name: "Kuda Bank" }
         ]);
         setIsLoadingBanks(false);
-      }, 1200);
     }
   }, [activeModal, banksList.length]);
 
   useEffect(() => {
     if (activeModal === "addProduct" && productTypesList.length === 0) {
       setIsLoadingProductTypes(true);
-      setTimeout(() => {
-        setProductTypesList([
+      setProductTypesList([
           { value: "general", label: "General" },
           { value: "vip", label: "VIP" },
           { value: "special", label: "Special" },
         ]);
         setIsLoadingProductTypes(false);
-      }, 1000);
     }
   }, [activeModal, productTypesList.length]);
 
@@ -1047,12 +1042,11 @@ function MainApp() {
     }
   };
 
-  const handleDeposit = (e: React.FormEvent) => {
+  const handleDeposit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (depositAmount) {
       setIsProcessing(true);
-      setTimeout(async () => {
-        const { success } = await requestDeposit(Number(depositAmount), "", undefined, currentUser?.bankDetails);
+      const { success } = await requestDeposit(Number(depositAmount), "", undefined, currentUser?.bankDetails);
         if (success) {
           setDepositAmount("");
           setIsProcessing(false);
@@ -1060,7 +1054,6 @@ function MainApp() {
         } else {
           setIsProcessing(false);
         }
-      }, 1000);
     }
   };
 
@@ -1213,7 +1206,7 @@ function MainApp() {
     }
     setIsLoggingIn(true);
     try {
-      await new Promise(r => setTimeout(r, 1500));
+      
       const res = await login(loginIdentifier, loginPassword);
       if (res?.mustChangePassword && res?.user) {
         setForcePasswordChangeUser(res.user);
@@ -1428,7 +1421,7 @@ function MainApp() {
                   }
                   setIsLoggingIn(true);
                   try {
-                    await new Promise(r => setTimeout(r, 1500));
+                    
                     await signup(registerForm.phone, registerForm.password, registerForm.invitationCode);
                   } finally {
                     setIsLoggingIn(false);
@@ -3079,13 +3072,12 @@ function MainApp() {
               const isExpired = inv.status === "completed" || now.getTime() >= new Date(inv.endDate).getTime();
               const product = products.find(p => p.name === inv.planName) as any;
               const pType = product ? (product.product_type || product.type || "general") : "general";
-              const isVip = product ? (product.is_vip === true || pType === "vip" || (product.category && product.category.toLowerCase() === 'vip')) : false;
+              const pName = (product?.name || '').toLowerCase();
+              const isVip = product ? (product.is_vip === true || pType === 'vip' || (product.category && product.category.toLowerCase() === 'vip') || pName.includes('vip') || pName.includes('eq equity exchange project')) : false;
               
-              if (orderTab === "expired") return isExpired;
-              if (orderTab === "general") return !isExpired && pType === "general" && !isVip;
-              // Special tab shows products where product_type = 'special' OR category = 'VIP'
-              if (orderTab === "special") return !isExpired && (pType === "special" || isVip);
-              return false;
+              if (orderTab === "special") return pType === "special" || isVip;
+              if (orderTab === "vip") return isVip;
+              return pType === "general" && !isVip;
             });
 
             const handleGetAll = async () => {
@@ -3165,7 +3157,7 @@ function MainApp() {
                       onClick={async () => {
                         setIsProcessing(true);
                         await handleGetAll();
-                        setTimeout(() => setIsProcessing(false), 1000);
+                        setIsProcessing(false);
                       }}
                       className={`w-full py-2.5 rounded-[12px] font-bold text-[14px] mb-3 shrink-0 z-10 shadow-md transition-transform flex justify-center items-center ${isProcessing ? 'opacity-80 scale-[0.98]' : ''} ${totalCanBeCollected > 0 ? 'bg-[#7B2FFF] text-white active:scale-[0.98]' : 'bg-[#7B2FFF]/50 text-white/80 active:scale-[1]'}`}
                     >
@@ -3183,23 +3175,31 @@ function MainApp() {
                     </button>
                   )}
                   {/* Tab Navigation */}
-                  <div className="flex w-full gap-2 mb-4 shrink-0 z-10">
-                    {(['general', 'special', 'expired'] as const).map(tab => {
-                      const isActive = orderTab === tab;
-                      return (
-                        <button
-                          key={tab}
-                          onClick={() => setOrderTab(tab)}
-                          className={`flex-1 py-1.5 rounded-full text-[12px] font-bold transition-colors ${isActive ? 'bg-[#1A1A1A] text-white' : 'bg-white text-[#1A1A1A] border border-gray-200'}`}
-                        >
-                          {tab === 'general' ? 'General' : tab === 'special' ? 'Special' : 'Expired'}
-                        </button>
-                      );
-                    })}
+                  <div className="px-1 shrink-0 mb-4 mt-1 w-full">
+                    <div className="flex justify-between items-center relative bg-[#1A1E4E]/50 border border-white/10 rounded-full p-1 backdrop-blur-md">
+                      {(["general", "vip", "special"] as const).map((tab, idx) => {
+                        const isActive = orderTab === tab;
+                        const labels = ["General", "VIP", "Special"];
+                        return (
+                          <button
+                            key={tab}
+                            onClick={() => setOrderTab(tab as any)}
+                            className={`text-[14px] font-bold py-2 relative w-1/3 text-center transition-colors rounded-full z-10 ${
+                              isActive ? "text-white" : "text-white/50 hover:text-white/80"
+                            }`}
+                          >
+                            {labels[idx]}
+                            {isActive && (
+                              <div className="absolute inset-0 bg-[#6B3CFF] rounded-full -z-10 shadow-sm" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div className="flex-1 overflow-y-auto w-full pb-32 scrollbar-hide">
                     {filteredInvestments.length === 0 ? (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center -mt-20">
+                      <div className="flex-1 flex flex-col items-center justify-center pb-32 mt-20">
                         <EquinorStar className="w-24 h-24 text-white/20 mb-4" />
                       </div>
                     ) : (
@@ -3368,6 +3368,7 @@ function MainApp() {
                                   onClick={() => {
                                      setActiveModal("acceptJoy");
                                      setStagedInvId(inv.id);
+                                     setStagedPayoutAmount(profitAccrued);
                                   }}
                                   className={`bg-[#FF4444] text-white px-8 py-2 rounded-[24px] font-semibold text-[16px] ${stagedCollections.includes(inv.id) ? 'opacity-80 scale-95' : 'active:scale-95'}`}
                                 >
@@ -4554,7 +4555,8 @@ function MainApp() {
                 <span className="text-green-500 text-3xl">🎉</span>
               </div>
               <h3 className="text-[20px] font-bold text-gray-900 mb-2 text-center">Accept Profit With Joy!</h3>
-              <p className="text-[15px] text-gray-600 text-center mb-6 leading-relaxed">Your profit is ready to be collected.</p>
+              <p className="text-[15px] text-gray-600 text-center mb-2 leading-relaxed">Your profit is ready to be collected.</p>
+              <div className="text-[28px] font-bold text-[#7B2FFF] mb-6">₦{stagedPayoutAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
               <button 
                 onClick={() => {
                   if (stagedInvId) {
@@ -4617,6 +4619,7 @@ function MainApp() {
                 
                 <button 
                    onClick={() => {
+                     setShowVisualNotification(false);
                      setActiveModal(null);
                      setOrderTab("general");
                      setActiveTab("order");
@@ -5498,7 +5501,7 @@ function MainApp() {
                   disabled={isProcessing}
                   onClick={async () => {
                     await handleInvest(equinorSelectedPlan.name, equinorSelectedPlan.buyAmount, equinorSelectedPlan.roi, equinorSelectedPlan.days || 30, equinorSelectedPlan.type, equinorSelectedPlan.fixedDailyReturn, equinorSelectedPlan.tPlusDays, Number(buyingQuantity), equinorSelectedPlan.total_duration_days || equinorSelectedPlan.days || 30, equinorSelectedPlan.payout_cycle_days || equinorSelectedPlan.tPlusDays || 1);
-                    setOrderTab(equinorSelectedPlan.type === "vip" ? "special" : equinorSelectedPlan.type);
+                    setOrderTab(equinorSelectedPlan.type as any);
                     setActiveTab("order");
                   }}
                   className={`flex-1 py-3 rounded-full text-white font-semibold text-[15px] shadow-sm transform transition ${isProcessing ? 'bg-gray-400 scale-[0.98]' : 'bg-[#7367F0] hover:bg-[#7367F0]/90 active:scale-95'}`}
@@ -6158,12 +6161,7 @@ function MainApp() {
                         setIsProcessing(false);
                         return;
                       }
-                      setTimeout(() => {
-                        setPaymentProcessingState({ step: 2, message: "Confirming payment details..." });
-                        setTimeout(() => {
-                          setPaymentProcessingState({ step: 3, message: "Finalizing deposit..." });
-                          setTimeout(() => {
-                            setPaymentProcessingState(null);
+                      setPaymentProcessingState(null);
                             setIsProcessing(false);
                             setDepositAmount("");
                             setDepositReference("");
@@ -6172,9 +6170,6 @@ function MainApp() {
                             setSuccessAnimMessage("Deposit request submitted! Awaiting CBN/SEC confirmation.");
                             setSuccessAnimAmount(amt);
                             setActiveModal("successAnimated");
-                          }, 1500)
-                        }, 1500)
-                      }, 1500)
                     }}
                     className="h-[48px] rounded-xl px-8 font-bold text-[15px] bg-blue-600 text-white active:scale-95 transition-transform shadow-md shadow-blue-600/30"
                   >{isProcessing ? "Processing..." : "Confirm Payment"}</button>
@@ -6334,12 +6329,7 @@ function MainApp() {
                      setIsProcessing(false);
                      return;
                   }
-                  setTimeout(() => {
-                    setPaymentProcessingState({ step: 2, message: "Confirming account details..." });
-                    setTimeout(() => {
-                      setPaymentProcessingState({ step: 3, message: "Finalizing deposit..." });
-                      setTimeout(() => {
-                        setPaymentProcessingState(null);
+                  setPaymentProcessingState(null);
                         setIsProcessing(false);
                         setDepositAmount("");
                         setDepositReference("");
@@ -6348,13 +6338,10 @@ function MainApp() {
                         setSuccessAnimMessage("Deposit request submitted! Awaiting CBN/SEC confirmation.");
                         setSuccessAnimAmount(amt);
                         setActiveModal("successAnimated");
-                      }, 1500)
-                    }, 1500)
-                  }, 1500)
                 }}
                 className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl mt-4 active:scale-95 transition-transform shadow-md shadow-blue-600/30 text-[15px]"
               >
-                I Have Paid
+                {isProcessing ? "Processing..." : "I Have Paid"}
               </button>
             </div>
           </div>
@@ -6796,12 +6783,11 @@ function MainApp() {
                 </button>
               </div>
               <form
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
                   if (newProductName && (newProductRoi || newProductFixedDaily) && newProductMin && newProductDays && newProductType) {
                     setIsProcessingProduct(true);
-                    setTimeout(async () => {
-                      const success = await addProduct({
+                    const success = await addProduct({
                         name: newProductName,
                         title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize }),
                         description: newProductDescription,
@@ -6833,7 +6819,6 @@ function MainApp() {
                         setActiveModal(null);
                         // triggerVisualNotification("alert", "Notice", "Product added successfully!");
                       }
-                    }, 1200);
                   } else {
                     triggerVisualNotification("alert", "Notice", "Please fill all fields");
                   }
@@ -7067,12 +7052,11 @@ function MainApp() {
                 </button>
               </div>
               <form
-                onSubmit={(e) => {
+                onSubmit={async (e) => {
                   e.preventDefault();
                   if (newProductName && newProductRoi && newProductMin && newProductDays && newProductType) {
                     setIsProcessingProduct(true);
-                    setTimeout(() => {
-                      editProduct(editingProduct.id, {
+                    await editProduct(editingProduct.id, {
                         name: newProductName,
                         title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize }),
                         description: newProductDescription,
@@ -7101,7 +7085,6 @@ function MainApp() {
                       setIsProcessingProduct(false);
                       setActiveModal(null);
                       setEditingProduct(null);
-                    }, 1200);
                   } else {
                     triggerVisualNotification("alert", "Notice", "Please fill all fields");
                   }
