@@ -164,6 +164,7 @@ interface AppState {
   incomeRecords: IncomeRecord[];
   globalWithdrawalLimit: number;
   managerLink: string;
+  showCSIcon: boolean;
   groupLink: string;
   systemDepositAccounts: SystemDepositAccount[];
   chatMessages: ChatMessage[];
@@ -194,6 +195,7 @@ interface AppContextType extends AppState {
     limit: number | undefined,
   ) => void;
   updateContactLinks: (manager: string, group: string) => void;
+  updateShowCSIcon: (show: boolean) => void;
   disableUser: (userId: string) => void;
   enableUser: (userId: string) => void;
   restrictUserWithdrawals: (userId: string, restricted: boolean) => void;
@@ -281,6 +283,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [currentUser]);
   const [globalWithdrawalLimit, setGlobalWithdrawalLimit] = useState<number>(5000000);
   const [managerLink, setManagerLink] = useState<string>("https://t.me/manager");
+  const [showCSIcon, setShowCSIcon] = useState<boolean>(true);
   const [groupLink, setGroupLink] = useState<string>("https://t.me/group");
   const [systemDepositAccounts, setSystemDepositAccounts] = useState<SystemDepositAccount[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -433,6 +436,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       if (settingsData) {
         setGlobalWithdrawalLimit(settingsData.globalWithdrawalLimit ?? 5000000);
         setManagerLink(settingsData.managerLink || "https://t.me/manager");
+        setShowCSIcon(settingsData.showCSIcon !== false);
         setGroupLink(settingsData.groupLink || "https://t.me/group");
         _setAnnouncement(settingsData.announcement || null);
         _setAdminUsdtAddress(settingsData.adminUsdtAddress || null);
@@ -496,6 +500,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       if (settingsData) {
         setGlobalWithdrawalLimit(settingsData.globalWithdrawalLimit ?? 5000000);
         setManagerLink(settingsData.managerLink || "https://t.me/manager");
+        setShowCSIcon(settingsData.showCSIcon !== false);
         setGroupLink(settingsData.groupLink || "https://t.me/group");
         _setAnnouncement(settingsData.announcement || null);
         _setAdminUsdtAddress(settingsData.adminUsdtAddress || null);
@@ -1143,6 +1148,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     updateSetting('globalWithdrawalLimit', limit);
   };
 
+  const updateShowCSIcon = async (show: boolean) => {
+    setShowCSIcon(show);
+    await updateSetting('showCSIcon', show);
+  };
+
   const updateContactLinks = (manager: string, group: string) => {
     setManagerLink(manager);
     setGroupLink(group);
@@ -1258,13 +1268,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       if (thisTotal > 0) {
         totalToAdd += thisTotal;
         invUpdates.push({ id: investment.id, status: newStatus, lastCollectedDate: newDateStr });
-        incRecords.push({
-          userId: currentUser.id,
-          investmentId: investment.id,
-          planName: investment.planName,
-          amount: thisTotal,
-          date: now.toISOString()
-        });
+        if (profitToCollect > 0) {
+          incRecords.push({
+            userId: currentUser.id,
+            investmentId: investment.id,
+            planName: investment.planName,
+            amount: profitToCollect,
+            date: now.toISOString()
+          });
+        }
+        if (isFinished && investment.amount > 0) {
+          incRecords.push({
+            userId: currentUser.id,
+            investmentId: investment.id,
+            planName: "Returned principal",
+            amount: investment.amount,
+            date: now.toISOString()
+          });
+        }
       }
     }
     
@@ -1354,6 +1375,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     const newStatus = isFinished ? ("completed" as const) : ("active" as const);
     const newDateStr = newLastCollected.toISOString();
     const totalToAdd = profitToCollect + (isFinished ? investment.amount : 0);
+    const returnedPrincipal = isFinished ? investment.amount : 0;
 
     // Update investment status
     setInvestments((prev) =>
@@ -1581,6 +1603,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         level: newCommission.level,
         type: newCommission.type
       });
+      
+      const incomeRecord = {
+        userId: referer.id,
+        planName: "VIP Upgrade Bonus",
+        amount: bonus,
+        date: new Date().toISOString()
+      };
+      const incRecordLocal = {
+        id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+        ...incomeRecord
+      };
+      setIncomeRecords(prev => [incRecordLocal, ...prev]);
+      await supabase.from('incomeRecords').insert(incomeRecord);
+
       await supabase.from('users').update({ 
         balance: referer.balance + bonus, 
         referralEarnings: referer.referralEarnings + bonus 
@@ -1643,11 +1679,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
     let planName = "Task Bonus";
     if (taskId.startsWith("prize_draw")) planName = "Prize Draw Reward";
-    else if (taskId.startsWith("check_in")) planName = "Daily Check-in";
+    else if (taskId.startsWith("checkin_")) planName = "Check-in";
     else if (taskId.startsWith("bonus_")) planName = "Check-in Bonus";
     else if (taskId.startsWith("vip_upgrade")) planName = "VIP Upgrade Bonus";
     else if (taskId === "task1") planName = "Invite registration";
-    else if (taskId === "task2") planName = "First invest";
+    else if (taskId === "task2") planName = "First deposit";
     else if (taskId === "task3") planName = "Cumulative investment";
     else if (taskId === "task4") planName = "VIP level";
     else if (taskId === "task5") planName = "Register and top up";
@@ -1736,6 +1772,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         incomeRecords,
         globalWithdrawalLimit,
         managerLink,
+        showCSIcon,
         groupLink,
         systemDepositAccounts,
         chatMessages,
@@ -1751,6 +1788,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         updateGlobalWithdrawalLimit,
         updateUserWithdrawalLimit,
         updateContactLinks,
+        updateShowCSIcon,
         disableUser,
         enableUser,
         batchCollectEarnings,

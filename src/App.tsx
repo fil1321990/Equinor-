@@ -488,6 +488,8 @@ function MainApp() {
     managerLink,
     groupLink,
     updateContactLinks,
+    showCSIcon,
+    updateShowCSIcon,
     restrictUserWithdrawals,
     systemDepositAccounts,
     addSystemDepositAccount,
@@ -594,8 +596,9 @@ function MainApp() {
   const [isUploadingChatImg, setIsUploadingChatImg] = useState(false);
   const [adminChatUserContext, setAdminChatUserContext] = useState<string | null>(null);
   const [viewImage, setViewImage] = useState<string | null>(null);
-  const [adminSubTab, setAdminSubTab] = useState<"general" | "top" | "transactions">("general");
+  const [adminSubTab, setAdminSubTab] = useState<"general" | "top" | "transactions" | "stats">("general");
   const [txPeriod, setTxPeriod] = useState<"all" | "weekly" | "monthly">("all");
+  const [statsPeriod, setStatsPeriod] = useState<"all" | "this_week" | "last_week" | "last_month">("all");
   const [editingTxId, setEditingTxId] = useState<string | null>(null);
   const [editingTxNotes, setEditingTxNotes] = useState("");
   const [editingTxTags, setEditingTxTags] = useState("");
@@ -799,6 +802,7 @@ function MainApp() {
   const [newProductQuota, setNewProductQuota] = useState("0");
   const [newProductDescription, setNewProductDescription] = useState("");
   const [newProductType, setNewProductType] = useState<"general"|"vip"|"special">("general");
+  const [newProductAudienceType, setNewProductAudienceType] = useState<"all"|"new"|"old">("all");
   const [newProductImageUrl, setNewProductImageUrl] = useState("");
   const [newProductPromoUnlock, setNewProductPromoUnlock] = useState({ d: "", h: "", m: "", s: "" });
   const [newProductPromoClosing, setNewProductPromoClosing] = useState({ d: "", h: "", m: "", s: "" });
@@ -1112,7 +1116,7 @@ function MainApp() {
       setWithdrawAmount("");
       setSuccessAnimType("withdraw");
       setSuccessAnimTitle("Withdrawal Requested");
-      setSuccessAnimMessage("Withdrawal request submitted! Awaiting CBN/SEC confirmation.");
+      setSuccessAnimMessage("Withdrawal request submitted! Awaiting Bank confirmation.");
       setSuccessAnimAmount(amountNum);
       setActiveModal("successAnimated");
       setShowConfetti(true);
@@ -1136,7 +1140,8 @@ function MainApp() {
     tPlusDays?: number,
     quantity?: number,
     totalDurationDays?: number,
-    payoutCycleDays?: number
+    payoutCycleDays?: number,
+    audienceType?: "all" | "new" | "old"
   ) => {
     if (!currentUser) return;
     
@@ -1144,6 +1149,20 @@ function MainApp() {
     if (productType === "vip" && userVipLevel.levelIndex === 0) {
       triggerVisualNotification("alert", "Notice", `This is a VIP product. You must be at least VIP1 to invest.`);
       return;
+    }
+    
+    if (audienceType === "new") {
+      const userInvestments = investments.filter(inv => inv.userId === currentUser.id);
+      if (userInvestments.length > 0) {
+        triggerVisualNotification("alert", "Notice", "This product is only available for first-time buyers.");
+        return;
+      }
+    } else if (audienceType === "old") {
+      const userInvestments = investments.filter(inv => inv.userId === currentUser.id);
+      if (userInvestments.length === 0) {
+        triggerVisualNotification("alert", "Notice", "This product is only available for users who have purchased a product before.");
+        return;
+      }
     }
 
     if (planName.toLowerCase() === "vip member exclusive project") {
@@ -1583,7 +1602,6 @@ function MainApp() {
               <div className="bg-[#7b5cff] pt-5 px-4 pb-[30px] w-full flex-shrink-0">
                 <div className="text-center text-[16px] font-medium mb-1">Daily service</div>
                 <div className="text-center text-[18px] font-bold text-[#ffd24d] mb-1">Continuous sign-in {continuousStreak}</div>
-                <div className="text-center text-[14px] font-medium text-[#e0e0ff] mb-6">Total earned: ₦{totalEarnings}</div>
 
                 {/* Weekdays */}
                 <div className="grid grid-cols-7 mb-3">
@@ -1606,11 +1624,6 @@ function MainApp() {
 
                     return (
                       <div key={day} className={`aspect-square border rounded-xl relative flex items-end justify-center pb-1.5 ${checked ? "bg-[#a88cff] border-white" : "bg-[#a88cff]/50 border-white/40"}`}>
-                        {checked && (
-                          <div className="absolute top-1 w-[18px] h-[18px] bg-[#ffd24d] rounded-full flex items-center justify-center text-[12px] font-bold text-white leading-none">
-                            ✓
-                          </div>
-                        )}
                         {isBonusDay && (
                           <div className="absolute -top-1.5 -right-1.5 bg-[#4ade80] text-[#0a0a1a] text-[9px] font-bold px-1 py-0.5 rounded-md leading-none shadow-sm">
                             ₦{BONUSES[day as keyof typeof BONUSES]}
@@ -1665,7 +1678,7 @@ function MainApp() {
 
           const tasks = [
             { id: "task1", title: "Invite registration", desc: `Invite 10 friends to register reward N1500 (${inviteCount}/10)`, reward: 1500, done: inviteCount >= 10 },
-            { id: "task2", title: "First invest", desc: `First investment >= ₦250000 projects award ₦25000`, reward: 25000, done: hasBigFirstInvest },
+            { id: "task2", title: "First deposit", desc: `First investment >= ₦250000 projects award ₦25000`, reward: 25000, done: hasBigFirstInvest },
             { id: "task3", title: "Cumulative investment", desc: `Accumulated investment ₦1500000 Reward ₦100000 (${cumulativeInvest}/1500000)`, reward: 100000, done: cumulativeInvest >= 1500000 },
             { id: "task4", title: "VIP level", desc: `Upgrade to VIP2 to receive reward ₦40000`, reward: 40000, done: currentVip >= 2 },
             { id: "task5", title: "Register and top up", desc: `Invite 20 friends to register and get 15000 Naira top-up bonus (${inviteCount}/20)`, reward: 15000, done: inviteCount >= 20 },
@@ -1816,7 +1829,7 @@ function MainApp() {
                   ) : (
                     <button 
                       disabled
-                      className="w-full min-h-[44px] py-2 bg-gradient-to-r from-[#7B1FA2] to-[#9C27B0] text-white/90 rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 opacity-70 cursor-not-allowed">
+                      className="w-full min-h-[44px] py-3 h-auto bg-gradient-to-r from-[#7B1FA2] to-[#9C27B0] text-white/90 rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 opacity-70 cursor-not-allowed">
                       <span className="text-[14px] leading-tight text-center">Update with {nextVipLevel.requiredTotal} active friends to become {nextVipLevel.name} ({currentReferrals}/{nextVipLevel.requiredTotal})</span>
                     </button>
                   )
@@ -1950,12 +1963,14 @@ function MainApp() {
                   </div>
                 </div>
                 {/* Right Headphones */}
-                <div 
-                  onClick={() => setActiveModal("contact")}
-                  className="w-8 h-8 rounded-full bg-white flex shrink-0 items-center justify-center cursor-pointer"
-                >
-                  <Headphones className="w-4 h-4 text-[#7B61FF]" />
-                </div>
+                {showCSIcon ? (
+                  <div 
+                    onClick={() => setActiveModal("contact")}
+                    className="w-8 h-8 rounded-full bg-white flex shrink-0 items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-transform"
+                  >
+                    <Headphones className="w-4 h-4 text-[#7B61FF]" />
+                  </div>
+                ) : <div className="w-8 h-8 flex shrink-0" />}
               </div>
 
               {/* Content area */}
@@ -2393,7 +2408,7 @@ function MainApp() {
                                 </div>
                               </div>
                             );
-                          })()}
+    ;                      })()}
                         </div>
                       </div>
 
@@ -2417,7 +2432,7 @@ function MainApp() {
                                 : (levelBIds.includes(user.referralCode) ? 'B' : 'C');
                                 
                               return { ...user, generatedComm, userLevelStr };
-                            }).sort((a, b) => b.generatedComm - a.generatedComm);
+      ;                      }).sort((a, b) => b.generatedComm - a.generatedComm);
 
                             if (membersWithContributions.length === 0) {
                               return <div className="text-center text-white/40 text-[12px] font-medium py-4">No team members yet.</div>
@@ -2466,7 +2481,7 @@ function MainApp() {
                                 </div>
                               </div>
                             )));
-                          })()}
+    ;                      })()}
                         </div>
                       </div>
 
@@ -2523,8 +2538,8 @@ function MainApp() {
                                     </div>
                                   </div>
                                 )
-                              });
-                          })()}
+        ;                      });
+    ;                      })()}
                         </div>
                       </div>
                     </>
@@ -2540,14 +2555,14 @@ function MainApp() {
                 {/* Tab Navigation directly beneath (Header removed) */}
                 <div className="px-5 shrink-0 mb-4 mt-1 pt-6">
                 <div className="flex justify-between items-center relative bg-[#1A1E4E]/50 border border-white/10 rounded-full p-1 backdrop-blur-md">
-                  {(["general", "vip", "special", "expired"] as const).map((tab, idx) => {
+                  {(["general", "vip", "special"] as const).map((tab, idx) => {
                     const isActive = productTab === tab;
-                    const labels = ["General", "VIP", "Special", "Expired"];
+                    const labels = ["General", "VIP", "Special"];
                     return (
                       <button
                         key={tab}
-                        onClick={() => setProductTab(tab)}
-                        className={`text-[14px] font-bold py-2 relative w-1/4 text-center transition-colors rounded-full z-10 ${
+                        onClick={() => setProductTab(tab as any)}
+                        className={`text-[14px] font-bold py-2 relative w-1/3 text-center transition-colors rounded-full z-10 ${
                           isActive ? "text-white" : "text-white/50 hover:text-white/80"
                         }`}
                       >
@@ -2626,7 +2641,7 @@ function MainApp() {
                     const isSoldOut = planQuota > 0 && (plan.sold_count !== undefined && plan.sold_count >= planQuota);
                     let buttonText = "Rush to buy";
                     if (isPromoLocked) buttonText = "Locked";
-                    else if (isSoldOut) buttonText = "Sold Out";
+                    else if (isSoldOut) buttonText = "Quota Reached";
                     else if (isQuotaReached) buttonText = "Quota Reached";
                     const isButtonDisabled = isPromoLocked || isQuotaReached || isSoldOut;
                     let promoTimerString = "";
@@ -2724,7 +2739,7 @@ function MainApp() {
                               onClick={() => {
                                 if (isButtonDisabled) {
                                   if (isPromoLocked) triggerVisualNotification("alert", "Notice", "This product is currently locked for a promotional period.");
-                                  else if (isSoldOut) triggerVisualNotification("alert", "Notice", "This product is sold out.");
+                                  else if (isSoldOut) triggerVisualNotification("alert", "Notice", "This product quota has been reached.");
                                   else if (isQuotaReached) triggerVisualNotification("alert", "Notice", "You have already reached the maximum quota for this project.");
                                   return;
                                 }
@@ -3207,7 +3222,7 @@ function MainApp() {
                             )}
                           </button>
                         );
-                      })}
+;                      })}
                     </div>
                   </div>
                   <div className="flex-1 overflow-y-auto w-full pb-32 scrollbar-hide">
@@ -3399,8 +3414,9 @@ function MainApp() {
                             </div>
                           </div>
                         );
-                      })
+;                      })
                     )}
+                    <div className="h-[120px] shrink-0 w-full"></div>
                   </div>
                 </div>
               </div>
@@ -3566,7 +3582,7 @@ function MainApp() {
               </div>
               
               <div className="mx-4 mb-5 flex p-1 bg-white/10 backdrop-blur-md rounded-xl">
-                {(["general", "top", "transactions"] as const).map(tab => (
+                {(["general", "top", "transactions", "stats"] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => setAdminSubTab(tab)}
@@ -3649,6 +3665,7 @@ function MainApp() {
                     setNewProductTPlusDays("1");
                     setNewProductQuota("0");
                     setNewProductType("general");
+                        setNewProductAudienceType("all");
                     setNewProductImageUrl("");
                     setNewProductPromoUnlock("");
                     setNewProductPromoClosing("");
@@ -3731,6 +3748,7 @@ function MainApp() {
                               <span className="text-[10px] bg-white/10 text-white px-2 py-0.5 rounded font-black">{p.days}d</span>
                               <span className="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded font-black">T+{p.tPlusDays || 1}</span>
                               {p.maxQuota ? <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-black">Quota: {p.maxQuota}</span> : null}
+                              {p.audienceType && p.audienceType !== 'all' ? <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded font-black uppercase">{p.audienceType} Only</span> : null}
                             </div>
                           </div>
                         </div>
@@ -3757,6 +3775,7 @@ function MainApp() {
                               setNewProductTPlusDays(p.tPlusDays?.toString() || "1");
                               setNewProductQuota(p.maxQuota?.toString() || "0");
                               setNewProductType(p.type as any);
+                              setNewProductAudienceType(p.audienceType || "all");
                               setNewProductImageUrl(p.imageUrl || "");
                               
                               let unlockD = "", unlockH = "", unlockM = "", unlockS = "";
@@ -3825,6 +3844,15 @@ function MainApp() {
                       value={groupLink}
                       onChange={(e) => updateContactLinks(managerLink, e.target.value)}
                     />
+                  </div>
+                  <div className="flex items-center justify-between bg-white/5 p-3 rounded-lg border border-white/10 mt-2">
+                    <span className="text-white text-sm font-bold">Show CS Icon in Profile</span>
+                    <button
+                      onClick={() => updateShowCSIcon(!showCSIcon)}
+                      className={`w-10 h-6 rounded-full p-1 transition-colors ${showCSIcon ? 'bg-[#7B2FFF]' : 'bg-white/20'}`}
+                    >
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${showCSIcon ? 'translate-x-4' : 'translate-x-0'}`} />
+                    </button>
                   </div>
                 </div>
               </div>
@@ -4150,7 +4178,7 @@ function MainApp() {
                             </div>
                           </div>
                         );
-                      })}
+;                      })}
                     </div>
                   )}
                 </div>
@@ -4361,7 +4389,7 @@ function MainApp() {
                             const aDep = transactions.filter(t => t.userId === a.id && t.type === "deposit" && t.status === "approved").reduce((sum, tx) => sum + tx.amount, 0);
                             const bDep = transactions.filter(t => t.userId === b.id && t.type === "deposit" && t.status === "approved").reduce((sum, tx) => sum + tx.amount, 0);
                             return bDep - aDep;
-                         })
+   ;                      })
                          .slice(0, 50)
                          .map((u, i) => {
                             const dep = transactions.filter(t => t.userId === u.id && t.type === "deposit" && t.status === "approved").reduce((sum, tx) => sum + tx.amount, 0);
@@ -4382,7 +4410,7 @@ function MainApp() {
                                 </div>
                               </div>
                             );
-                       })}
+ ;                      })}
                     </div>
                   </div>
 
@@ -4396,7 +4424,7 @@ function MainApp() {
                             const aRef = users.filter(x => x.referredBy === a.referralCode).length;
                             const bRef = users.filter(x => x.referredBy === b.referralCode).length;
                             return bRef - aRef;
-                         })
+   ;                      })
                          .slice(0, 50)
                          .map((u, i) => {
                             const refCount = users.filter(x => x.referredBy === u.referralCode).length;
@@ -4417,7 +4445,7 @@ function MainApp() {
                                 </div>
                               </div>
                             );
-                       })}
+ ;                      })}
                     </div>
                   </div>
                 </div>
@@ -4485,12 +4513,123 @@ function MainApp() {
                                 } catch (e) {
                                   return <div key={tx.id} className="p-3 border-b border-white/5 text-red-400 text-xs text-center">Error loading transaction record</div>;
                                 }
-                              })
+        ;                      })
                               )}
                            </div>
                          </div>
                        </>
                      )
+                  })()}
+                </div>
+              )}
+              {adminSubTab === "stats" && (
+                <div className="mx-4 mb-5 space-y-4">
+                  <div className="flex justify-center gap-1 bg-white/10 p-1 rounded-lg backdrop-blur-sm mx-auto max-w-fit overflow-x-auto">
+                     <button onClick={() => setStatsPeriod("all")} className={`whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-bold uppercase ${statsPeriod === "all" ? "bg-[#7B2FFF] text-white" : "text-white/60 hover:text-white"}`}>All Time</button>
+                     <button onClick={() => setStatsPeriod("this_week")} className={`whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-bold uppercase ${statsPeriod === "this_week" ? "bg-[#7B2FFF] text-white" : "text-white/60 hover:text-white"}`}>This Week</button>
+                     <button onClick={() => setStatsPeriod("last_week")} className={`whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-bold uppercase ${statsPeriod === "last_week" ? "bg-[#7B2FFF] text-white" : "text-white/60 hover:text-white"}`}>Last Week</button>
+                     <button onClick={() => setStatsPeriod("last_month")} className={`whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-bold uppercase ${statsPeriod === "last_month" ? "bg-[#7B2FFF] text-white" : "text-white/60 hover:text-white"}`}>Last Month</button>
+                  </div>
+                  
+                  {(() => {
+                    const now = new Date();
+                    const getPeriodDates = () => {
+                       if (statsPeriod === "this_week") {
+                          const start = new Date(now);
+                          const day = now.getDay() || 7;
+                          if (day !== 1) start.setHours(-24 * (day - 1));
+                          start.setHours(0,0,0,0);
+                          return { start, end: new Date(now.getTime() + 86400000) }; // +1 day for inclusive end
+                       }
+                       if (statsPeriod === "last_week") {
+                          const startOfThisWeek = new Date(now);
+                          const day = now.getDay() || 7;
+                          if (day !== 1) startOfThisWeek.setHours(-24 * (day - 1));
+                          startOfThisWeek.setHours(0,0,0,0);
+                          const start = new Date(startOfThisWeek.getTime() - 7 * 24 * 60 * 60 * 1000);
+                          return { start, end: startOfThisWeek };
+                       }
+                       if (statsPeriod === "last_month") {
+                          const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                          const end = new Date(now.getFullYear(), now.getMonth(), 1);
+                          return { start, end };
+                       }
+                       return { start: new Date(0), end: new Date(now.getTime() + 86400000) };
+                    };
+                    
+                    const { start, end } = getPeriodDates();
+                    const inPeriod = (dStr?: string) => {
+                       if (!dStr) return false;
+                       const t = new Date(dStr).getTime();
+                       return t >= start.getTime() && t < end.getTime();
+                    };
+
+                    const filteredTx = statsPeriod === "all" ? transactions : transactions.filter(t => inPeriod(t.date));
+                    const filteredComm = statsPeriod === "all" ? commissions : commissions.filter(c => inPeriod(c.date));
+                    const filteredUsers = users; // Cannot filter users as they don't have created_at in frontend interface easily without DB mapping. We'll show total users always or filter active ones by investments.
+                    
+                    // We can check if an investment was made in the period to consider them active in period? 
+                    // Let's filter investments for active users
+                    const filteredInv = statsPeriod === "all" ? investments : investments.filter(i => inPeriod(i.startDate));
+                    
+                    const totalRegistered = users.length;
+                    
+                    // Active users: Users who have active investments, or if a period is selected, users who made an investment in that period
+                    const activeUsersCount = Array.from(new Set(
+                       statsPeriod === "all" 
+                         ? investments.filter(i => i.status === "active").map(i => i.userId)
+                         : filteredInv.map(i => i.userId)
+                    )).length;
+
+                    const depTx = filteredTx.filter(t => t.type === "deposit");
+                    const withTx = filteredTx.filter(t => t.type === "withdrawal");
+
+                    const depApproved = depTx.filter(t => t.status === "approved");
+                    const withApproved = withTx.filter(t => t.status === "approved");
+                    
+                    const depTotal = depApproved.reduce((sum, t) => sum + t.amount, 0);
+                    const withTotal = withApproved.reduce((sum, t) => sum + t.amount, 0);
+
+                    const pendingTx = filteredTx.filter(t => t.status === "pending");
+                    const approvedTx = filteredTx.filter(t => t.status === "approved");
+                    const rejectedTx = filteredTx.filter(t => t.status === "rejected");
+
+                    // Referrals: Users referred by someone
+                    const referralCount = users.filter(u => u.referredBy).length; // Total referrals
+                    
+                    // Commissions
+                    const commTotal = filteredComm.reduce((sum, c) => sum + c.amount, 0);
+                    const invTotal = filteredInv.reduce((sum, i) => sum + i.amount, 0);
+
+                    const StatCard = ({ title, value, subtitle }: { title: string, value: string | number, subtitle?: string }) => (
+                      <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-3 flex flex-col justify-center text-center">
+                         <div className="text-[10px] text-white/60 font-bold uppercase mb-1 tracking-wider">{title}</div>
+                         <div className="text-white font-black text-lg">{value}</div>
+                         {subtitle && <div className="text-[#00D4FF] text-[10px] font-bold mt-1">{subtitle}</div>}
+                      </div>
+                    );
+
+                    return (
+                      <div className="grid grid-cols-2 gap-3 mt-4">
+                        <StatCard title="Registered Users" value={totalRegistered} subtitle="All Time" />
+                        <StatCard title="Active Users" value={activeUsersCount} subtitle={statsPeriod === "all" ? "Currently Active" : "Active in Period"} />
+                        
+                        <StatCard title="Deposits Count" value={depTx.length} />
+                        <StatCard title="Deposits Total" value={typeof formatCurrency === 'function' ? formatCurrency(depTotal) : `₦${depTotal.toLocaleString()}`} subtitle="Approved Only" />
+                        
+                        <StatCard title="Withdrawals Count" value={withTx.length} />
+                        <StatCard title="Withdrawals Total" value={typeof formatCurrency === 'function' ? formatCurrency(withTotal) : `₦${withTotal.toLocaleString()}`} subtitle="Approved Only" />
+                        
+                        <StatCard title="Total Investment" value={typeof formatCurrency === 'function' ? formatCurrency(invTotal) : `₦${invTotal.toLocaleString()}`} />
+                        <StatCard title="Pending Tx" value={pendingTx.length} />
+                        <StatCard title="Referrals" value={referralCount} subtitle="All Time" />
+                        
+                        <StatCard title="Total Commission" value={typeof formatCurrency === 'function' ? formatCurrency(commTotal) : `₦${commTotal.toLocaleString()}`} />
+                        <StatCard title="Approved Tx" value={approvedTx.length} />
+                        
+                        <StatCard title="Rejected Tx" value={rejectedTx.length} />
+                      </div>
+                    );
                   })()}
                 </div>
               )}
@@ -4918,11 +5057,11 @@ function MainApp() {
                 </button>
                 <button 
                   onClick={() => {
-                    if (navigator.share) {
+                                        if (navigator.share) {
                       navigator.share({
                         title: 'Join me on Equinor',
                         text: `Use my referral code: ${currentUser?.referralCode}`,
-                        url: referralLink
+                        url: referralLink,
                       }).catch((err) => {
                         console.log('Error sharing', err);
                       });
@@ -5004,7 +5143,7 @@ function MainApp() {
                               claimedBy,
                               createdAt: p.roi
                             };
-                          });
+    ;                      });
                           
                           const found = freshValidCodes.find(c => c.code === code);
                           if (found) {
@@ -5528,7 +5667,7 @@ function MainApp() {
                 <button 
                   disabled={isProcessing}
                   onClick={async () => {
-                    await handleInvest(equinorSelectedPlan.name, equinorSelectedPlan.buyAmount, equinorSelectedPlan.roi, equinorSelectedPlan.days || 30, equinorSelectedPlan.type, equinorSelectedPlan.fixedDailyReturn, equinorSelectedPlan.tPlusDays, Number(buyingQuantity), equinorSelectedPlan.total_duration_days || equinorSelectedPlan.days || 30, equinorSelectedPlan.payout_cycle_days || equinorSelectedPlan.tPlusDays || 1);
+                    await handleInvest(equinorSelectedPlan.name, equinorSelectedPlan.buyAmount, equinorSelectedPlan.roi, equinorSelectedPlan.days || 30, equinorSelectedPlan.type, equinorSelectedPlan.fixedDailyReturn, equinorSelectedPlan.tPlusDays, Number(buyingQuantity), equinorSelectedPlan.total_duration_days || equinorSelectedPlan.days || 30, equinorSelectedPlan.payout_cycle_days || equinorSelectedPlan.tPlusDays || 1, equinorSelectedPlan.audienceType);
                     setOrderTab(equinorSelectedPlan.type as any);
                     setActiveTab("order");
                   }}
@@ -6195,7 +6334,7 @@ function MainApp() {
                             setDepositReference("");
                             setSuccessAnimType("deposit");
                             setSuccessAnimTitle("Deposit Requested");
-                            setSuccessAnimMessage("Deposit request submitted! Awaiting CBN/SEC confirmation.");
+                            setSuccessAnimMessage("Deposit request submitted! Awaiting Bank confirmation.");
                             setSuccessAnimAmount(amt);
                             setActiveModal("successAnimated");
                     }}
@@ -6258,8 +6397,8 @@ function MainApp() {
               </div>
             </div>
 
-            <div className="p-4 flex flex-col gap-4">
-              <div className="bg-white rounded-2xl p-4 text-center shadow-sm border border-slate-100 flex flex-col items-center">
+            <div className="p-3 flex flex-col gap-2">
+              <div className="bg-white rounded-2xl p-2 text-center shadow-sm border border-slate-100 flex flex-col items-center">
                 <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mb-2">
                   <Clock className="w-5 h-5 text-blue-600 animate-pulse" />
                 </div>
@@ -6275,20 +6414,20 @@ function MainApp() {
                   <div className="bg-slate-100/50 p-2 border-b border-slate-200 text-center">
                     <h4 className="text-slate-600 font-bold text-sm uppercase tracking-wide">Deposit Destination</h4>
                   </div>
-                  <div className="p-3 flex flex-col gap-3">
-                    <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                  <div className="p-2 flex flex-col gap-2">
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-100">
                       <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Amount</span>
                       <span className="text-xl font-bold text-slate-900">₦{Number(depositAmount).toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-100">
                       <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Bank Name</span>
                       <span className="text-slate-900 font-bold text-sm">{systemDepositAccounts[depositCheckoutAccountIndex % systemDepositAccounts.length]?.bankName}</span>
                     </div>
-                    <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-100">
                       <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Account Name</span>
                       <span className="text-slate-900 font-bold text-sm tracking-wide">{systemDepositAccounts[depositCheckoutAccountIndex % systemDepositAccounts.length]?.accountName}</span>
                     </div>
-                    <div className="flex flex-col gap-2 pt-2">
+                    <div className="flex flex-col gap-1 pt-1">
                       <span className="text-slate-500 text-xs font-bold uppercase tracking-wider">Account Number</span>
                       <div className="flex gap-2">
                         <div className="flex-1 bg-slate-50 rounded-xl border border-slate-200 p-3 flex items-center justify-between font-mono text-slate-900 font-bold text-lg tracking-wider shadow-inner">
@@ -6318,10 +6457,10 @@ function MainApp() {
                 </div>
               )}
 
-              <div className="mt-2 bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-2">
+              <div className="mt-1 bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex flex-col gap-2">
                 <span className="text-slate-600 font-bold text-sm uppercase tracking-wide">Bank Transaction Note / Narration</span>
                 <p className="text-xs text-slate-500">
-                  Please paste your bank transaction note below. Include your Main ID <span className="font-bold text-blue-600">({currentUser?.referralCode})</span> so the admin can quickly confirm your deposit.
+                  Kindly forward your bank deposit receipt to the marketing manager to confirm and verify your payment.
                 </p>
                 <input
                   type="text"
@@ -6350,6 +6489,11 @@ function MainApp() {
 
                   setIsProcessing(true);
                   setPaymentProcessingState({ step: 1, message: "Verifying transaction with the bank..." });
+                  await new Promise(r => setTimeout(r, 1000));
+                  setPaymentProcessingState({ step: 2, message: "Awaiting Bank confirmation..." });
+                  await new Promise(r => setTimeout(r, 1000));
+                  setPaymentProcessingState({ step: 3, message: "Finalizing request..." });
+                  await new Promise(r => setTimeout(r, 1000));
                   const targetAccount = systemDepositAccounts[depositCheckoutAccountIndex % systemDepositAccounts.length];
                   const { success } = await requestDeposit(amt, finalReference, targetAccount, currentUser?.bankDetails);
                   if (!success) {
@@ -6363,11 +6507,11 @@ function MainApp() {
                         setDepositReference("");
                         setSuccessAnimType("deposit");
                         setSuccessAnimTitle("Deposit Requested");
-                        setSuccessAnimMessage("Deposit request submitted! Awaiting CBN/SEC confirmation.");
+                        setSuccessAnimMessage("Deposit request submitted! Awaiting Bank confirmation.");
                         setSuccessAnimAmount(amt);
                         setActiveModal("successAnimated");
                 }}
-                className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl mt-2 mb-8 active:scale-95 transition-transform shadow-md shadow-blue-600/30 text-[15px]"
+                className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl mt-2 mb-4 active:scale-95 transition-transform shadow-md shadow-blue-600/30 text-[15px]"
               >
                 {isProcessing ? "Processing..." : "I Have Paid"}
               </button>
@@ -6825,11 +6969,12 @@ function MainApp() {
                         tPlusDays: Number(newProductTPlusDays),
                         maxQuota: Number(newProductQuota),
                         type: newProductType,
+                        audienceType: newProductAudienceType,
                         fixedDailyReturn: newProductFixedDaily ? Number(newProductFixedDaily) : undefined,
                         imageUrl: newProductImageUrl,
                         promotionalUnlockDate: getOffsetMs(newProductPromoUnlock) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoUnlock)).toISOString() : undefined,
                         promoClosingDate: getOffsetMs(newProductPromoClosing) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoClosing)).toISOString() : undefined
-                      });
+                            });
                       setIsProcessingProduct(false);
                       if (success) {
                         setNewProductName("");
@@ -6841,6 +6986,7 @@ function MainApp() {
                         setNewProductTPlusDays("1");
                         setNewProductQuota("0");
                         setNewProductType("general");
+                        setNewProductAudienceType("all");
                         setNewProductImageUrl("");
                         setNewProductPromoUnlock("");
                         setNewProductPromoClosing("");
@@ -6990,6 +7136,23 @@ function MainApp() {
                   </div>
                 </div>
                 <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Audience Type</label>
+                  <div className="relative">
+                    <select
+                      value={newProductAudienceType}
+                      onChange={(e) => setNewProductAudienceType(e.target.value as any)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium appearance-none"
+                    >
+                      <option value="all">All Members</option>
+                      <option value="new">New Members Only</option>
+                      <option value="old">Old Members Only</option>
+                    </select>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                      <ChevronDown className="w-5 h-5" />
+                    </div>
+                  </div>
+                </div>
+                <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Product Image (Optional)</label>
                   <label className="flex items-center justify-center w-full bg-slate-50 border border-slate-200 border-dashed rounded-xl px-4 py-3 text-slate-500 cursor-pointer hover:bg-slate-100 transition-colors">
                     <span className="text-sm font-medium">{newProductImageUrl ? "Image Selected" : "Tap to Upload Image"}</span>
@@ -7094,10 +7257,11 @@ function MainApp() {
                         tPlusDays: Number(newProductTPlusDays),
                         maxQuota: Number(newProductQuota),
                         type: newProductType,
+                        audienceType: newProductAudienceType,
                         imageUrl: newProductImageUrl,
                         promotionalUnlockDate: getOffsetMs(newProductPromoUnlock) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoUnlock)).toISOString() : undefined,
                         promoClosingDate: getOffsetMs(newProductPromoClosing) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoClosing)).toISOString() : undefined
-                      });
+                            });
                       setNewProductName("");
                       setNewProductTitle("EQUINOR");
                       setNewProductDescription("");
@@ -7107,6 +7271,7 @@ function MainApp() {
                       setNewProductTPlusDays("1");
                       setNewProductQuota("0");
                       setNewProductType("general");
+                        setNewProductAudienceType("all");
                       setNewProductImageUrl("");
                       setNewProductPromoUnlock("");
                       setNewProductPromoClosing("");
@@ -7249,6 +7414,23 @@ function MainApp() {
                       <option value="general">General</option>
                       <option value="vip">VIP</option>
                       <option value="special">Special</option>
+                    </select>
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                      <ChevronDown className="w-5 h-5" />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Audience Type</label>
+                  <div className="relative">
+                    <select
+                      value={newProductAudienceType}
+                      onChange={(e) => setNewProductAudienceType(e.target.value as any)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium appearance-none"
+                    >
+                      <option value="all">All Members</option>
+                      <option value="new">New Members Only</option>
+                      <option value="old">Old Members Only</option>
                     </select>
                     <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                       <ChevronDown className="w-5 h-5" />
@@ -7455,8 +7637,8 @@ function MainApp() {
                           accountName: bankAccountName,
                           accountNumber: bankAccountNumber,
                           bankCode: selectedBankCode,
-                          bankName: bankNameStr,
-                        });
+                          bankName: bankNameStr
+                          });
                         if (success) {
                           setToastMessage("Bank details saved successfully!");
                           setTimeout(() => setToastMessage(null), 3000);
@@ -8024,6 +8206,7 @@ function MainApp() {
       </AnimatePresence>
 
     </div>
+
   );
 }
 
