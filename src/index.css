@@ -24,3 +24,12 @@
 .animate-scroll-carousel {
   animation: scrollCarousel 20s linear infinite;
 }
+
+/* Hide scrollbar */
+::-webkit-scrollbar {
+  display: none;
+}
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

@@ -14,13 +14,13 @@ export function getDailyIncome(
     ? Number(investment.fixedDailyReturn) * (investment.quantity || 1)
     : (Number(investment.amount || 0) * (1 + Number(investment.expectedRoi || 0) / 100)) / durationDays;
 
-  if (investment.planName === "VIP Member Exclusive Project") {
+  if ((investment.planName || "").toLowerCase() === "vip member exclusive project") {
     let userLevelName = user ? (VIP_LEVELS[user.vipLevelIndex || 0]?.name || "VIP0") : "VIP0";
     if (userLevelName === "VIP0") userLevelName = "VIP1"; // Show at least VIP1 rates for preview/UI
     dailyIncome = (VIP_MEMBER_EXCLUSIVE_TIERS[userLevelName]?.dailyIncome || 0) * (investment.quantity || 1);
   }
 
-  if (investment.planName === "VIP Team Exclusive Project" && user && investment.id !== "mock") {
+  if ((investment.planName || "").toLowerCase() === "vip team exclusive project" && user && investment.id !== "mock") {
     const aLevelSubordinateUids = allUsers
       .filter((u) => u.referredBy === user.referralCode)
       .map((u) => u.id);
@@ -33,15 +33,16 @@ export function getDailyIncome(
         
     for (const subInv of subordinateInvestments) {
       const subUser = allUsers.find(u => u.id === subInv.userId);
-      if (subInv.planName === "VIP Team Exclusive Project") {
+      if ((subInv.planName || "").toLowerCase() === "vip team exclusive project") {
          subordinateTotalDailyIncome += subInv.fixedDailyReturn != null ? subInv.fixedDailyReturn * (subInv.quantity || 1) : (subInv.amount || 0) * (1 + (subInv.expectedRoi || 0) / 100);
       } else {
          subordinateTotalDailyIncome += getDailyIncome(subInv, subUser, [], []);
       }
     }
     const bonus = subordinateTotalDailyIncome * 0.01;
-    dailyIncome = bonus;
+    dailyIncome = (investment.fixedDailyReturn != null ? Number(investment.fixedDailyReturn) : 300) + bonus;
   }
 
+  dailyIncome = Number(dailyIncome.toFixed(2));
   return dailyIncome;
 }

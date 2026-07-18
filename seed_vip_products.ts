@@ -11,7 +11,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 async function run() {
   const products = [
     {
-      name: 'Equinor Equity Exchange Project',
+      name: 'EQ Equity exchange project',
       title: 'EQUINOR',
       roi: 0,
       min: 0,
@@ -53,4 +53,5 @@ async function run() {
     }
   }
 }
+
 run();

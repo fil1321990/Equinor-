@@ -8,4 +8,11 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Supabase credentials are not set. The Supabase client will not work.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: {
+    fetch: (...args) => {
+      const [url, options] = args;
+      return fetch(url, { ...options, cache: 'no-store' });
+    },
+  },
+});

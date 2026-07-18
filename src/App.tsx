@@ -5,7 +5,7 @@ console.log("App.tsx is loading...");
 
 import {
   Crown,
-  CheckSquare,
+  CheckSquare, Check,
   CalendarCheck,
   CreditCard,
   Wallet,
@@ -988,6 +988,7 @@ function MainApp() {
     } else {
       setToastMessage(`Checked in! Keep your streak going to earn bonuses.`);
     }
+
     setTimeout(() => {
       setToastMessage(null);
     }, 3000);
@@ -1166,12 +1167,16 @@ function MainApp() {
     }
 
     if (planName.toLowerCase() === "vip member exclusive project") {
-      if (userVipLevel.levelIndex < 3) {
-        triggerVisualNotification("alert", "Notice", "You must be at least VIP3 to activate the VIP Member Exclusive Project.");
+      if (userVipLevel.levelIndex < 1) {
+        triggerVisualNotification("alert", "Notice", "You must be at least VIP1 to activate the VIP Member Exclusive Project.");
         return;
       }
     }
     if (planName.toLowerCase() === "vip team exclusive project") {
+      if (userVipLevel.levelIndex < 9) {
+        triggerVisualNotification("alert", "Notice", "You must be at least VIP9 to purchase the VIP Team Exclusive Project.");
+        return;
+      }
       const aLevelSubordinates = users.filter(u => u.referredBy === currentUser.referralCode).length;
       if (aLevelSubordinates < 30) {
         triggerVisualNotification("alert", "Notice", "You need at least 30 team members to purchase the VIP Team Exclusive Project.");
@@ -1236,7 +1241,7 @@ function MainApp() {
     }
     setIsLoggingIn(true);
     try {
-      
+      await new Promise(resolve => setTimeout(resolve, 2000));
       const res = await login(loginIdentifier, loginPassword);
       if (res?.mustChangePassword && res?.user) {
         setForcePasswordChangeUser(res.user);
@@ -1341,9 +1346,10 @@ function MainApp() {
                   if (!loginIdentifier || !loginPassword) return triggerVisualNotification("alert", "Notice", "Enter credentials");
                   handleLoginSubmit();
                 }}
-                className="w-full bg-[#6B2EFF] text-white py-4 rounded-full font-bold text-lg mt-4 active:scale-95 transition-transform"
+                className="w-full bg-[#6B2EFF] text-white py-4 rounded-full font-bold text-lg mt-4 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                disabled={isLoggingIn}
               >
-                Log in as Admin
+                {isLoggingIn ? <Loader2 className="w-6 h-6 animate-spin" /> : "Log in as Admin"}
               </button>
             </div>
             <button
@@ -1451,15 +1457,16 @@ function MainApp() {
                   }
                   setIsLoggingIn(true);
                   try {
-                    
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                     await signup(registerForm.phone, registerForm.password, registerForm.invitationCode);
                   } finally {
                     setIsLoggingIn(false);
                   }
                 }}
-                className="w-full bg-[#6B2EFF] text-white py-4 rounded-full font-bold text-lg mt-8 active:scale-95 transition-transform"
+                className="w-full bg-[#6B2EFF] text-white py-4 rounded-full font-bold text-lg mt-8 active:scale-95 transition-transform flex items-center justify-center gap-2"
+                disabled={isLoggingIn}
               >
-                Sign up
+                {isLoggingIn ? <Loader2 className="w-6 h-6 animate-spin" /> : "Sign up"}
               </button>
             </div>
             
@@ -1552,9 +1559,10 @@ function MainApp() {
                 }
                 handleLoginSubmit();
               }}
-              className="w-full bg-[#6B2EFF] text-white py-4 rounded-full font-bold text-lg mt-8 active:scale-95 transition-transform"
+              className="w-full bg-[#6B2EFF] text-white py-4 rounded-full font-bold text-lg mt-8 active:scale-95 transition-transform flex items-center justify-center gap-2"
+              disabled={isLoggingIn}
             >
-              Log in
+              {isLoggingIn ? <Loader2 className="w-6 h-6 animate-spin" /> : "Log in"}
             </button>
             <div className="mt-4 text-center">
               <button className="text-white/50 text-sm hover:text-white">
@@ -1623,13 +1631,20 @@ function MainApp() {
                     const isBonusDay = [7, 15, 30].includes(day);
 
                     return (
-                      <div key={day} className={`aspect-square border rounded-xl relative flex items-end justify-center pb-1.5 ${checked ? "bg-[#a88cff] border-white" : "bg-[#a88cff]/50 border-white/40"}`}>
+                      <div key={day} className={`aspect-square border-[1.5px] rounded-xl relative flex flex-col items-center justify-center gap-1 ${checked ? "bg-white/10 border-[#FFB300]" : "bg-white/5 border-white/40"}`}>
                         {isBonusDay && (
-                          <div className="absolute -top-1.5 -right-1.5 bg-[#4ade80] text-[#0a0a1a] text-[9px] font-bold px-1 py-0.5 rounded-md leading-none shadow-sm">
+                          <div className="absolute -top-2 -right-2 bg-[#4ade80] text-[#0a0a1a] text-[9px] font-bold px-1 py-0.5 rounded-md leading-none shadow-sm z-10">
                             ₦{BONUSES[day as keyof typeof BONUSES]}
                           </div>
                         )}
-                        <div className="text-[12px] font-medium text-white">{MONTH_LABEL}.{day}</div>
+                        {checked ? (
+                          <div className="w-5 h-5 bg-[#FFB300] rounded-full flex items-center justify-center shadow-sm shrink-0">
+                            <Check className="text-[#0a0a1a] w-3.5 h-3.5 stroke-[4]" />
+                          </div>
+                        ) : (
+                          <div className="w-5 h-5 shrink-0" />
+                        )}
+                        <div className="text-[10px] sm:text-[12px] font-medium text-white leading-none">{MONTH_LABEL}.{day}</div>
                       </div>
                     );
                   })}
@@ -1744,20 +1759,22 @@ function MainApp() {
         })()}
 
         {activeTab === "vip" && (
-          <div className="absolute inset-0 z-50 bg-gradient-to-b from-[#1A237E] to-[#0D1333] flex flex-col font-sans text-white overflow-y-auto w-full h-full pb-safe">
-            {/* Header */}
-            <div className="flex items-center h-[56px] px-4 sticky top-0 z-20 w-full flex-shrink-0 relative bg-gradient-to-b from-[#1A237E] to-[#1A237E]/90 backdrop-blur-md">
+          <div className="absolute inset-0 z-50 bg-[#0D1333] flex flex-col font-sans text-white overflow-hidden w-full h-full pb-safe">
+            {/* Header Navbar */}
+            <div className="flex items-center h-[56px] px-4 w-full flex-shrink-0 relative bg-[#1A237E] z-20">
               <button className="flex items-center justify-center cursor-pointer absolute left-4 active:scale-95" onClick={() => setActiveTab("home")}>
                 <ChevronLeft className="w-6 h-6 text-white" />
               </button>
               <div className="flex-1 text-center font-semibold text-[18px]">VIP</div>
             </div>
 
-            {/* Content  */}
-            <div className="flex-1 overflow-y-auto px-6 pb-8 relative flex flex-col items-center">
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto scrollbar-hide relative flex flex-col items-center w-full">
               
+              {/* Top blue background area */}
+              <div className="bg-[#1A237E] w-full pt-2 pb-[50px] relative flex flex-col items-center flex-shrink-0 rounded-b-[32px] px-6">
               {/* Stepper */}
-              <div className="w-full flex items-center justify-between py-6 relative z-10">
+              <div className="w-full flex items-center justify-between py-3 relative z-10">
                 <div className="absolute top-[34px] left-[10%] right-[10%] h-[2px] bg-white/40 -z-10" />
                 {VIP_LEVELS.slice(Math.max(0, Math.min(currentVipIndex - 1, VIP_LEVELS.length - 4)), Math.max(0, Math.min(currentVipIndex - 1, VIP_LEVELS.length - 4)) + 4).map((level, idx, arr) => {
                   const isActive = level.levelIndex === currentVipIndex;
@@ -1777,18 +1794,21 @@ function MainApp() {
               </div>
 
               {/* Tier Badge Hero */}
-              <div className="relative w-full py-4 flex flex-col items-center justify-center mb-4">
-                <div className="absolute w-[160px] h-[160px] bg-[#E91E63]/40 blur-[20px] rounded-full mix-blend-screen -z-10" />
-                <RankBadge rankName={currentVipLevel.name} size={160} />
+              <div className="relative w-full py-2 flex flex-col items-center justify-center mb-2">
+                <div className="absolute w-[120px] h-[120px] bg-[#E91E63]/40 blur-[20px] rounded-full mix-blend-screen -z-10" />
+                <RankBadge rankName={currentVipLevel.name} size={120} />
+              </div>
               </div>
 
+              {/* Body area */}
+              <div className="w-full px-6 pb-2 flex flex-col items-center -mt-[30px] relative z-20">
               {/* Status Card */}
-              <div className="w-full bg-gradient-to-br from-[#FFD54F] to-[#FFB300] rounded-[16px] p-4 shadow-xl relative overflow-hidden mb-6">
+              <div className="w-full bg-gradient-to-br from-[#FFD54F] to-[#FFB300] rounded-[16px] p-3 shadow-xl relative overflow-hidden mb-4">
                 
-                <div className="flex items-center gap-4 mb-5 relative z-10">
+                <div className="flex items-center gap-3 mb-3 relative z-10">
                   <button 
                     onClick={() => document.getElementById('avatar-upload')?.click()}
-                    className="w-12 h-12 rounded-full border-2 border-white/50 bg-black/10 flex shrink-0 items-center justify-center shadow-sm overflow-hidden relative cursor-pointer"
+                    className="w-10 h-10 rounded-full border-2 border-white/50 bg-black/10 flex shrink-0 items-center justify-center shadow-sm overflow-hidden relative cursor-pointer"
                   >
                     {currentUser?.avatar ? (
                       <img src={currentUser.avatar} alt="Avatar" className="w-full h-full object-cover rounded-full" />
@@ -1810,33 +1830,33 @@ function MainApp() {
                 {viewVipIndex < actualVipIndex ? (
                   <button 
                     disabled
-                    className="w-full min-h-[44px] py-2 bg-black/10 text-[#212121] rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 transition-colors">
+                    className="w-full min-h-[36px] py-1 bg-black/10 text-[#212121] rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 transition-colors">
                     <span className="text-[14px]">Level Unlocked</span>
                   </button>
                 ) : viewVipIndex > actualVipIndex ? (
                   <button 
                     disabled
-                    className="w-full min-h-[44px] py-2 bg-black/10 text-[#212121]/50 rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 transition-colors">
+                    className="w-full min-h-[36px] py-1 bg-black/10 text-[#212121]/50 rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 transition-colors">
                     <span className="text-[14px]">Reach {currentVipLevel.name} first</span>
                   </button>
                 ) : nextVipLevel ? (
                   canUpgrade ? (
                     <button 
                       onClick={handleUpgradeVip}
-                      className="w-full min-h-[44px] py-2 bg-gradient-to-r from-[#7B1FA2] to-[#9C27B0] text-white rounded-[12px] font-semibold flex items-center justify-center px-4 active:scale-95 transition-transform shadow-[0_4px_10px_rgba(156,39,176,0.3)] relative z-10">
+                      className="w-full min-h-[36px] py-1 bg-gradient-to-r from-[#7B1FA2] to-[#9C27B0] text-white rounded-[12px] font-semibold flex items-center justify-center px-4 active:scale-95 transition-transform shadow-[0_4px_10px_rgba(156,39,176,0.3)] relative z-10">
                       <span className="text-[14px]">Upgrade to {nextVipLevel.name}</span>
                     </button>
                   ) : (
                     <button 
                       disabled
-                      className="w-full min-h-[44px] py-3 h-auto bg-gradient-to-r from-[#7B1FA2] to-[#9C27B0] text-white/90 rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 opacity-70 cursor-not-allowed">
+                      className="w-full min-h-[36px] py-1.5 h-auto bg-gradient-to-r from-[#7B1FA2] to-[#9C27B0] text-white/90 rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 opacity-70 cursor-not-allowed">
                       <span className="text-[14px] leading-tight text-center">Update with {nextVipLevel.requiredTotal} active friends to become {nextVipLevel.name} ({currentReferrals}/{nextVipLevel.requiredTotal})</span>
                     </button>
                   )
                 ) : (
                   <button 
                     disabled
-                    className="w-full min-h-[44px] py-2 bg-black/10 text-[#212121] rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 transition-colors">
+                    className="w-full min-h-[36px] py-1 bg-black/10 text-[#212121] rounded-[12px] font-semibold flex items-center justify-center px-4 relative z-10 transition-colors">
                     <span className="text-[14px]">Max Level Reached</span>
                   </button>
                 )}
@@ -1844,23 +1864,23 @@ function MainApp() {
 
               {/* Benefits Section */}
               <div className="w-full flex justify-start">
-                <div className="flex flex-col gap-4 text-left">
-                  <h3 className="text-[#FFB300] font-medium text-[15px] mb-2">{currentVipLevel.name} Privileges</h3>
+                <div className="flex flex-col gap-1.5 text-left">
+                  <h3 className="text-[#FFB300] font-medium text-[15px] mb-1">{currentVipLevel.name} Privileges</h3>
                   
-                  <p className="text-white/85 font-normal text-[14px] leading-relaxed">
+                  <p className="text-white/85 font-normal text-[13px] leading-relaxed">
                     Exclusive {currentVipLevel.name} Member Project available.
                   </p>
                   
                   {VIP_MEMBER_EXCLUSIVE_TIERS[currentVipLevel.name] && (
                     <>
-                      <p className="text-white/85 font-normal text-[14px] leading-relaxed">
+                      <p className="text-white/85 font-normal text-[13px] leading-relaxed">
                         Earn extra ₦{VIP_MEMBER_EXCLUSIVE_TIERS[currentVipLevel.name].dailyIncome.toLocaleString()}/day (total value ₦{VIP_MEMBER_EXCLUSIVE_TIERS[currentVipLevel.name].totalRevenue.toLocaleString()}).
                       </p>
                     </>
                   )}
                   
                   {EQUITY_EXCHANGE_TIERS[currentVipLevel.name] && (
-                    <p className="text-white/85 font-normal text-[14px] leading-relaxed">
+                    <p className="text-white/85 font-normal text-[13px] leading-relaxed">
                       EQ smart wallet transaction limit of ₦{EQUITY_EXCHANGE_TIERS[currentVipLevel.name].get24h.toLocaleString()}/day. ({EQUITY_EXCHANGE_TIERS[currentVipLevel.name].discount}% discount)
                     </p>
                   )}
@@ -1869,7 +1889,7 @@ function MainApp() {
                     <button
                       onClick={handleUpgradeVip}
                       disabled={!canUpgrade}
-                      className="w-full mt-4 h-[44px] bg-gradient-to-r from-[#FFB300] to-[#FFD54F] text-[#212121] rounded-[12px] font-semibold flex items-center justify-center px-4 active:scale-95 transition-transform shadow-[0_4px_10px_rgba(255,179,0,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full mt-2 h-[36px] bg-gradient-to-r from-[#FFB300] to-[#FFD54F] text-[#212121] rounded-[12px] font-semibold flex items-center justify-center px-4 active:scale-95 transition-transform shadow-[0_4px_10px_rgba(255,179,0,0.3)] disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <span className="text-[14px]">
                         {canUpgrade ? `Congratulations! Upgrade to ${nextVipLevel.name}` : `Need ${nextVipLevel.requiredTotal} friends to reach ${nextVipLevel.name}`}
@@ -1879,6 +1899,7 @@ function MainApp() {
                 </div>
               </div>
 
+              </div>
             </div>
           </div>
         )}
@@ -2318,7 +2339,7 @@ function MainApp() {
                   
                         <div className="flex flex-col relative z-10">
                           <span className="text-white text-[12px] opacity-80 mb-1">Total commission</span>
-                          <span className="text-white text-[28px] font-black">₦ {formatCurrency(totalCommissionEarned)}</span>
+                          <span className="text-white text-[28px] font-black">{formatCurrency(totalCommissionEarned)}</span>
                         </div>
                   <div className="relative z-10 w-[52px] h-[52px] rounded-full flex items-center justify-center border-[2px] border-white/10 shadow-[0_0_15px_rgba(123,47,255,0.4)]" style={{ background: 'linear-gradient(135deg, rgba(123,47,255,0.2) 0%, rgba(77,168,255,0.2) 100%)' }}>
                     <Users className="w-[24px] h-[24px] text-[#4DA8FF]" />
@@ -2331,26 +2352,26 @@ function MainApp() {
                         {/* Row 1 */}
                         <div className="flex gap-3">
                           <div className="flex-1 bg-white rounded-[16px] p-4 flex flex-col items-center justify-center text-center shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
-                            <span className="text-[#7B2FFF] text-[18px] font-black leading-tight mb-0.5">₦ {formatCurrency(totalTeamRechargeAmount)}</span>
+                            <span className="text-[#7B2FFF] text-[18px] font-black leading-tight mb-0.5">{formatCurrency(totalTeamRechargeAmount)}</span>
                             <span className="text-[#8A8A9E] text-[10px] font-bold">Team total<br/>recharge</span>
                           </div>
                           <div className="flex-1 bg-white rounded-[16px] p-4 flex flex-col items-center justify-center text-center shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
-                            <span className="text-[#7B2FFF] text-[18px] font-black leading-tight mb-0.5">₦ {formatCurrency(totalTeamInvestAmount)}</span>
+                            <span className="text-[#7B2FFF] text-[18px] font-black leading-tight mb-0.5">{formatCurrency(totalTeamInvestAmount)}</span>
                             <span className="text-[#8A8A9E] text-[10px] font-bold">Total team<br/>invest</span>
                           </div>
                         </div>
                         {/* Row 2 */}
                         <div className="flex gap-3">
                           <div className="flex-1 bg-white rounded-[16px] p-3 flex flex-col items-center justify-center text-center shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
-                            <span className="text-[#7B2FFF] text-[15px] font-black leading-tight mb-0.5">₦ {formatCurrency(totalYesterdayCommission)}</span>
+                            <span className="text-[#7B2FFF] text-[15px] font-black leading-tight mb-0.5">{formatCurrency(totalYesterdayCommission)}</span>
                             <span className="text-[#8A8A9E] text-[9px] font-bold">Yesterday's<br/>commission</span>
                           </div>
                           <div className="flex-1 bg-white rounded-[16px] p-3 flex flex-col items-center justify-center text-center shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
-                            <span className="text-[#7B2FFF] text-[15px] font-black leading-tight mb-0.5">₦ {formatCurrency(totalCommissionEarned)}</span>
+                            <span className="text-[#7B2FFF] text-[15px] font-black leading-tight mb-0.5">{formatCurrency(totalCommissionEarned)}</span>
                             <span className="text-[#8A8A9E] text-[9px] font-bold">Team<br/>Commission</span>
                           </div>
                           <div className="flex-1 bg-white rounded-[16px] p-3 flex flex-col items-center justify-center text-center shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
-                            <span className="text-[#7B2FFF] text-[15px] font-black leading-tight mb-0.5">₦ {formatCurrency(totalTodayCommission)}</span>
+                            <span className="text-[#7B2FFF] text-[15px] font-black leading-tight mb-0.5">{formatCurrency(totalTodayCommission)}</span>
                             <span className="text-[#8A8A9E] text-[9px] font-bold">Today's<br/>commission</span>
                           </div>
                         </div>
@@ -2455,7 +2476,7 @@ function MainApp() {
                                   </div>
                                 </div>
                                 <div className="flex flex-col items-end">
-                                  <span className="text-[#4DA8FF] text-[14px] font-black tracking-tight">+₦{formatCurrency(member.generatedComm)}</span>
+                                  <span className="text-[#4DA8FF] text-[14px] font-black tracking-tight">+{formatCurrency(member.generatedComm)}</span>
                                   <span className="text-white/40 text-[9px] font-bold uppercase tracking-wider mt-0.5">Contribution</span>
                                 </div>
                               </div>
@@ -2532,8 +2553,8 @@ function MainApp() {
                                          <span className="text-[#FFA500] text-[10px] font-bold tracking-wide">VIP{user.vipLevelIndex || 0}</span>
                                        </div>
                                         <div className="text-right mt-1">
-                                          <div className="text-white text-[10px] font-bold mb-0.5">Inv: ₦{formatCurrency(rfInvests.reduce((a,b)=>a+b.amount,0))}</div>
-                                          <div className="text-white/70 text-[9px]">Dep: ₦{formatCurrency(rfRecharges.reduce((a,b)=>a+b.amount,0))}</div>
+                                          <div className="text-white text-[10px] font-bold mb-0.5">Inv: {formatCurrency(rfInvests.reduce((a,b)=>a+b.amount,0))}</div>
+                                          <div className="text-white/70 text-[9px]">Dep: {formatCurrency(rfRecharges.reduce((a,b)=>a+b.amount,0))}</div>
                                         </div>
                                     </div>
                                   </div>
@@ -2607,7 +2628,7 @@ function MainApp() {
                 const isActive = p.status ? p.status === 'active' : true;
                 if (p.promoClosingDate && new Date(p.promoClosingDate).getTime() < Date.now()) return false;
                 if (!isActive) return false;
-                if (productTab === 'special') return pType === 'special' || isVip;
+                if (productTab === 'special') return pType === 'special';
                 if (productTab === 'vip') return isVip;
                 return pType === productTab.toLowerCase();
               }).length === 0 ? (
@@ -2625,9 +2646,19 @@ function MainApp() {
                   const isActive = p.status ? p.status === 'active' : (p.is_active !== false);
                   if (p.promoClosingDate && new Date(p.promoClosingDate).getTime() < Date.now()) return false;
                   if (!isActive) return false;
-                  if (productTab === 'special') return pType === 'special' || isVip;
+                  if (productTab === 'special') return pType === 'special';
                   if (productTab === 'vip') return isVip;
                   return pType === productTab.toLowerCase() && !isVip;
+                }).sort((a: any, b: any) => {
+                  if (productTab === 'vip') {
+                    const order = ['eq equity exchange project', 'vip member exclusive project', 'vip team exclusive project'];
+                    const idxA = order.indexOf((a.name || '').toLowerCase());
+                    const idxB = order.indexOf((b.name || '').toLowerCase());
+                    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+                    if (idxA !== -1) return -1;
+                    if (idxB !== -1) return 1;
+                  }
+                  return (a.min || 0) - (b.min || 0);
                 }).map((plan: any) => {
                     let cost = plan.price || plan.min;
                     let roi = plan.total_income || plan.roi;
@@ -2671,7 +2702,7 @@ function MainApp() {
                       } as import('./store').Investment;
                       
                       const calculatedDailyReturn = getDailyIncome(mockInv, currentUser, users, investments);
-                      const totalIncome = calculatedDailyReturn * (plan.total_duration_days || plan.days || 1);
+                      const totalIncome = Number((calculatedDailyReturn * (plan.total_duration_days || plan.days || 1)).toFixed(2));
                       return (
                         <div key={plan.id} className="relative bg-[#F8F9FF] rounded-[20px] mb-6 shadow-sm overflow-hidden flex flex-col p-4">
                           {/* Image Header wrapper */}
@@ -2750,17 +2781,29 @@ function MainApp() {
                                 }
 
                                 if (plan.type === "vip" && VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex === 0) {
+                                  if (plan.name.toLowerCase() === 'vip team exclusive project') {
+                                    triggerVisualNotification("alert", "Notice", "You must be at least VIP9 to purchase the VIP Team Exclusive Project.");
+                                    return;
+                                  }
+                                  if (plan.name.toLowerCase() === 'vip member exclusive project') {
+                                    triggerVisualNotification("alert", "Notice", "You must be at least VIP1 to activate the VIP Member Exclusive Project.");
+                                    return;
+                                  }
                                   triggerVisualNotification("alert", "Notice", "This is a VIP product. You must be at least VIP1 to invest.");
                                   return;
                                 }
                                 
                                 if (plan.name.toLowerCase() === 'vip member exclusive project') {
-                                  if (VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex < 3) {
-                                    triggerVisualNotification("alert", "Notice", "You must be at least VIP3 to activate the VIP Member Exclusive Project.");
+                                  if (VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex < 1) {
+                                    triggerVisualNotification("alert", "Notice", "You must be at least VIP1 to activate the VIP Member Exclusive Project.");
                                     return;
                                   }
                                 }
                                 if (isVipTeam) {
+                                  if (VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex < 9) {
+                                    triggerVisualNotification("alert", "Notice", "You must be at least VIP9 to purchase the VIP Team Exclusive Project.");
+                                    return;
+                                  }
                                   const aLevelSubordinates = users.filter(u => u.referredBy === currentUser.referralCode).length;
                                   if (aLevelSubordinates < 30) {
                                     triggerVisualNotification("alert", "Notice", "You need at least 30 team members to purchase the VIP Team Exclusive Project.");
@@ -2883,6 +2926,14 @@ function MainApp() {
                                 }
 
                                 if (plan.type === "vip" && VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex === 0) {
+                                  if (plan.name.toLowerCase() === 'vip team exclusive project') {
+                                    triggerVisualNotification("alert", "Notice", "You must be at least VIP9 to purchase the VIP Team Exclusive Project.");
+                                    return;
+                                  }
+                                  if (plan.name.toLowerCase() === 'vip member exclusive project') {
+                                    triggerVisualNotification("alert", "Notice", "You must be at least VIP1 to activate the VIP Member Exclusive Project.");
+                                    return;
+                                  }
                                   triggerVisualNotification("alert", "Notice", "This is a VIP product. You must be at least VIP1 to invest.");
                                   return;
                                 }
@@ -2942,7 +2993,7 @@ function MainApp() {
   total_duration_days: plan.total_duration_days || plan.days,
                     } as import('./store').Investment;
                     const calculatedDailyReturn = getDailyIncome(mockInv, currentUser, users, investments);
-                    const totalIncome = calculatedDailyReturn * (plan.total_duration_days || plan.days || 1);
+                    const totalIncome = Number((calculatedDailyReturn * (plan.total_duration_days || plan.days || 1)).toFixed(2));
                     
                     return (
                       <div key={plan.id} className="relative bg-[#F8F9FF] rounded-[20px] mb-6 shadow-sm overflow-hidden flex flex-col p-4">
@@ -3011,6 +3062,14 @@ function MainApp() {
                               }
 
                               if (plan.type === "vip" && VIP_LEVELS[currentUser.vipLevelIndex || 0].levelIndex === 0) {
+                                if (plan.name.toLowerCase() === 'vip team exclusive project') {
+                                  triggerVisualNotification("alert", "Notice", "You must be at least VIP9 to purchase the VIP Team Exclusive Project.");
+                                  return;
+                                }
+                                if (plan.name.toLowerCase() === 'vip member exclusive project') {
+                                  triggerVisualNotification("alert", "Notice", "You must be at least VIP1 to activate the VIP Member Exclusive Project.");
+                                  return;
+                                }
                                 triggerVisualNotification("alert", "Notice", "This is a VIP product. You must be at least VIP1 to invest.");
                                 return;
                               }
@@ -3424,7 +3483,7 @@ function MainApp() {
           })()}
 
           {activeTab === "mine" && (
-            <div className="pb-6 relative z-10 w-full max-w-md mx-auto">
+            <div className="pb-0 relative z-10 w-full">
               {/* Profile Header */}
               <div className="flex justify-between items-center px-4 mb-5 mt-5">
                 <div className="flex items-center gap-3">
@@ -3474,103 +3533,131 @@ function MainApp() {
                 </button>
               </div>
 
-              {/* Balance Card */}
-              <div className="mx-4 mb-3 bg-[#FDD835] rounded-[16px] p-3 flex flex-col justify-between h-[95px] shadow-none">
-                <div className="flex flex-col">
-                  <div className="text-[12px] font-medium text-[#1A1A1A] leading-none mb-0.5">Account balance</div>
-                  <div className="text-[22px] font-bold text-[#1A1A1A] leading-none">₦ {formatCurrency(currentUser.balance)}</div>
-                </div>
-                <div className="flex gap-2 w-full">
-                  <button
-                    onClick={() => setActiveModal("deposit")}
-                    className="flex-1 bg-[#1A1A1A] text-[#FFFFFF] h-[28px] rounded-[14px] text-[11px] font-semibold flex items-center justify-center active:scale-95 transition-transform border-none"
-                  >
-                    Recharge
-                  </button>
-                  <button
-                    onClick={() => setActiveModal("withdraw")}
-                    className="flex-1 bg-[#1A1A1A] text-[#FFFFFF] h-[28px] rounded-[14px] text-[11px] font-semibold flex items-center justify-center active:scale-95 transition-transform border-none"
-                  >
-                    Withdraw
-                  </button>
-                </div>
-              </div>
+              {/* Container for Layout */}
+              <div className="mx-auto flex flex-col w-full self-center">
+                
+                <div className="-mx-1 w-[calc(100%+8px)]">
+                  {/* Account balance card */}
+                  <div className="bg-[#FDD835] rounded-[24px] w-full py-3 px-5 flex flex-col relative h-[65px] justify-between overflow-hidden shadow-sm">
+                    {/* Top Row: Account balance label */}
+                    <div className="flex w-full justify-start relative z-10">
+                      <div className="text-[11px] font-black text-[#1A1A1A] leading-none">Account balance</div>
+                    </div>
+                    
+                    {/* Bottom Row: Balance */}
+                    <div className="flex w-full justify-start relative z-10">
+                      <div className="text-[14px] font-black text-[#1A1A1A] leading-none tracking-tight">
+                        {formatCurrency(currentUser.balance)}
+                      </div>
+                    </div>
 
-              {/* Promo Card */}
-              <div className="mx-4 mb-5 bg-[#4A22D4] rounded-[16px] p-[2px] shadow-[0_0_20px_rgba(74,34,212,0.4)] relative h-[95px]">
-                <div className="w-full h-full border border-white/20 rounded-[14px] relative overflow-hidden flex flex-col items-center justify-center flex-1 px-3 py-2 gap-2">
-                  <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-r from-transparent to-white/10 pointer-events-none" />
-                  
-                  <div className="text-[16px] font-extrabold text-white leading-tight drop-shadow-md z-10 w-full relative text-center tracking-wide">
-                    RESCUE PRESENTS
+                    {/* Middle Right: Buttons */}
+                    <div className="absolute right-6 top-1/2 -translate-y-1/2 flex gap-2 z-10">
+                      <button
+                        onClick={() => setActiveModal("deposit")}
+                        className="w-[55px] bg-[#1A1A1A] text-[#FFFFFF] h-[26px] rounded-[13px] text-[8.5px] font-semibold flex items-center justify-center active:scale-95 transition-transform border-none shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
+                      >
+                        Recharge
+                      </button>
+                      <button
+                        onClick={() => setActiveModal("withdraw")}
+                        className="w-[55px] bg-[#1A1A1A] text-[#FFFFFF] h-[26px] rounded-[13px] text-[8.5px] font-semibold flex items-center justify-center active:scale-95 transition-transform border-none shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
+                      >
+                        Withdraw
+                      </button>
+                    </div>
                   </div>
-                  <button
-                    className="bg-[#FF4FA3] text-white px-2 h-[26px] rounded-[13px] text-[10px] font-bold uppercase tracking-wider flex items-center justify-center active:scale-95 transition-transform w-[120px] shadow-sm border-none z-10 relative"
+                </div>
+                
+                {/* Spacing 16px gap with purple background */}
+                <div className="h-4 w-full"></div>
+
+                {/* Main container */}
+                <div className="bg-[#1E5BFF] rounded-t-[32px] pb-[136px] pt-6 px-4 -mx-5 -mb-32 flex flex-col w-[calc(100%+40px)] shadow-[0_-4px_20px_rgba(0,0,0,0.15)] min-h-[calc(100vh-300px)]">
+                  
+                  {/* Top: Promo Card */}
+                  <div 
+                    className="bg-[#1A0B2E] rounded-[16px] p-[14px] px-4 flex relative overflow-hidden shadow-[0_4px_20px_rgba(45,10,78,0.5)] cursor-pointer active:scale-[0.98] transition-transform group"
                     onClick={() => setActiveModal("redemptionCode")}
                   >
-                    Check presents
-                  </button>
-                  
-                  <div className="absolute right-4 bottom-1 w-[40px] h-[40px] flex items-center justify-center rotate-12 z-10 shrink-0 brightness-110 drop-shadow-xl">
-                    <Gift className="w-[30px] h-[30px] text-[#FF4FA3]" strokeWidth={1.5} />
-                  </div>
-                </div>
-              </div>
-
-              {/* Menu Container */}
-              <div className="mx-4 mb-5 bg-white rounded-2xl overflow-hidden shadow-lg">
-                {[
-                  { icon: FileText, label: "Funding details", action: () => setActiveModal("fundingDetails") },
-                  { icon: ClipboardList, label: "Commission Record", action: () => setActiveModal("commissionRecord") },
-                  { icon: BarChart2, label: "Income Record", action: () => setActiveModal("incomeRecord") },
-                  { icon: Landmark, label: "Bank account", action: () => {
-                    setBankAccountNumber(currentUser.bankDetails?.accountNumber || "");
-                    setSelectedBankCode(currentUser.bankDetails?.bankCode || "");
-                    setBankAccountName(currentUser.bankDetails?.accountName || "");
-                    setIsEditingBank(false);
-                    setActiveModal("bankDetails");
-                  } },
-                  { icon: Info, label: "About us", action: () => setActiveModal("about") },
-                  { icon: Settings, label: "Set Up", action: () => setActiveModal("setup") },
-                  { icon: Download, label: "Download", action: () => handleDownloadApp() },
-                ].map((item, index, arr) => {
-                  const badgeCount = item.label === "Customer Support" 
-                    ? chatMessages.filter(m => currentUser?.role === 'admin' 
-                        ? !m.receiverId && m.senderId !== currentUser?.id 
-                        : m.receiverId === currentUser?.id).length 
-                    : 0;
-
-                  return (
-                  <div
-                    key={index}
-                    onClick={item.action}
-                    className={`flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors text-black text-[15px] ${
-                      index !== arr.length - 1 ? 'border-b border-gray-100' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <item.icon className="w-5 h-5 text-gray-500 opacity-80" />
-                      <span className="font-medium">{item.label}</span>
+                    {/* Dark purple gradient background */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#3b0a6d] via-[#1a0b2e] to-[#0a001a] z-0 pointer-events-none" />
+                    
+                    {/* Bling mercury glow effects */}
+                    <div className="absolute -top-[40px] -right-[20px] w-[120px] h-[120px] bg-[#E0E7FF]/20 rounded-full blur-[30px] z-0 pointer-events-none transition-opacity group-hover:opacity-100 opacity-60" />
+                    <div className="absolute -bottom-[30px] -left-[20px] w-[100px] h-[100px] bg-[#FF4FA3]/20 rounded-full blur-[25px] z-0 pointer-events-none" />
+                    
+                    {/* Thin mercury top & bottom lines */}
+                    <div className="absolute top-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-[#E0E7FF]/80 to-transparent shadow-[0_0_10px_#ffffff] z-10" />
+                    <div className="absolute bottom-0 left-[10%] right-[10%] h-[1px] bg-gradient-to-r from-transparent via-[#8630A1]/60 to-transparent z-10" />
+                    
+                    {/* Glass border overlay */}
+                    <div className="absolute inset-0 border-[0.5px] border-white/10 rounded-[16px] z-10 pointer-events-none" />
+                    
+                    <div className="w-[45px] h-[45px] flex items-center justify-center rotate-12 shrink-0 brightness-110 drop-shadow-[0_0_15px_rgba(255,79,163,0.4)] bg-white/5 rounded-full absolute right-4 top-3 z-10 border-[0.5px] border-[#FF4FA3]/30 backdrop-blur-sm">
+                      <Gift className="w-[28px] h-[28px] text-[#FF4FA3]" strokeWidth={1.5} />
                     </div>
-                    <div className="flex items-center gap-3">
-                      {item.label === "Customer Support" && badgeCount > 0 && (
-                        <span className="bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
-                          {badgeCount}
-                        </span>
-                      )}
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
+
+                    <div className="flex flex-col gap-2 flex-1 z-10 relative pr-[50px]">
+                      <div className="text-[16px] font-black bg-gradient-to-r from-[#FDD835] via-[#FF4FA3] to-[#4AD2FF] text-transparent bg-clip-text leading-tight w-full tracking-wide drop-shadow-[0_0_8px_rgba(255,79,163,0.3)]">
+                        RESCUE PRESENTS
+                      </div>
+                      <button
+                        className="bg-gradient-to-r from-[#FF4FA3] to-[#D53F8C] text-white px-3 h-[28px] rounded-[14px] text-[7.5px] sm:text-[8px] font-bold uppercase tracking-wider flex items-center justify-center active:scale-95 transition-transform w-fit shadow-[0_2px_10px_rgba(255,79,163,0.4)] border-[0.5px] border-white/20 text-center leading-[1.2]"
+                        onClick={(e) => { e.stopPropagation(); setActiveModal("redemptionCode"); }}
+                      >
+                        Rescue presents of great value with a click
+                      </button>
                     </div>
                   </div>
-                )})}
-                <div
-                  onClick={logout}
-                  className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors text-red-500 font-bold border-t border-gray-100 text-[15px]"
-                >
-                  <div className="flex items-center gap-3">
-                    <LogOut className="w-5 h-5 text-red-400 opacity-80" />
-                    <span>Log Out</span>
+
+                  {/* Spacing 16px gap */}
+                  <div className="h-4 w-full"></div>
+
+                  {/* Bottom: Menu Container */}
+                  <div className="bg-white rounded-[16px] overflow-hidden flex flex-col shadow-sm">
+                    {[
+                      { icon: FileText, label: "Funding details", action: () => setActiveModal("fundingDetails") },
+                      { icon: ClipboardList, label: "Commission Record", action: () => setActiveModal("commissionRecord") },
+                      { icon: BarChart2, label: "Income Record", action: () => setActiveModal("incomeRecord") },
+                      { icon: Landmark, label: "Bank account", action: () => {
+                        setBankAccountNumber(currentUser.bankDetails?.accountNumber || "");
+                        setSelectedBankCode(currentUser.bankDetails?.bankCode || "");
+                        setBankAccountName(currentUser.bankDetails?.accountName || "");
+                        setIsEditingBank(false);
+                        setActiveModal("bankDetails");
+                      } },
+                      { icon: Info, label: "About us", action: () => setActiveModal("about") },
+                      { icon: Download, label: "Download", action: () => handleDownloadApp() },
+                    ].map((item, index, arr) => (
+                      <div
+                        key={index}
+                        onClick={item.action}
+                        className={`flex items-center justify-between px-4 py-[14px] cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors text-black ${
+                          index !== arr.length - 1 ? 'border-b border-[#F5F5F5]' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <item.icon className="w-[22px] h-[22px] text-gray-600 opacity-90" strokeWidth={1.8} />
+                          <span className="font-medium text-[16px] text-gray-800">{item.label}</span>
+                        </div>
+                        <ChevronRight className="w-[18px] h-[18px] text-gray-400 opacity-40" strokeWidth={2} />
+                      </div>
+                    ))}
+                    
+                    {/* Log Out Button */}
+                    <div
+                      onClick={logout}
+                      className="flex items-center justify-between px-4 py-[14px] cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors text-red-500 border-t border-[#F5F5F5]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <LogOut className="w-[22px] h-[22px] text-red-400 opacity-90" strokeWidth={1.8} />
+                        <span className="font-medium text-[16px]">Log Out</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
+
               </div>
             </div>
           )}
@@ -3748,7 +3835,7 @@ function MainApp() {
                               <span className="text-[10px] bg-white/10 text-white px-2 py-0.5 rounded font-black">{p.days}d</span>
                               <span className="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded font-black">T+{p.tPlusDays || 1}</span>
                               {p.maxQuota ? <span className="text-[10px] bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-black">Quota: {p.maxQuota}</span> : null}
-                              {p.audienceType && p.audienceType !== 'all' ? <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded font-black uppercase">{p.audienceType} Only</span> : null}
+                              {getAudienceType(p) !== 'all' ? <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded font-black uppercase">{getAudienceType(p)} Only</span> : null}
                             </div>
                           </div>
                         </div>
@@ -3775,7 +3862,7 @@ function MainApp() {
                               setNewProductTPlusDays(p.tPlusDays?.toString() || "1");
                               setNewProductQuota(p.maxQuota?.toString() || "0");
                               setNewProductType(p.type as any);
-                              setNewProductAudienceType(p.audienceType || "all");
+                              setNewProductAudienceType(getAudienceType(p));
                               setNewProductImageUrl(p.imageUrl || "");
                               
                               let unlockD = "", unlockH = "", unlockM = "", unlockS = "";
@@ -5077,7 +5164,7 @@ function MainApp() {
                 </button>
                 <div className="flex flex-col items-center mt-2 opacity-80 pb-2">
                   <span className="text-white text-[12px] text-center">
-                    Earn <span className="font-bold text-[#FFD700]">₦10,000</span> for every new VIP level your invitee unlocks!
+                    Earn <span className="font-bold text-[#FFD700]">₦1,500</span> for every new VIP level your invitee unlocks!
                   </span>
                 </div>
               </div>
@@ -5667,7 +5754,7 @@ function MainApp() {
                 <button 
                   disabled={isProcessing}
                   onClick={async () => {
-                    await handleInvest(equinorSelectedPlan.name, equinorSelectedPlan.buyAmount, equinorSelectedPlan.roi, equinorSelectedPlan.days || 30, equinorSelectedPlan.type, equinorSelectedPlan.fixedDailyReturn, equinorSelectedPlan.tPlusDays, Number(buyingQuantity), equinorSelectedPlan.total_duration_days || equinorSelectedPlan.days || 30, equinorSelectedPlan.payout_cycle_days || equinorSelectedPlan.tPlusDays || 1, equinorSelectedPlan.audienceType);
+                    await handleInvest(equinorSelectedPlan.name, equinorSelectedPlan.buyAmount, equinorSelectedPlan.roi, equinorSelectedPlan.days || 30, equinorSelectedPlan.type, equinorSelectedPlan.fixedDailyReturn, equinorSelectedPlan.tPlusDays, Number(buyingQuantity), equinorSelectedPlan.total_duration_days || equinorSelectedPlan.days || 30, equinorSelectedPlan.payout_cycle_days || equinorSelectedPlan.tPlusDays || 1, getAudienceType(equinorSelectedPlan));
                     setOrderTab(equinorSelectedPlan.type as any);
                     setActiveTab("order");
                   }}
@@ -6123,7 +6210,7 @@ function MainApp() {
                           </div>
                           <div className="flex flex-col items-end gap-1">
                             <span className={`font-bold text-[16px] ${t.type === 'deposit' ? 'text-[#00D4FF]' : 'text-[#FF4DA8]'}`}>
-                              {t.type === 'deposit' ? '+' : '-'}₦{formatCurrency(t.amount)}
+                              {t.type === 'deposit' ? '+' : '-'}{formatCurrency(t.amount)}
                             </span>
                             <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full flex items-center gap-1.5 ${t.status === 'completed' ? 'bg-green-500/20 text-green-400' : t.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
                               {t.status === 'completed' && <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shadow-[0_0_5px_rgba(74,222,128,0.8)]"></span>}
@@ -6321,7 +6408,20 @@ function MainApp() {
                       const finalReference = depositReference.trim() || `User ${currentUser?.referralCode || 'USDT Deposit'}`;
 
                       setIsProcessing(true);
+                      const todayTransactions = transactions.filter(t => t.userId === currentUser?.id && t.type === 'deposit' && new Date(t.date).toDateString() === new Date().toDateString());
+                      const depositCount = todayTransactions.length;
+                      let totalTime = 2000;
+                      if (depositCount === 1) totalTime = 3000;
+                      else if (depositCount === 2) totalTime = 4000;
+                      else if (depositCount >= 3) totalTime = 5000;
+                      const stepTime = Math.floor(totalTime / 3);
+
                       setPaymentProcessingState({ step: 1, message: "Verifying transaction on the blockchain..." });
+                      await new Promise(r => setTimeout(r, stepTime));
+                      setPaymentProcessingState({ step: 2, message: "Awaiting blockchain confirmation..." });
+                      await new Promise(r => setTimeout(r, stepTime));
+                      setPaymentProcessingState({ step: 3, message: "Finalizing request..." });
+                      await new Promise(r => setTimeout(r, stepTime));
                       const { success } = await requestDeposit(amt, finalReference, { bankName: 'USDT', accountNumber: 'TRC20 Wallet', accountName: 'Equinor USDT' }, currentUser?.bankDetails);
                       if (!success) {
                         setPaymentProcessingState(null);
@@ -6462,17 +6562,6 @@ function MainApp() {
                 <p className="text-xs text-slate-500">
                   Kindly forward your bank deposit receipt to the marketing manager to confirm and verify your payment.
                 </p>
-                <input
-                  type="text"
-                  placeholder={`e.g. Deposit for ID: ${currentUser?.referralCode}`}
-                  value={depositReference}
-                  onChange={e => {
-                    setDepositReference(e.target.value);
-                    if (depositCheckoutStep < 3) setDepositCheckoutStep(3);
-                  }}
-                  onFocus={() => setDepositCheckoutStep(3)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
-                />
               </div>
 
               <button
@@ -6488,12 +6577,20 @@ function MainApp() {
                   const finalReference = depositReference.trim() || `User ${currentUser?.referralCode || 'Deposit'}`;
 
                   setIsProcessing(true);
+                  const todayTransactions = transactions.filter(t => t.userId === currentUser?.id && t.type === 'deposit' && new Date(t.date).toDateString() === new Date().toDateString());
+                  const depositCount = todayTransactions.length;
+                  let totalTime = 2000;
+                  if (depositCount === 1) totalTime = 3000;
+                  else if (depositCount === 2) totalTime = 4000;
+                  else if (depositCount >= 3) totalTime = 5000;
+                  const stepTime = Math.floor(totalTime / 3);
+                  
                   setPaymentProcessingState({ step: 1, message: "Verifying transaction with the bank..." });
-                  await new Promise(r => setTimeout(r, 1000));
+                  await new Promise(r => setTimeout(r, stepTime));
                   setPaymentProcessingState({ step: 2, message: "Awaiting Bank confirmation..." });
-                  await new Promise(r => setTimeout(r, 1000));
+                  await new Promise(r => setTimeout(r, stepTime));
                   setPaymentProcessingState({ step: 3, message: "Finalizing request..." });
-                  await new Promise(r => setTimeout(r, 1000));
+                  await new Promise(r => setTimeout(r, stepTime));
                   const targetAccount = systemDepositAccounts[depositCheckoutAccountIndex % systemDepositAccounts.length];
                   const { success } = await requestDeposit(amt, finalReference, targetAccount, currentUser?.bankDetails);
                   if (!success) {
@@ -6618,7 +6715,7 @@ function MainApp() {
               <div className="h-[1px] bg-white/20 my-4" />
 
               <div className="flex justify-between items-center mb-4">
-                 <span className="text-sm font-medium text-white/80">Total balance: ₦{formatCurrency(currentUser?.balance || 0)}</span>
+                 <span className="text-sm font-medium text-white/80">Total balance: {formatCurrency(currentUser?.balance || 0)}</span>
                  <button 
                    role="button" 
                    onClick={() => {
@@ -6669,7 +6766,7 @@ function MainApp() {
                           <span className="text-white/50 text-xs">{new Date(w.date).toLocaleString()}</span>
                         </div>
                         <div className="flex flex-col items-end">
-                          <span className="text-white font-bold text-lg">₦{formatCurrency(w.amount)}</span>
+                          <span className="text-white font-bold text-lg">{formatCurrency(w.amount)}</span>
                           <span className={`text-xs font-bold ${w.status === 'approved' ? 'text-green-400' : w.status === 'rejected' ? 'text-red-400' : 'text-amber-400'}`}>
                             {w.status.toUpperCase()}
                           </span>
@@ -6767,7 +6864,7 @@ function MainApp() {
             <div className="px-4 mt-4 shrink-0 z-10 mb-4">
               <div className="w-full h-[48px] rounded-[56px] bg-gradient-to-r from-[#7B2FF7] to-[#3A0CA3] flex flex-row items-center justify-between px-6 shadow-lg">
                 <span className="text-sm font-medium text-white/70">Commission</span>
-                <span className="text-xl font-bold text-white">₦ {formatCurrency(currentUser?.referralEarnings || 0)}</span>
+                <span className="text-xl font-bold text-white">{formatCurrency(currentUser?.referralEarnings || 0)}</span>
               </div>
             </div>
 
@@ -6797,7 +6894,7 @@ function MainApp() {
                             <span className="text-white/40 text-[10px] mt-0.5">From: {fromUserFull?.referralCode || "Unknown"}</span>
                           </div>
                           <div className="text-[#00D4FF] font-bold text-base">
-                            +₦{formatCurrency(c.amount)}
+                            +{formatCurrency(c.amount)}
                           </div>
                         </div>
                       );
@@ -6836,7 +6933,7 @@ function MainApp() {
               <div className="w-full h-[48px] rounded-[28px] bg-gradient-to-r from-[#7B2FF7] to-[#3A0CA3] flex flex-row items-center justify-between px-6 shadow-lg">
                 <span className="text-sm font-medium text-white/70">Total Collected Income</span>
                 <span className="text-xl font-bold text-white">
-                  ₦ {formatCurrency(incomeRecords.filter(r => r.userId === currentUser?.id).reduce((sum, r) => sum + r.amount, 0))}
+                  {formatCurrency(incomeRecords.filter(r => r.userId === currentUser?.id).reduce((sum, r) => sum + r.amount, 0))}
                 </span>
               </div>
             </div>
@@ -6864,7 +6961,7 @@ function MainApp() {
                           <span className="text-white/60 text-[10px] mt-0.5">{new Date(record.date).toLocaleString()}</span>
                         </div>
                         <div className="text-[#00D4FF] font-bold text-base">
-                          +₦{formatCurrency(record.amount)}
+                          +{formatCurrency(record.amount)}
                         </div>
                       </div>
                     ))}
@@ -6961,7 +7058,7 @@ function MainApp() {
                     setIsProcessingProduct(true);
                     const success = await addProduct({
                         name: newProductName,
-                        title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize }),
+                        title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize, audienceType: newProductAudienceType }),
                         description: newProductDescription,
                         roi: newProductFixedDaily ? (((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100 : Number(newProductRoi),
                         min: Number(newProductMin),
@@ -6969,7 +7066,6 @@ function MainApp() {
                         tPlusDays: Number(newProductTPlusDays),
                         maxQuota: Number(newProductQuota),
                         type: newProductType,
-                        audienceType: newProductAudienceType,
                         fixedDailyReturn: newProductFixedDaily ? Number(newProductFixedDaily) : undefined,
                         imageUrl: newProductImageUrl,
                         promotionalUnlockDate: getOffsetMs(newProductPromoUnlock) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoUnlock)).toISOString() : undefined,
@@ -7249,7 +7345,7 @@ function MainApp() {
                     setIsProcessingProduct(true);
                     await editProduct(editingProduct.id, {
                         name: newProductName,
-                        title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize }),
+                        title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize, audienceType: newProductAudienceType }),
                         description: newProductDescription,
                         roi: newProductFixedDaily ? (((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100 : Number(newProductRoi),
                         min: Number(newProductMin),
@@ -7257,7 +7353,6 @@ function MainApp() {
                         tPlusDays: Number(newProductTPlusDays),
                         maxQuota: Number(newProductQuota),
                         type: newProductType,
-                        audienceType: newProductAudienceType,
                         imageUrl: newProductImageUrl,
                         promotionalUnlockDate: getOffsetMs(newProductPromoUnlock) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoUnlock)).toISOString() : undefined,
                         promoClosingDate: getOffsetMs(newProductPromoClosing) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoClosing)).toISOString() : undefined
@@ -7803,12 +7898,7 @@ function MainApp() {
           let gradientEnd = "#16a34a";
           let rgbColor = "52,199,89";
 
-          if (successAnimType === "deposit") {
-            primaryColor = "#00E5FF";
-            gradientStart = "#67E8F9";
-            gradientEnd = "#0891B2";
-            rgbColor = "0,229,255";
-          } else if (successAnimType === "withdraw") {
+          if (successAnimType === "withdraw") {
             primaryColor = "#FF007F";
             gradientStart = "#F472B6";
             gradientEnd = "#BE185D";
@@ -8347,6 +8437,18 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     return (this as any).props.children;
   }
 }
+
+
+export const getAudienceType = (p: any) => {
+  if (p.audienceType) return p.audienceType;
+  if (p.type === 'redemption_code') return 'all';
+  try {
+    const parsed = JSON.parse(p.title || "{}");
+    return parsed.audienceType || "all";
+  } catch(e) {
+    return "all";
+  }
+};
 
 export default function App() {
   return (

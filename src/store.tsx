@@ -518,7 +518,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   useEffect(() => {
-    // Use Supabase realtime instead of aggressive polling
+    // Add aggressive polling as a fallback to ensure data reflects smoothly without refresh
+    const interval = setInterval(() => {
+      globalMutate('appData');
+    }, 5000);
+
     const subscription = supabase
       .channel('public_changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, (payload) => {
@@ -535,6 +539,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       .subscribe();
 
     return () => {
+      clearInterval(interval);
       supabase.removeChannel(subscription);
     };
   }, []);
@@ -1688,7 +1693,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     else if (taskId === "task4") planName = "VIP level";
     else if (taskId === "task5") planName = "Register and top up";
     
-    if (reward >= 0) {
+    if (reward > 0) {
       const dbRecord = {
         userId: currentUser.id,
         planName,
