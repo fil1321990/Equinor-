@@ -165,6 +165,7 @@ interface AppState {
   globalWithdrawalLimit: number;
   managerLink: string;
   showCSIcon: boolean;
+  showInAppCS: boolean;
   groupLink: string;
   systemDepositAccounts: SystemDepositAccount[];
   chatMessages: ChatMessage[];
@@ -196,6 +197,7 @@ interface AppContextType extends AppState {
   ) => void;
   updateContactLinks: (manager: string, group: string) => void;
   updateShowCSIcon: (show: boolean) => void;
+  updateShowInAppCS: (show: boolean) => void;
   disableUser: (userId: string) => void;
   enableUser: (userId: string) => void;
   restrictUserWithdrawals: (userId: string, restricted: boolean) => void;
@@ -284,6 +286,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [globalWithdrawalLimit, setGlobalWithdrawalLimit] = useState<number>(5000000);
   const [managerLink, setManagerLink] = useState<string>("https://t.me/manager");
   const [showCSIcon, setShowCSIcon] = useState<boolean>(true);
+  const [showInAppCS, setShowInAppCS] = useState<boolean>(true);
   const [groupLink, setGroupLink] = useState<string>("https://t.me/group");
   const [systemDepositAccounts, setSystemDepositAccounts] = useState<SystemDepositAccount[]>([]);
   const [users, setUsers] = useState<User[]>([]);
@@ -436,7 +439,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       if (settingsData) {
         setGlobalWithdrawalLimit(settingsData.globalWithdrawalLimit ?? 5000000);
         setManagerLink(settingsData.managerLink || "https://t.me/manager");
-        setShowCSIcon(settingsData.showCSIcon !== false);
+        
+        let csConfig = { whatsapp: true, inApp: true };
+        if (settingsData.adminWhatsApp) {
+          try {
+            if (settingsData.adminWhatsApp === "false" || settingsData.adminWhatsApp === "true") {
+               csConfig.whatsapp = settingsData.adminWhatsApp === "true";
+            } else {
+               csConfig = JSON.parse(settingsData.adminWhatsApp);
+            }
+          } catch(e) {}
+        }
+        setShowCSIcon(csConfig.whatsapp);
+        setShowInAppCS(csConfig.inApp);
         setGroupLink(settingsData.groupLink || "https://t.me/group");
         _setAnnouncement(settingsData.announcement || null);
         _setAdminUsdtAddress(settingsData.adminUsdtAddress || null);
@@ -500,7 +515,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       if (settingsData) {
         setGlobalWithdrawalLimit(settingsData.globalWithdrawalLimit ?? 5000000);
         setManagerLink(settingsData.managerLink || "https://t.me/manager");
-        setShowCSIcon(settingsData.showCSIcon !== false);
+        
+        let csConfig = { whatsapp: true, inApp: true };
+        if (settingsData.adminWhatsApp) {
+          try {
+            if (settingsData.adminWhatsApp === "false" || settingsData.adminWhatsApp === "true") {
+               csConfig.whatsapp = settingsData.adminWhatsApp === "true";
+            } else {
+               csConfig = JSON.parse(settingsData.adminWhatsApp);
+            }
+          } catch(e) {}
+        }
+        setShowCSIcon(csConfig.whatsapp);
+        setShowInAppCS(csConfig.inApp);
         setGroupLink(settingsData.groupLink || "https://t.me/group");
         _setAnnouncement(settingsData.announcement || null);
         _setAdminUsdtAddress(settingsData.adminUsdtAddress || null);
@@ -1155,7 +1182,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const updateShowCSIcon = async (show: boolean) => {
     setShowCSIcon(show);
-    await updateSetting('showCSIcon', show);
+    const newConfig = { whatsapp: show, inApp: showInAppCS };
+    await updateSetting('adminWhatsApp', JSON.stringify(newConfig));
+  };
+  
+  const updateShowInAppCS = async (show: boolean) => {
+    setShowInAppCS(show);
+    const newConfig = { whatsapp: showCSIcon,
+        showInAppCS, inApp: show };
+    await updateSetting('adminWhatsApp', JSON.stringify(newConfig));
   };
 
   const updateContactLinks = (manager: string, group: string) => {
@@ -1263,7 +1298,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       const dailyIncome = getDailyIncome(investment, currentUser, users, investments);
       const profitToCollect = (timeToCollectMs / msInADay) * dailyIncome;
       
-      const newLastCollected = new Date(lastCollected.getTime() + timeToCollectMs);
+      const newLastCollected = now;
       const isFinished = newLastCollected.getTime() >= endDate.getTime();
       
       const newStatus = isFinished ? "completed" : "active";
@@ -1374,7 +1409,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const profitToCollect = (timeToCollectMs / msInADay) * dailyIncome;
 
-    const newLastCollected = new Date(lastCollected.getTime() + timeToCollectMs);
+    const newLastCollected = now;
     const isFinished = newLastCollected.getTime() >= endDate.getTime();
     
     const newStatus = isFinished ? ("completed" as const) : ("active" as const);
@@ -1778,6 +1813,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         globalWithdrawalLimit,
         managerLink,
         showCSIcon,
+        showInAppCS,
         groupLink,
         systemDepositAccounts,
         chatMessages,
@@ -1794,6 +1830,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         updateUserWithdrawalLimit,
         updateContactLinks,
         updateShowCSIcon,
+        updateShowInAppCS,
         disableUser,
         enableUser,
         batchCollectEarnings,

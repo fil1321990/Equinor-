@@ -489,6 +489,8 @@ function MainApp() {
     groupLink,
     updateContactLinks,
     showCSIcon,
+    showInAppCS,
+    updateShowInAppCS,
     updateShowCSIcon,
     restrictUserWithdrawals,
     systemDepositAccounts,
@@ -593,6 +595,55 @@ function MainApp() {
   const [tick, setTick] = useState(0);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInput, setChatInput] = useState("");
+  
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const [isScrolledToBottom, setIsScrolledToBottom] = useState(true);
+
+  const [adminLastReadTimestamp, setAdminLastReadTimestamp] = useState<number>(() => {
+    try { return parseInt(localStorage.getItem('adminLastReadTimestamp') || '0', 10); } catch { return 0; }
+  });
+  const [userLastReadTimestamp, setUserLastReadTimestamp] = useState<number>(() => {
+    try { return parseInt(localStorage.getItem('userLastReadTimestamp') || '0', 10); } catch { return 0; }
+  });
+
+  useEffect(() => {
+     if (isChatOpen) {
+        setIsScrolledToBottom(true);
+     }
+  }, [isChatOpen]);
+
+  useEffect(() => {
+     if (isChatOpen) {
+        const now = Date.now();
+        if (currentUser?.role === 'admin') {
+           setAdminLastReadTimestamp(now);
+           localStorage.setItem('adminLastReadTimestamp', now.toString());
+        } else {
+           setUserLastReadTimestamp(now);
+           localStorage.setItem('userLastReadTimestamp', now.toString());
+        }
+     }
+  }, [isChatOpen, chatMessages.length, currentUser]);
+
+  const unreadChatCount = useMemo(() => {
+      if (!currentUser) return 0;
+      if (currentUser.role === 'admin') {
+          return chatMessages.filter(m => !m.receiverId && m.senderId !== currentUser.id && new Date(m.timestamp).getTime() > adminLastReadTimestamp).length;
+      } else {
+          return chatMessages.filter(m => m.receiverId === currentUser.id && new Date(m.timestamp).getTime() > userLastReadTimestamp).length;
+      }
+  }, [chatMessages, currentUser, adminLastReadTimestamp, userLastReadTimestamp]);
+
+  useEffect(() => {
+    if (isChatOpen && chatScrollRef.current && isScrolledToBottom) {
+       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [chatMessages, isChatOpen, isScrolledToBottom]);
+
+  const handleChatScroll = (e: React.UIEvent<HTMLDivElement>) => {
+     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+     setIsScrolledToBottom(scrollHeight - scrollTop - clientHeight < 50);
+  };
   const [isUploadingChatImg, setIsUploadingChatImg] = useState(false);
   const [adminChatUserContext, setAdminChatUserContext] = useState<string | null>(null);
   const [viewImage, setViewImage] = useState<string | null>(null);
@@ -1631,20 +1682,22 @@ function MainApp() {
                     const isBonusDay = [7, 15, 30].includes(day);
 
                     return (
-                      <div key={day} className={`aspect-square border-[1.5px] rounded-xl relative flex flex-col items-center justify-center gap-1 ${checked ? "bg-white/10 border-[#FFB300]" : "bg-white/5 border-white/40"}`}>
-                        {isBonusDay && (
-                          <div className="absolute -top-2 -right-2 bg-[#4ade80] text-[#0a0a1a] text-[9px] font-bold px-1 py-0.5 rounded-md leading-none shadow-sm z-10">
-                            ₦{BONUSES[day as keyof typeof BONUSES]}
-                          </div>
-                        )}
-                        {checked ? (
-                          <div className="w-5 h-5 bg-[#FFB300] rounded-full flex items-center justify-center shadow-sm shrink-0">
-                            <Check className="text-[#0a0a1a] w-3.5 h-3.5 stroke-[4]" />
-                          </div>
-                        ) : (
-                          <div className="w-5 h-5 shrink-0" />
-                        )}
-                        <div className="text-[10px] sm:text-[12px] font-medium text-white leading-none">{MONTH_LABEL}.{day}</div>
+                      <div key={day} className="aspect-square relative flex items-center justify-center">
+                        <div className={`w-10 h-10 sm:w-11 sm:h-11 border-[1.5px] rounded-lg relative flex flex-col items-center justify-center gap-1 ${checked ? "bg-white/10 border-[#FFC107]" : "bg-transparent border-transparent"}`}>
+                          {isBonusDay && (
+                            <div className="absolute -top-2 -right-2 bg-[#4ade80] text-[#0a0a1a] text-[9px] font-bold px-1 py-0.5 rounded-md leading-none shadow-sm z-10">
+                              ₦{BONUSES[day as keyof typeof BONUSES]}
+                            </div>
+                          )}
+                          {checked ? (
+                            <div className="w-4 h-4 bg-[#FFC107] rounded-full flex items-center justify-center shadow-sm shrink-0">
+                              <Check className="text-[#0a0a1a] w-3 h-3 stroke-[4]" />
+                            </div>
+                          ) : (
+                            <div className="w-4 h-4 shrink-0" />
+                          )}
+                          <div className="text-[10px] sm:text-[12px] font-medium text-white leading-none">{MONTH_LABEL}.{day}</div>
+                        </div>
                       </div>
                     );
                   })}
@@ -2030,9 +2083,9 @@ function MainApp() {
                     >
                       <MessageSquare className="w-5 h-5 text-white" />
                       View Support Chats
-                      {chatMessages.filter(m => m.receiverId === currentUser?.id || (!m.receiverId && m.senderId !== currentUser?.id)).length > 0 && (
-                        <span className="absolute right-4 bg-red-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full">
-                          {chatMessages.filter(m => !m.receiverId && m.senderId !== currentUser?.id).length}
+                      {unreadChatCount > 0 && (
+                        <span className="absolute right-4 bg-red-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shadow-lg border-2 border-white/20">
+                          {unreadChatCount}
                         </span>
                       )}
                     </button>
@@ -2821,7 +2874,7 @@ function MainApp() {
                                 setBuyingQuantity("1");
                                 setActiveModal("equinorConfirm");
                               }}
-                              className={isButtonDisabled ? "bg-slate-300 text-slate-500 px-6 py-2.5 rounded-[20px] font-bold text-[14px] cursor-not-allowed transform transition" : "bg-[#7B2FF7] text-white px-6 py-2.5 rounded-[20px] font-bold text-[14px] shadow-sm transform transition active:scale-95"}
+                              className={isButtonDisabled ? "bg-slate-300 text-slate-500 px-4 py-2.5 rounded-[20px] font-bold text-[14px] cursor-not-allowed transform transition" : "bg-[#7B2FF7] text-white px-4 py-2.5 rounded-[20px] font-bold text-[14px] shadow-sm transform transition active:scale-95"}
                             >
                               {buttonText}
                             </button>
@@ -2942,7 +2995,7 @@ function MainApp() {
                                 setBuyingQuantity("1");
                                 setActiveModal("equinorConfirm");
                               }}
-                              className={isButtonDisabled ? "bg-slate-300 text-slate-500 px-6 py-2.5 rounded-[20px] font-bold text-[14px] cursor-not-allowed transform transition shrink-0 mt-1" : "bg-[#7B2FF7] text-white px-6 py-2.5 rounded-[20px] font-bold text-[14px] shadow-sm transform transition active:scale-95 shrink-0 mt-1"}
+                              className={isButtonDisabled ? "bg-slate-300 text-slate-500 px-4 py-2.5 rounded-[20px] font-bold text-[14px] cursor-not-allowed transform transition shrink-0 mt-1" : "bg-[#7B2FF7] text-white px-4 py-2.5 rounded-[20px] font-bold text-[14px] shadow-sm transform transition active:scale-95 shrink-0 mt-1"}
                             >
                               {buttonText}
                             </button>
@@ -3078,7 +3131,7 @@ function MainApp() {
                               setBuyingQuantity("1");
                               setActiveModal("equinorConfirm");
                             }}
-                            className={isButtonDisabled ? "bg-slate-300 text-slate-500 px-6 py-2.5 rounded-[20px] font-black text-[14px] cursor-not-allowed transform transition" : "bg-[#7B2FF7] text-white px-6 py-2.5 rounded-[20px] font-black text-[14px] shadow-sm transform transition active:scale-95"}
+                            className={isButtonDisabled ? "bg-slate-300 text-slate-500 px-4 py-2.5 rounded-[20px] font-black text-[14px] cursor-not-allowed transform transition" : "bg-[#7B2FF7] text-white px-4 py-2.5 rounded-[20px] font-black text-[14px] shadow-sm transform transition active:scale-95"}
                           >
                             {buttonText}
                           </button>
@@ -3221,7 +3274,7 @@ function MainApp() {
                 </div>
                 <div className="relative z-10 p-4 pt-4 flex flex-col h-full overflow-hidden w-full max-w-md mx-auto">
                   {/* Summary Cards outside scroll */}
-                  <div className="flex gap-2 mb-3 shrink-0 z-10 w-full mt-2">
+                  <div className="flex gap-2 mb-1 shrink-0 z-10 w-full mt-1">
                     {/* Left Card */}
                     <div className="flex-1 bg-gradient-to-br from-[#FFB800] to-[#FFA000] rounded-[12px] p-3 text-white shadow-md flex flex-col justify-center min-w-0">
                       <div className="text-[14px] xs:text-[16px] font-black leading-tight mb-1 truncate">
@@ -3246,7 +3299,7 @@ function MainApp() {
                         await handleGetAll();
                         setIsProcessing(false);
                       }}
-                      className={`w-full py-2.5 rounded-[12px] font-bold text-[14px] mb-3 shrink-0 z-10 shadow-md transition-transform flex justify-center items-center ${isProcessing ? 'opacity-80 scale-[0.98]' : ''} ${totalCanBeCollected > 0 ? 'bg-[#7B2FFF] text-white active:scale-[0.98]' : 'bg-[#7B2FFF]/50 text-white/80 active:scale-[1]'}`}
+                      className={`w-full py-2.5 rounded-[12px] font-bold text-[14px] mb-1 shrink-0 z-10 shadow-md transition-transform flex justify-center items-center ${isProcessing ? 'opacity-80 scale-[0.98]' : ''} ${totalCanBeCollected > 0 ? 'bg-[#7B2FFF] text-white active:scale-[0.98]' : 'bg-[#7B2FFF]/50 text-white/80 active:scale-[1]'}`}
                     >
                       {isProcessing ? (
                         <div className="flex items-center gap-2">
@@ -3262,7 +3315,7 @@ function MainApp() {
                     </button>
                   )}
                   {/* Tab Navigation */}
-                  <div className="px-1 shrink-0 mb-4 mt-1 w-full">
+                  <div className="px-1 shrink-0 mb-2 mt-1 w-full">
                     <div className="flex justify-between items-center relative bg-[#1A1E4E]/50 border border-white/10 rounded-full p-1 backdrop-blur-md">
                       {(["general", "vip", "special", "expired"] as const).map((tab, idx) => {
                         const isActive = orderTab === tab;
@@ -3327,9 +3380,9 @@ function MainApp() {
 
                         return (
                           
-<div key={inv.id} className="relative bg-[#F8F9FF] rounded-[16px] mb-3 shadow-sm p-4 w-full">
+<div key={inv.id} className="relative bg-[#F8F9FF] rounded-[16px] mb-3 shadow-sm p-3 w-full">
   {/* 1. Full-width hero image */}
-  <div className="w-full h-[80px] rounded-[12px] overflow-hidden mb-3 bg-slate-800">
+  <div className="w-full h-[50px] rounded-[10px] overflow-hidden mb-2 bg-slate-800">
     {product?.imageUrl ? (
       <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
     ) : inv.planName.toLowerCase() === 'vip team exclusive project' ? (
@@ -3348,95 +3401,68 @@ function MainApp() {
     )}
   </div>
 
-  {/* 2. Top Row: Left "T+7" pill, Right: Price */}
-  <div className="flex justify-between items-center mb-2">
-    <div className="bg-[#FFE5E5] text-[#FF4444] px-2 py-0.5 rounded-[4px] text-[12px] font-medium">
-      T+{inv.payout_cycle_days || inv.tPlusDays || 1}
-    </div>
-    <div className="flex flex-col items-end">
-      <span className="text-[15px] font-bold text-[#1A1A1A]">Price: ₦{inv.amount.toLocaleString()}</span>
-    </div>
+  {/* 3. Title */}
+  <div className="flex flex-col mb-2">
+    {(() => { let t: any = { color: "#1A1A1A", size: "18" }; try { const product = products.find(p => p.name === inv.planName) as any; if (product) { const parsed = JSON.parse(product.title || ""); if (parsed && parsed.text) t = parsed; } } catch(e) {} return <h3 className="font-bold leading-tight" style={{ color: t.color, fontSize: t.size + 'px' }}>{inv.planName}</h3>; })()}
   </div>
 
-  {/* 3. Title & Start/End Time Block */}
-  <div className="flex flex-col mb-1">
-    {(() => { let t: any = { color: "#1A1A1A", size: "18" }; try { const product = products.find(p => p.name === inv.planName) as any; if (product) { const parsed = JSON.parse(product.title || ""); if (parsed && parsed.text) t = parsed; } } catch(e) {} return <h3 className="font-bold leading-tight mb-1" style={{ color: t.color, fontSize: t.size + 'px' }}>{inv.planName}</h3>; })()}
-    <div className="flex flex-col gap-0">
-      <div className="flex items-center gap-1">
-        <span className="text-[12px] text-[#666666]">StartTime:</span>
-        <span className="text-[12px] font-medium text-[#1A1A1A]">{new Date(inv.startDate).toLocaleDateString()} {new Date(inv.startDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-      </div>
-      <div className="flex items-center gap-1">
-        <span className="text-[12px] text-[#666666]">EndTime:</span>
-        <span className="text-[12px] font-medium text-[#1A1A1A]">{new Date(inv.endDate).toLocaleDateString()} {new Date(inv.endDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-      </div>
+  {/* Start/End Time Block & Timer */}
+  <div className="flex items-center mb-2 relative">
+    <div className="flex flex-col text-[8px] leading-[1.1] text-left shrink-0">
+      <div className="text-[#666666]">StartTime:</div>
+      <div className="font-bold text-[#1A1A1A]">{new Date(inv.startDate).toLocaleDateString('en-GB')} {new Date(inv.startDate).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}</div>
+      <div className="text-[#666666] mt-0.5">EndTime:</div>
+      <div className="font-bold text-[#1A1A1A]">{new Date(inv.endDate).toLocaleDateString('en-GB')} {new Date(inv.endDate).toLocaleTimeString('en-GB', {hour: '2-digit', minute:'2-digit'})}</div>
     </div>
-  </div>
-
-  {/* Duration Timer (Circles) Right-aligned */}
-  <div className="flex justify-end mb-2">
-    {!isExpired ? (
-      <div className="flex items-center gap-1">
-        {expYears > 0 && <div className="bg-black text-white rounded-full w-7 h-7 flex items-center justify-center text-[10px] font-bold">{expYears}Y</div>}
-        {Math.floor(expDays/30) > 0 && <div className="bg-black text-white rounded-full w-7 h-7 flex items-center justify-center text-[10px] font-bold">{Math.floor(expDays/30)}M</div>}
-        <div className="bg-black text-white rounded-full w-7 h-7 flex items-center justify-center text-[10px] font-bold">{expDays%30}d</div>
-        <div className="bg-black text-white rounded-full w-7 h-7 flex items-center justify-center text-[10px] font-bold">{expHours.toString().padStart(2, '0')}h</div>
-        <div className="bg-black text-white rounded-full w-7 h-7 flex items-center justify-center text-[10px] font-bold">{expMinutes.toString().padStart(2, '0')}m</div>
-        <div className="bg-black text-white rounded-full w-7 h-7 flex items-center justify-center text-[10px] font-bold">{expSeconds.toString().padStart(2, '0')}s</div>
-      </div>
-    ) : (
-      <div className="h-[28px]"></div>
-    )}
-  </div>
-
-  {/* T+ Collection Countdown */}
-  <div className="flex justify-between items-center mb-3">
-    <div className="text-[12px] font-semibold text-[#1A1A1A]">Collection In:</div>
-    <div className="flex items-center gap-[2px]">
+    
+    <div className="flex-1 flex justify-center items-center gap-1">
       {!canCollect && !isExpired ? (
         <>
           {daysLeft > 0 && (
-            <>
-              <div className="bg-[#10B981] text-white rounded-[4px] px-1.5 h-[28px] flex items-center justify-center text-[12px] font-bold">{daysLeft}</div>
-              <div className="text-[#10B981] font-medium text-[12px] px-0.5">d</div>
-            </>
+            <div className="bg-black text-white rounded-[8px] px-3 h-[32px] flex items-center justify-center font-black text-[13px] min-w-[42px] shadow-sm tracking-wider">
+              {daysLeft} Day
+            </div>
           )}
-          <div className="bg-[#10B981] text-white rounded-[4px] w-[26px] h-[28px] flex items-center justify-center text-[12px] font-bold">{hoursLeft.toString().padStart(2, '0')}</div>
-          <div className="text-[#10B981] font-medium text-[10px] px-0.5">:</div>
-          <div className="bg-[#10B981] text-white rounded-[4px] w-[26px] h-[28px] flex items-center justify-center text-[12px] font-bold">{minutesLeft.toString().padStart(2, '0')}</div>
-          <div className="text-[#10B981] font-medium text-[10px] px-0.5">:</div>
-          <div className="bg-[#10B981] text-white rounded-[4px] w-[26px] h-[28px] flex items-center justify-center text-[12px] font-bold">{secondsLeft.toString().padStart(2, '0')}</div>
+          <div className="bg-black text-white rounded-[8px] w-[36px] h-[32px] flex items-center justify-center font-black text-[14px] shadow-sm tracking-wider">
+            {hoursLeft.toString().padStart(2, '0')}
+          </div>
+          <span className="text-[#1A1A1A] font-black text-lg leading-none -mt-0.5">:</span>
+          <div className="bg-black text-white rounded-[8px] w-[36px] h-[32px] flex items-center justify-center font-black text-[14px] shadow-sm tracking-wider">
+            {minutesLeft.toString().padStart(2, '0')}
+          </div>
+          <span className="text-[#1A1A1A] font-black text-lg leading-none -mt-0.5">:</span>
+          <div className="bg-black text-white rounded-[8px] w-[36px] h-[32px] flex items-center justify-center font-black text-[14px] shadow-sm tracking-wider">
+            {secondsLeft.toString().padStart(2, '0')}
+          </div>
         </>
       ) : (
-        <span className="text-[#10B981] font-bold text-[12px]">Ready</span>
+        <div className="bg-black text-white rounded-[8px] px-4 h-[32px] flex items-center justify-center font-black text-[13px] shadow-sm tracking-wider">
+          Ready
+        </div>
       )}
     </div>
   </div>
 
-  {/* 4. 4 stat pills */}
-  <div className="grid grid-cols-4 gap-[4px] mb-4">
-    <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
+  {/* 3-up grid: daily income, cycle, total income */}
+  <div className="grid grid-cols-3 gap-[4px] mb-1">
+    <div className="bg-[#E8E9FF] rounded-[8px] py-1.5 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
       <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[13px] truncate w-full">₦{dailyIncome.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
       <div className="text-[#5B5FEF] text-[9px] sm:text-[11px] whitespace-nowrap">Daily income</div>
     </div>
-    <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
+    <div className="bg-[#E8E9FF] rounded-[8px] py-1.5 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
       <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[13px] truncate w-full">{inv.total_duration_days || inv.days || Math.round((invEnd.getTime() - invStart.getTime()) / (1000 * 3600 * 24))} D</div>
       <div className="text-[#5B5FEF] text-[9px] sm:text-[11px] whitespace-nowrap">Cycle</div>
     </div>
-    <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
+    <div className="bg-[#E8E9FF] rounded-[8px] py-1.5 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
       <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[13px] truncate w-full">₦{(dailyIncome * (inv.total_duration_days || inv.days || Math.round((invEnd.getTime() - invStart.getTime()) / (1000 * 3600 * 24)))).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
       <div className="text-[#5B5FEF] text-[9px] sm:text-[11px] whitespace-nowrap">Total income</div>
     </div>
-    {(() => {
-      const quota = product?.max_quota || product?.maxQuota || 0;
-      const userBoughtCount = investments.filter(i => i.userId === currentUser?.id && i.planName === inv.planName && i.status !== 'completed').reduce((sum, i) => sum + (i.quantity || 1), 0);
-      return (
-        <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
-          <div className="text-[#5B5FEF] font-semibold text-[12px] sm:text-[13px]">{quota === 0 ? '∞' : `${userBoughtCount}/${quota}`}</div>
-          <div className="text-[#5B5FEF] text-[9px] sm:text-[11px] whitespace-nowrap">Quota</div>
-        </div>
-      );
-    })()}
+  </div>
+
+  {/* Full single width block below the 3-up grid for Price */}
+  <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-3 mb-2 flex flex-col items-center justify-center text-center">
+    <div className="text-[#5B5FEF] font-bold text-[14px]">Price: ₦{inv.amount.toLocaleString()}</div>
+    <div className="text-[#5B5FEF] text-[10px] mt-0.5">Payment amount</div>
   </div>
 
   {/* 5. Profit Row */}
@@ -3573,7 +3599,7 @@ function MainApp() {
                 <div className="h-4 w-full"></div>
 
                 {/* Main container */}
-                <div className="bg-[#1E5BFF] rounded-t-[32px] pb-[136px] pt-6 px-4 -mx-5 -mb-32 flex flex-col w-[calc(100%+40px)] shadow-[0_-4px_20px_rgba(0,0,0,0.15)] min-h-[calc(100vh-300px)]">
+                <div className="bg-[#1E5BFF] rounded-t-[32px] pt-6 px-4 -mx-5 -mb-32 flex flex-col flex-1 w-[calc(100%+40px)] min-h-[calc(100vh-250px)] shadow-[0_-4px_20px_rgba(0,0,0,0.15)]">
                   
                   {/* Top: Promo Card */}
                   <div 
@@ -3615,7 +3641,7 @@ function MainApp() {
                   <div className="h-4 w-full"></div>
 
                   {/* Bottom: Menu Container */}
-                  <div className="bg-white rounded-[16px] overflow-hidden flex flex-col shadow-sm">
+                  <div className="bg-white rounded-t-[16px] overflow-hidden flex flex-col flex-1 shadow-sm pb-32">
                     {[
                       { icon: FileText, label: "Funding details", action: () => setActiveModal("fundingDetails") },
                       { icon: ClipboardList, label: "Commission Record", action: () => setActiveModal("commissionRecord") },
@@ -3689,9 +3715,9 @@ function MainApp() {
                 >
                   <MessageSquare className="w-5 h-5 text-indigo-400" />
                   View Support Chats
-                  {chatMessages.filter(m => m.receiverId === currentUser?.id || (!m.receiverId && m.senderId !== currentUser?.id)).length > 0 && (
-                    <span className="absolute right-4 bg-red-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full">
-                      {chatMessages.filter(m => !m.receiverId && m.senderId !== currentUser?.id).length}
+                  {unreadChatCount > 0 && (
+                    <span className="absolute right-4 bg-red-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shadow-lg border-2 border-white/20">
+                      {unreadChatCount}
                     </span>
                   )}
                 </button>
@@ -3932,14 +3958,25 @@ function MainApp() {
                       onChange={(e) => updateContactLinks(managerLink, e.target.value)}
                     />
                   </div>
-                  <div className="flex items-center justify-between bg-white/5 p-3 rounded-lg border border-white/10 mt-2">
-                    <span className="text-white text-sm font-bold">Show CS Icon in Profile</span>
-                    <button
-                      onClick={() => updateShowCSIcon(!showCSIcon)}
-                      className={`w-10 h-6 rounded-full p-1 transition-colors ${showCSIcon ? 'bg-[#7B2FFF]' : 'bg-white/20'}`}
-                    >
-                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${showCSIcon ? 'translate-x-4' : 'translate-x-0'}`} />
-                    </button>
+                  <div className="flex flex-col gap-2 mt-2">
+                    <div className="flex items-center justify-between bg-white/5 p-3 rounded-lg border border-white/10">
+                      <span className="text-white text-sm font-bold">Show WhatsApp CS Icon</span>
+                      <button
+                        onClick={() => updateShowCSIcon(!showCSIcon)}
+                        className={`w-10 h-6 rounded-full p-1 transition-colors ${showCSIcon ? 'bg-[#7B2FFF]' : 'bg-white/20'}`}
+                      >
+                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${showCSIcon ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between bg-white/5 p-3 rounded-lg border border-white/10">
+                      <span className="text-white text-sm font-bold">Show In-App Chat Icon</span>
+                      <button
+                        onClick={() => updateShowInAppCS(!showInAppCS)}
+                        className={`w-10 h-6 rounded-full p-1 transition-colors ${showInAppCS ? 'bg-[#7B2FFF]' : 'bg-white/20'}`}
+                      >
+                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${showInAppCS ? 'translate-x-4' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4684,6 +4721,16 @@ function MainApp() {
                     // Referrals: Users referred by someone
                     const referralCount = users.filter(u => u.referredBy).length; // Total referrals
                     
+                    const todayStart = new Date();
+                    todayStart.setHours(0,0,0,0);
+                    const todayDepApproved = transactions.filter(t => t.type === "deposit" && t.status === "approved" && new Date(t.date).getTime() >= todayStart.getTime());
+                    const todayDepTotal = todayDepApproved.reduce((sum, t) => sum + t.amount, 0);
+                    const todayDepCount = todayDepApproved.length;
+                    
+                    const todayWithApproved = transactions.filter(t => t.type === "withdrawal" && t.status === "approved" && new Date(t.date).getTime() >= todayStart.getTime());
+                    const todayWithTotal = todayWithApproved.reduce((sum, t) => sum + t.amount, 0);
+                    const todayWithCount = todayWithApproved.length;
+
                     // Commissions
                     const commTotal = filteredComm.reduce((sum, c) => sum + c.amount, 0);
                     const invTotal = filteredInv.reduce((sum, i) => sum + i.amount, 0);
@@ -4701,9 +4748,15 @@ function MainApp() {
                         <StatCard title="Registered Users" value={totalRegistered} subtitle="All Time" />
                         <StatCard title="Active Users" value={activeUsersCount} subtitle={statsPeriod === "all" ? "Currently Active" : "Active in Period"} />
                         
+                        <StatCard title="Today's Deposits" value={todayDepCount} subtitle="Approved Today" />
+                        <StatCard title="Today's Dep Total" value={typeof formatCurrency === 'function' ? formatCurrency(todayDepTotal) : `₦${todayDepTotal.toLocaleString()}`} subtitle="Approved Today" />
+
                         <StatCard title="Deposits Count" value={depTx.length} />
                         <StatCard title="Deposits Total" value={typeof formatCurrency === 'function' ? formatCurrency(depTotal) : `₦${depTotal.toLocaleString()}`} subtitle="Approved Only" />
                         
+                        <StatCard title="Today's Withdrawals" value={todayWithCount} subtitle="Approved Today" />
+                        <StatCard title="Today's With Total" value={typeof formatCurrency === 'function' ? formatCurrency(todayWithTotal) : `₦${todayWithTotal.toLocaleString()}`} subtitle="Approved Today" />
+
                         <StatCard title="Withdrawals Count" value={withTx.length} />
                         <StatCard title="Withdrawals Total" value={typeof formatCurrency === 'function' ? formatCurrency(withTotal) : `₦${withTotal.toLocaleString()}`} subtitle="Approved Only" />
                         
@@ -4741,18 +4794,15 @@ function MainApp() {
               label="Home"
               active={activeTab === "home" && !activeModal}
             />
-            {/* Middle Big Logo for Products */}
-            <div className="relative -top-5 flex flex-col items-center z-40 mx-2">
-              <button 
-                onClick={() => {
-                  setActiveTab("product");
-                  setActiveModal(null);
-                }}
-                className={`w-[56px] h-[56px] rounded-full flex items-center justify-center shadow-[0_4px_12px_rgba(123,47,255,0.4)] transition-transform active:scale-95 border-[3px] border-white ${activeTab === "product" && !activeModal ? "bg-[#7B2FF7]" : "bg-[#1C0F3F]"}`}
-              >
-                <EquinorStar className="w-[36px] h-[36px]" />
-              </button>
-            </div>
+            <TabItem
+              onClick={() => {
+                setActiveTab("product");
+                setActiveModal(null);
+              }}
+              icon={<LayoutGrid className="w-[24px] h-[24px]" style={{ strokeWidth: 2 }} />}
+              label="Product"
+              active={activeTab === "product" && !activeModal}
+            />
             <TabItem
               onClick={() => {
                 setActiveTab("order");
@@ -7188,6 +7238,26 @@ function MainApp() {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
                   />
                 </div>
+                {/* Preview block */}
+                {(newProductRoi || newProductFixedDaily) && newProductMin && newProductDays && (
+                  <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl">
+                    <p className="text-[10px] font-bold text-indigo-800 mb-2 uppercase tracking-wider">Income Preview</p>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-[11px] text-indigo-600 font-medium">Daily Income</p>
+                        <p className="text-[14px] font-bold text-indigo-900">₦{newProductFixedDaily ? Number(newProductFixedDaily).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : (Number(newProductMin) * (1 + Number(newProductRoi) / 100) / Number(newProductDays)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-indigo-600 font-medium">Total Return</p>
+                        <p className="text-[14px] font-bold text-indigo-900">₦{newProductFixedDaily ? (Number(newProductFixedDaily) * Number(newProductDays)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : (Number(newProductMin) * (1 + Number(newProductRoi) / 100)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-indigo-600 font-medium">Effective ROI</p>
+                        <p className="text-[14px] font-bold text-indigo-900">{newProductFixedDaily ? ((((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : Number(newProductRoi).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}%</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">T+ (Earning Cycle in Days)</label>
                   <input
@@ -7472,6 +7542,26 @@ function MainApp() {
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
                   />
                 </div>
+                {/* Preview block */}
+                {(newProductRoi || newProductFixedDaily) && newProductMin && newProductDays && (
+                  <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl">
+                    <p className="text-[10px] font-bold text-indigo-800 mb-2 uppercase tracking-wider">Income Preview</p>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-[11px] text-indigo-600 font-medium">Daily Income</p>
+                        <p className="text-[14px] font-bold text-indigo-900">₦{newProductFixedDaily ? Number(newProductFixedDaily).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : (Number(newProductMin) * (1 + Number(newProductRoi) / 100) / Number(newProductDays)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-indigo-600 font-medium">Total Return</p>
+                        <p className="text-[14px] font-bold text-indigo-900">₦{newProductFixedDaily ? (Number(newProductFixedDaily) * Number(newProductDays)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : (Number(newProductMin) * (1 + Number(newProductRoi) / 100)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] text-indigo-600 font-medium">Effective ROI</p>
+                        <p className="text-[14px] font-bold text-indigo-900">{newProductFixedDaily ? ((((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : Number(newProductRoi).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}%</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">T+ (Earning Cycle in Days)</label>
                   <input
@@ -8079,15 +8169,15 @@ function MainApp() {
       </div>
 
       {/* Support Chat Floating Button */}
-      {currentUser && !isChatOpen && (
+      {currentUser && !isChatOpen && showInAppCS && (
         <button
           onClick={() => setIsChatOpen(true)}
           className="absolute bottom-24 right-4 w-14 h-14 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full shadow-lg flex items-center justify-center z-40 transform transition hover:scale-105 active:scale-95"
         >
           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
-          {currentUser.role === 'admin' && chatMessages.filter(m => !m.receiverId && m.senderId !== currentUser?.id).length > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
-              {chatMessages.filter(m => !m.receiverId && m.senderId !== currentUser?.id).length}
+          {unreadChatCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-md">
+              {unreadChatCount}
             </span>
           )}
         </button>
@@ -8126,7 +8216,11 @@ function MainApp() {
             </div>
 
             {/* Message Area */}
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" ref={(el) => { if (el) { el.scrollTop = el.scrollHeight; } }}>
+            <div 
+              className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]" 
+              ref={chatScrollRef}
+              onScroll={handleChatScroll}
+            >
               <div className="flex flex-col gap-1 items-start max-w-[85%]">
                 <div className="bg-white text-slate-800 p-3 rounded-2xl rounded-tl-sm shadow-sm border border-slate-100 text-[14px]">
                   Hello! How can I help you today?
