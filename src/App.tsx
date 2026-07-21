@@ -1259,14 +1259,7 @@ function MainApp() {
       return;
     }
     setIsProcessing(true);
-    setPaymentProcessingState({ step: 1, message: "Initiating order..." });
     try {
-      await new Promise(res => setTimeout(res, 800));
-      setPaymentProcessingState({ step: 2, message: "Deducting balance..." });
-      await new Promise(res => setTimeout(res, 800));
-      setPaymentProcessingState({ step: 3, message: "Finalizing purchase..." });
-      await new Promise(res => setTimeout(res, 800));
-
       const res = await createInvestment(planName, totalAmount, roi, days, fixedDailyReturn, tPlusDays, quantity, totalDurationDays, payoutCycleDays);
       if (res && res.success) {
         setActiveModal(null);
@@ -1276,7 +1269,6 @@ function MainApp() {
       }
     } finally {
       setIsProcessing(false);
-      setPaymentProcessingState(null);
     }
   };
 
@@ -2881,30 +2873,28 @@ function MainApp() {
                           </div>
 
                           {/* Stats Grid Bottom Section */}
-                          <div className="pb-2">
-                            <div className="flex flex-wrap gap-2">
-                              <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
-                                <span className="text-[#5B5FEF]/80 text-[11px]">Total income:</span>
-                                <span className="text-[#5B5FEF] font-black text-[12px] ml-1">₦{totalIncome.toLocaleString()}</span>
-                              </div>
-                              <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
-                                {(() => {
-    const userBoughtCount = investments.filter(inv => inv.userId === currentUser?.id && inv.planName === plan.name).reduce((sum, inv) => sum + (inv.quantity || 1), 0);
-    return (
-      <>
-        <span className="text-[#5B5FEF]/80 text-[11px]">Quota:</span>
-        <span className="text-[#5B5FEF] font-black text-[12px] ml-1">{plan.maxQuota ? `${userBoughtCount}/${plan.maxQuota}` : '∞'}</span>
-      </>
-    );
-  })()}
-                              </div>
-                              <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
-                                <span className="text-[#5B5FEF]/80 text-[11px]">Cycle:</span>
-                                <span className="text-[#5B5FEF] font-black text-[12px] ml-1">{plan.total_duration_days || plan.days} Days</span>
-                              </div>
-                              <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
-                                <span className="text-[#5B5FEF]/80 text-[11px]">Daily income:</span>
-                                <span className="text-[#5B5FEF] font-black text-[12px] ml-1">₦{calculatedDailyReturn.toLocaleString()}</span>
+                          <div className="pb-1 w-full mt-2">
+                            <div className="bg-white rounded-[12px] px-3 py-2.5 w-full shadow-sm border border-slate-100">
+                              <div className="grid grid-cols-2 gap-y-1.5 gap-x-2">
+                                <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                  Total income: ₦{totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                </div>
+                                <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                  {(() => {
+                                    const userBoughtCount = investments.filter(inv => inv.userId === currentUser?.id && inv.planName === plan.name).reduce((sum, inv) => sum + (inv.quantity || 1), 0);
+                                    return (
+                                      <>
+                                        Quota: {plan.maxQuota ? `${userBoughtCount}/${plan.maxQuota}` : '∞'}
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                                <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                  Cycle: {plan.total_duration_days || plan.days} Days
+                                </div>
+                                <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                  Daily income: ₦{calculatedDailyReturn.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -3022,15 +3012,15 @@ function MainApp() {
                           </div>
 
                           {/* Stats Grid Bottom Section */}
-                          <div className="pb-2">
-                            <div className="flex flex-wrap gap-2">
-                              <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
-                                <span className="text-[#5B5FEF]/80 text-[11px]">24H Returns:</span>
-                                <span className="text-[#5B5FEF] font-medium text-[12px] ml-1">₦{get24h.toLocaleString()}</span>
-                              </div>
-                              <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
-                                <span className="text-[#5B5FEF]/80 text-[11px]">Cycle:</span>
-                                <span className="text-[#5B5FEF] font-medium text-[12px] ml-1">{plan.total_duration_days || plan.days} Days</span>
+                          <div className="pb-1 w-full mt-2">
+                            <div className="bg-white rounded-[12px] px-3 py-2.5 w-full shadow-sm border border-slate-100">
+                              <div className="grid grid-cols-2 gap-y-1.5 gap-x-2">
+                                <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                  24H Returns: ₦{get24h.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                </div>
+                                <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                  Cycle: {plan.total_duration_days || plan.days} Days
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -3138,30 +3128,28 @@ function MainApp() {
                         </div>
 
                         {/* Stats Grid Bottom Section */}
-                        <div className="pb-2">
-                          <div className="flex flex-wrap gap-2">
-                            <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
-                              <span className="text-[#5B5FEF]/80 text-[11px]">Total income:</span>
-                              <span className="text-[#5B5FEF] font-black text-[12px] ml-1">₦{totalIncome.toLocaleString()}</span>
-                            </div>
-                            <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
-                              {(() => {
-    const userBoughtCount = investments.filter(inv => inv.userId === currentUser?.id && inv.planName === plan.name).reduce((sum, inv) => sum + (inv.quantity || 1), 0);
-    return (
-      <>
-        <span className="text-[#5B5FEF]/80 text-[11px]">Quota:</span>
-        <span className="text-[#5B5FEF] font-black text-[12px] ml-1">{plan.maxQuota ? `${userBoughtCount}/${plan.maxQuota}` : '∞'}</span>
-      </>
-    );
-  })()}
-                            </div>
-                            <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
-                              <span className="text-[#5B5FEF]/80 text-[11px]">Cycle:</span>
-                              <span className="text-[#5B5FEF] font-black text-[12px] ml-1">{plan.total_duration_days || plan.days} Days</span>
-                            </div>
-                            <div className="flex items-center whitespace-nowrap bg-[#E8E9FF] px-2 py-1 rounded-[8px] text-[#5B5FEF]">
-                              <span className="text-[#5B5FEF]/80 text-[11px]">Daily income:</span>
-                              <span className="text-[#5B5FEF] font-black text-[12px] ml-1">₦{calculatedDailyReturn.toLocaleString()}</span>
+                        <div className="pb-1 w-full mt-2">
+                          <div className="bg-white rounded-[12px] px-3 py-2.5 w-full shadow-sm border border-slate-100">
+                            <div className="grid grid-cols-2 gap-y-1.5 gap-x-2">
+                              <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                Total income: ₦{totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                              </div>
+                              <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                {(() => {
+                                  const userBoughtCount = investments.filter(inv => inv.userId === currentUser?.id && inv.planName === plan.name).reduce((sum, inv) => sum + (inv.quantity || 1), 0);
+                                  return (
+                                    <>
+                                      Quota: {plan.maxQuota ? `${userBoughtCount}/${plan.maxQuota}` : '∞'}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                              <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                Cycle: {plan.total_duration_days || plan.days} Days
+                              </div>
+                              <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                Daily income: ₦{calculatedDailyReturn.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -3401,6 +3389,27 @@ function MainApp() {
     )}
   </div>
 
+  {/* 2. Top Row: Left "T+7" pill, Right: Duration Timer */}
+  <div className="flex justify-between items-center mb-1">
+    <div className="bg-[#FFE5E5] text-[#FF4444] px-2 py-0.5 rounded-[4px] text-[12px] font-medium">
+      T+{inv.payout_cycle_days || inv.tPlusDays || 1}
+    </div>
+    <div className="flex justify-end">
+      {!isExpired ? (
+        <div className="flex items-center gap-1 text-[8px] font-bold text-[#1A1A1A]">
+          {expYears > 0 && <span>{expYears}Y</span>}
+          {Math.floor(expDays/30) > 0 && <span>{Math.floor(expDays/30)}M</span>}
+          <span>{expDays%30}d</span>
+          <span>{expHours.toString().padStart(2, '0')}h</span>
+          <span>{expMinutes.toString().padStart(2, '0')}m</span>
+          <span>{expSeconds.toString().padStart(2, '0')}s</span>
+        </div>
+      ) : (
+        <div className="h-[15px]"></div>
+      )}
+    </div>
+  </div>
+
   {/* 3. Title */}
   <div className="flex flex-col mb-2">
     {(() => { let t: any = { color: "#1A1A1A", size: "18" }; try { const product = products.find(p => p.name === inv.planName) as any; if (product) { const parsed = JSON.parse(product.title || ""); if (parsed && parsed.text) t = parsed; } } catch(e) {} return <h3 className="font-bold leading-tight" style={{ color: t.color, fontSize: t.size + 'px' }}>{inv.planName}</h3>; })()}
@@ -3419,9 +3428,14 @@ function MainApp() {
       {!canCollect && !isExpired ? (
         <>
           {daysLeft > 0 && (
-            <div className="bg-black text-white rounded-[8px] px-3 h-[32px] flex items-center justify-center font-black text-[13px] min-w-[42px] shadow-sm tracking-wider">
-              {daysLeft} Day
-            </div>
+            <>
+              <div className="bg-black text-white rounded-[8px] px-2 min-w-[36px] h-[32px] flex items-center justify-center font-black text-[14px] shadow-sm tracking-wider">
+                {daysLeft}
+              </div>
+              <div className="text-[#1A1A1A] font-black text-[13px] mx-1">
+                Day
+              </div>
+            </>
           )}
           <div className="bg-black text-white rounded-[8px] w-[36px] h-[32px] flex items-center justify-center font-black text-[14px] shadow-sm tracking-wider">
             {hoursLeft.toString().padStart(2, '0')}
@@ -3444,18 +3458,20 @@ function MainApp() {
   </div>
 
   {/* 3-up grid: daily income, cycle, total income */}
-  <div className="grid grid-cols-3 gap-[4px] mb-1">
-    <div className="bg-[#E8E9FF] rounded-[8px] py-1.5 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
-      <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[13px] truncate w-full">₦{dailyIncome.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-      <div className="text-[#5B5FEF] text-[9px] sm:text-[11px] whitespace-nowrap">Daily income</div>
-    </div>
-    <div className="bg-[#E8E9FF] rounded-[8px] py-1.5 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
-      <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[13px] truncate w-full">{inv.total_duration_days || inv.days || Math.round((invEnd.getTime() - invStart.getTime()) / (1000 * 3600 * 24))} D</div>
-      <div className="text-[#5B5FEF] text-[9px] sm:text-[11px] whitespace-nowrap">Cycle</div>
-    </div>
-    <div className="bg-[#E8E9FF] rounded-[8px] py-1.5 px-1 flex flex-col items-center justify-center text-center overflow-hidden">
-      <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[13px] truncate w-full">₦{(dailyIncome * (inv.total_duration_days || inv.days || Math.round((invEnd.getTime() - invStart.getTime()) / (1000 * 3600 * 24)))).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
-      <div className="text-[#5B5FEF] text-[9px] sm:text-[11px] whitespace-nowrap">Total income</div>
+  <div className="bg-[#E8E9FF] rounded-[10px] py-2 w-full mb-1">
+    <div className="grid grid-cols-3 divide-x divide-[#5B5FEF]/20 w-full px-1">
+      <div className="flex flex-col items-center text-center px-1 overflow-hidden">
+        <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[12px] truncate w-full">₦{dailyIncome.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+        <div className="text-[#5B5FEF] text-[9px] sm:text-[10px] whitespace-nowrap">Daily income</div>
+      </div>
+      <div className="flex flex-col items-center text-center px-1 overflow-hidden">
+        <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[12px] truncate w-full">{inv.total_duration_days || inv.days || Math.round((invEnd.getTime() - invStart.getTime()) / (1000 * 3600 * 24))} D</div>
+        <div className="text-[#5B5FEF] text-[9px] sm:text-[10px] whitespace-nowrap">Cycle</div>
+      </div>
+      <div className="flex flex-col items-center text-center px-1 overflow-hidden">
+        <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[12px] truncate w-full">₦{(dailyIncome * (inv.total_duration_days || inv.days || Math.round((invEnd.getTime() - invStart.getTime()) / (1000 * 3600 * 24)))).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
+        <div className="text-[#5B5FEF] text-[9px] sm:text-[10px] whitespace-nowrap">Total income</div>
+      </div>
     </div>
   </div>
 
@@ -5650,18 +5666,17 @@ function MainApp() {
         )}
 
         {activeModal === "about" && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-            <div className="bg-[#141a3a] border border-white/10 p-6 rounded-[2rem] w-full max-w-sm relative shadow-2xl max-h-[90vh] flex flex-col">
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4">
+            <div className="bg-[#0B1B3D] border border-white/10 p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] w-full relative shadow-2xl max-h-[92vh] flex flex-col">
               <button
                 onClick={() => setActiveModal(null)}
                 className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/10 rounded-full text-white/50 hover:text-white"
               >
                 <X size={18} />
               </button>
-              <h3 className="text-xl font-bold mb-4 text-[#00D4FF]">About Us</h3>
+              <h3 className="text-[23px] font-bold mb-4 text-white text-center">About Us</h3>
               
-              <div className="w-full h-40 rounded-xl mb-4 overflow-hidden relative flex-shrink-0">
-                <div className="absolute inset-0 bg-[#3B82F6] blur-[20px] opacity-20"></div>
+              <div className="w-full h-40 mb-4 overflow-hidden relative flex-shrink-0">
                 <img 
                   src={aboutUsImage || "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Equinor_logo.svg/1024px-Equinor_logo.svg.png"}
                   alt="Equinor" 
@@ -5672,13 +5687,13 @@ function MainApp() {
                 />
               </div>
 
-              <div className="text-white/80 text-sm space-y-3 leading-relaxed overflow-y-auto pr-2 custom-scrollbar flex-1 min-h-0">
-                <p><strong>Company Name:</strong> Equinor ASA (Stock Code: EQNR)</p>
+              <div className="text-[#10B981] text-[14.5px] space-y-3 leading-relaxed overflow-y-auto pr-2 custom-scrollbar flex-1 min-h-0">
+                <p><strong>Company Name:</strong> <span className="text-[#FBBF24] text-[17.5px] font-bold">Equinor ASA (Stock Code: EQNR)</span></p>
                 <p>Equinor was founded in 1972, and its headquarters is located in Stavanger, Norway. It is the largest oil and gas operator on the Norwegian Continental Shelf (NCS) and one of the world's leading offshore oil, gas, and integrated energy companies.</p>
                 <p>The company operates in more than 30 countries and its business spans various sectors including Conventional oil & natural gas, Offshore Wind, Floating Wind, Carbon Capture & Storage (CCS), Hydrogen fuel, Energy Storage, etc.</p>
                 <div className="pt-4 mt-4 border-t border-white/10">
-                  <p className="italic font-medium text-[#00D4FF] mb-2 text-base text-center leading-snug">"Energy for people.<br/>Progress for society.<br/>Searching for better."</p>
-                  <p className="text-xs text-white/60 text-center">To supply energy for people, contribute to societal development, and search for better energy solutions.</p>
+                  <p className="italic font-medium text-[#FBBF24] mb-2 text-base text-center leading-snug">"Energy for people.<br/>Progress for society.<br/>Searching for better."</p>
+                  <p className="text-xs text-[#10B981]/80 text-center">To supply energy for people, contribute to societal development, and search for better energy solutions.</p>
                 </div>
 
                 {/* FAQ Section */}
@@ -5689,16 +5704,16 @@ function MainApp() {
                   </h4>
                   <div className="space-y-3">
                     <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                      <h5 className="font-semibold text-white text-sm mb-1.5">How fast are withdrawals processed?</h5>
-                      <p className="text-white/60 text-xs leading-relaxed">Withdrawals are generally processed within 24 hours. Once approved, the funds are immediately routed to your designated bank account or USDT wallet.</p>
+                      <h5 className="font-semibold text-white text-[15px] mb-1.5">How fast are withdrawals processed?</h5>
+                      <p className="text-[#10B981] text-[14.5px] leading-relaxed">Withdrawals are generally processed within 24 hours. Once approved, the funds are immediately routed to your designated bank account or USDT wallet.</p>
                     </div>
                     <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                      <h5 className="font-semibold text-white text-sm mb-1.5">Are there any deposit fees?</h5>
-                      <p className="text-white/60 text-xs leading-relaxed">We do not charge any internal fees for deposits. Please ensure you transfer the exact amount displayed during the recharge process.</p>
+                      <h5 className="font-semibold text-white text-[15px] mb-1.5">Are there any deposit fees?</h5>
+                      <p className="text-[#10B981] text-[14.5px] leading-relaxed">We do not charge any internal fees for deposits. Please ensure you transfer the exact amount displayed during the recharge process.</p>
                     </div>
                     <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                      <h5 className="font-semibold text-white text-sm mb-1.5">What is the minimum withdrawal amount?</h5>
-                      <p className="text-white/60 text-xs leading-relaxed">The minimum withdrawal amount is ₦6,000 to ensure efficient processing and coverage of standard network operations.</p>
+                      <h5 className="font-semibold text-white text-[15px] mb-1.5">What is the minimum withdrawal amount?</h5>
+                      <p className="text-[#10B981] text-[14.5px] leading-relaxed">The minimum withdrawal amount is ₦6,000 to ensure efficient processing and coverage of standard network operations.</p>
                     </div>
                   </div>
                 </div>
@@ -5805,8 +5820,6 @@ function MainApp() {
                   disabled={isProcessing}
                   onClick={async () => {
                     await handleInvest(equinorSelectedPlan.name, equinorSelectedPlan.buyAmount, equinorSelectedPlan.roi, equinorSelectedPlan.days || 30, equinorSelectedPlan.type, equinorSelectedPlan.fixedDailyReturn, equinorSelectedPlan.tPlusDays, Number(buyingQuantity), equinorSelectedPlan.total_duration_days || equinorSelectedPlan.days || 30, equinorSelectedPlan.payout_cycle_days || equinorSelectedPlan.tPlusDays || 1, getAudienceType(equinorSelectedPlan));
-                    setOrderTab(equinorSelectedPlan.type as any);
-                    setActiveTab("order");
                   }}
                   className={`flex-1 py-3 rounded-full text-white font-semibold text-[15px] shadow-sm transform transition ${isProcessing ? 'bg-gray-400 scale-[0.98]' : 'bg-[#7367F0] hover:bg-[#7367F0]/90 active:scale-95'}`}
                 >
@@ -5817,34 +5830,7 @@ function MainApp() {
           </div>
         )}
 
-        {activeModal === "purchaseSuccess" && (
-          <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 transition-opacity duration-200" onClick={() => setActiveModal(null)}>
-            <div className="bg-white rounded-[20px] w-full max-w-[320px] flex flex-col items-center text-center relative shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <div className="w-full py-8 px-6 pb-6 flex flex-col items-center">
-                <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
-                  <Check className="w-8 h-8 text-emerald-500" />
-                </div>
-                <h2 className="text-[24px] font-bold text-black mb-2 tracking-[-0.02em]">Purchase Successful!</h2>
-                <p className="text-gray-500 text-[14px] leading-snug">
-                  Your product is now active.
-                </p>
-              </div>
 
-              <div className="w-full px-6 pb-6">
-                <button 
-                  onClick={() => {
-                     setActiveModal(null);
-                     setOrderTab("general");
-                     setActiveTab("order");
-                  }}
-                  className="w-full bg-[#EC4899] text-white py-3 rounded-[12px] font-bold active:scale-95 transition-transform text-[15px] shadow-lg"
-                >
-                  View Active Products
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {activeModal === "setup" && (
           <div className="absolute inset-0 z-50 flex flex-col bg-[#0A0E27] overflow-y-auto">
