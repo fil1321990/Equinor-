@@ -814,6 +814,7 @@ function MainApp() {
         let claimedBy = [];
         try { claimedBy = p.title ? JSON.parse(p.title) : []; } catch (e) { }
         return {
+          id: p.id,
           code: p.name,
           amount: p.min,
           minClaims: p.days,
@@ -822,8 +823,9 @@ function MainApp() {
           claimedBy,
           createdAt: p.roi
         };
-      });
-  }, [products]);
+      })
+      .filter(c => Date.now() <= c.createdAt + (c.validityMinutes * 60 * 1000) && c.claimedBy.length < c.maxClaims);
+  }, [products, tick]);
   const [newRedemptionAmount, setNewRedemptionAmount] = useState("");
   const [newRedemptionMin, setNewRedemptionMin] = useState("1");
   const [newRedemptionMax, setNewRedemptionMax] = useState("1");
@@ -852,6 +854,7 @@ function MainApp() {
   const [newProductTPlusDays, setNewProductTPlusDays] = useState("1");
   const [newProductQuota, setNewProductQuota] = useState("0");
   const [newProductDescription, setNewProductDescription] = useState("");
+  const [newProductDescColor, setNewProductDescColor] = useState("");
   const [newProductType, setNewProductType] = useState<"general"|"vip"|"special">("general");
   const [newProductAudienceType, setNewProductAudienceType] = useState<"all"|"new"|"old">("all");
   const [newProductImageUrl, setNewProductImageUrl] = useState("");
@@ -2879,7 +2882,7 @@ function MainApp() {
                                 <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
                                   Total income: ₦{totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                                 </div>
-                                <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                <div className="flex items-center justify-end font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
                                   {(() => {
                                     const userBoughtCount = investments.filter(inv => inv.userId === currentUser?.id && inv.planName === plan.name).reduce((sum, inv) => sum + (inv.quantity || 1), 0);
                                     return (
@@ -2889,11 +2892,11 @@ function MainApp() {
                                     );
                                   })()}
                                 </div>
-                                <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
-                                  Cycle: {plan.total_duration_days || plan.days} Days
-                                </div>
-                                <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                <div className="flex items-center justify-start font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
                                   Daily income: ₦{calculatedDailyReturn.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                                </div>
+                                <div className="flex items-center justify-end font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                  Cycle: {plan.total_duration_days || plan.days} Days
                                 </div>
                               </div>
                             </div>
@@ -3134,7 +3137,7 @@ function MainApp() {
                               <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
                                 Total income: ₦{totalIncome.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                               </div>
-                              <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                              <div className="flex items-center justify-end font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
                                 {(() => {
                                   const userBoughtCount = investments.filter(inv => inv.userId === currentUser?.id && inv.planName === plan.name).reduce((sum, inv) => sum + (inv.quantity || 1), 0);
                                   return (
@@ -3144,11 +3147,11 @@ function MainApp() {
                                   );
                                 })()}
                               </div>
-                              <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
-                                Cycle: {plan.total_duration_days || plan.days} Days
-                              </div>
-                              <div className="flex items-center font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                              <div className="flex items-center justify-start font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
                                 Daily income: ₦{calculatedDailyReturn.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                              </div>
+                              <div className="flex items-center justify-end font-bold text-[#1A1A1A] text-[12px] whitespace-nowrap">
+                                Cycle: {plan.total_duration_days || plan.days} Days
                               </div>
                             </div>
                           </div>
@@ -3370,7 +3373,7 @@ function MainApp() {
                           
 <div key={inv.id} className="relative bg-[#F8F9FF] rounded-[16px] mb-3 shadow-sm p-3 w-full">
   {/* 1. Full-width hero image */}
-  <div className="w-full h-[50px] rounded-[10px] overflow-hidden mb-2 bg-slate-800">
+  <div className="w-full h-[120px] rounded-[10px] overflow-hidden mb-2 bg-slate-800">
     {product?.imageUrl ? (
       <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
     ) : inv.planName.toLowerCase() === 'vip team exclusive project' ? (
@@ -3458,7 +3461,7 @@ function MainApp() {
   </div>
 
   {/* 3-up grid: daily income, cycle, total income */}
-  <div className="bg-[#E8E9FF] rounded-[10px] py-2 w-full mb-1">
+  <div className="bg-[#E8E9FF] rounded-[10px] py-1.5 w-full mb-1">
     <div className="grid grid-cols-3 divide-x divide-[#5B5FEF]/20 w-full px-1">
       <div className="flex flex-col items-center text-center px-1 overflow-hidden">
         <div className="text-[#5B5FEF] font-semibold text-[11px] sm:text-[12px] truncate w-full">₦{dailyIncome.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</div>
@@ -3476,7 +3479,7 @@ function MainApp() {
   </div>
 
   {/* Full single width block below the 3-up grid for Price */}
-  <div className="bg-[#E8E9FF] rounded-[8px] py-2 px-3 mb-2 flex flex-col items-center justify-center text-center">
+  <div className="bg-[#E8E9FF] rounded-[8px] py-1.5 px-3 mb-2 flex flex-col items-center justify-center text-center">
     <div className="text-[#5B5FEF] font-bold text-[14px]">Price: ₦{inv.amount.toLocaleString()}</div>
     <div className="text-[#5B5FEF] text-[10px] mt-0.5">Payment amount</div>
   </div>
@@ -3499,16 +3502,16 @@ function MainApp() {
                                      setStagedInvId(inv.id);
                                      setStagedPayoutAmount(profitAccrued);
                                   }}
-                                  className={`bg-[#FF4444] text-white px-8 py-2 rounded-[24px] font-semibold text-[16px] ${stagedCollections.includes(inv.id) ? 'opacity-80 scale-95' : 'active:scale-95'}`}
+                                  className={`bg-[#FF4444] text-white px-8 py-1.5 rounded-[24px] font-semibold text-[15px] ${stagedCollections.includes(inv.id) ? 'opacity-80 scale-95' : 'active:scale-95'}`}
                                 >
                                   {stagedCollections.includes(inv.id) ? "Collected" : "Get"}
                                 </button>
                               ) : isExpired ? (
-                                <div className="bg-[#E8E9FF] text-[#A0A0A0] px-8 py-2 rounded-[24px] font-semibold text-[16px]">
+                                <div className="bg-[#E8E9FF] text-[#A0A0A0] px-8 py-1.5 rounded-[24px] font-semibold text-[15px]">
                                   {inv.status === 'completed' ? 'Completed' : 'Expired'}
                                 </div>
                               ) : (
-                                <button className="bg-[#E8E9FF] text-[#A0A0A0] px-8 py-2 rounded-[24px] font-semibold text-[16px] cursor-not-allowed">
+                                <button className="bg-[#E8E9FF] text-[#A0A0A0] px-8 py-1.5 rounded-[24px] font-semibold text-[15px] cursor-not-allowed">
                                   Get
                                 </button>
                               )}
@@ -3615,7 +3618,7 @@ function MainApp() {
                 <div className="h-4 w-full"></div>
 
                 {/* Main container */}
-                <div className="bg-[#1E5BFF] rounded-t-[32px] pt-6 px-4 -mx-5 -mb-32 flex flex-col flex-1 w-[calc(100%+40px)] min-h-[calc(100vh-250px)] shadow-[0_-4px_20px_rgba(0,0,0,0.15)]">
+                <div className="bg-[#1E5BFF] rounded-t-[32px] pt-6 pb-32 px-4 -mx-5 -mb-32 flex flex-col flex-1 w-[calc(100%+40px)] min-h-[calc(100vh-250px)] shadow-[0_-4px_20px_rgba(0,0,0,0.15)]">
                   
                   {/* Top: Promo Card */}
                   <div 
@@ -3657,7 +3660,7 @@ function MainApp() {
                   <div className="h-4 w-full"></div>
 
                   {/* Bottom: Menu Container */}
-                  <div className="bg-white rounded-t-[16px] overflow-hidden flex flex-col flex-1 shadow-sm pb-32">
+                  <div className="bg-white rounded-[2.5rem] overflow-hidden flex flex-col shadow-sm mb-6">
                     {[
                       { icon: FileText, label: "Funding details", action: () => setActiveModal("fundingDetails") },
                       { icon: ClipboardList, label: "Commission Record", action: () => setActiveModal("commissionRecord") },
@@ -3675,7 +3678,7 @@ function MainApp() {
                       <div
                         key={index}
                         onClick={item.action}
-                        className={`flex items-center justify-between px-4 py-[14px] cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors text-black ${
+                        className={`flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors text-black ${
                           index !== arr.length - 1 ? 'border-b border-[#F5F5F5]' : ''
                         }`}
                       >
@@ -3690,7 +3693,7 @@ function MainApp() {
                     {/* Log Out Button */}
                     <div
                       onClick={logout}
-                      className="flex items-center justify-between px-4 py-[14px] cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors text-red-500 border-t border-[#F5F5F5]"
+                      className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors text-red-500 border-t border-[#F5F5F5]"
                     >
                       <div className="flex items-center gap-3">
                         <LogOut className="w-[22px] h-[22px] text-red-400 opacity-90" strokeWidth={1.8} />
@@ -3897,8 +3900,11 @@ function MainApp() {
                               setNewProductTitle(parsedTitle.text || "EQUINOR");
                               setNewProductTitleColor(parsedTitle.color || "#1E293B");
                               setNewProductTitleSize(parsedTitle.size?.toString() || "18");
-                              setNewProductDescription(p.description || "");
-                              setNewProductRoi(p.roi.toString());
+                              let parsedDesc: any = { text: p.description || "", color: "" };
+                              try { const pD = JSON.parse(p.description || ""); if (pD.text !== undefined) parsedDesc = pD; } catch(e) {}
+                              setNewProductDescription(parsedDesc.text);
+                              setNewProductDescColor(parsedDesc.color || "");
+                              setNewProductFixedDaily(p.fixedDailyReturn ? p.fixedDailyReturn.toString() : (p.min * (1 + p.roi / 100) / (p.total_duration_days || p.days)).toFixed(2));
                               setNewProductMin(p.min.toString());
                               setNewProductDays(p.days.toString());
                               setNewProductTPlusDays(p.tPlusDays?.toString() || "1");
@@ -4751,6 +4757,22 @@ function MainApp() {
                     const commTotal = filteredComm.reduce((sum, c) => sum + c.amount, 0);
                     const invTotal = filteredInv.reduce((sum, i) => sum + i.amount, 0);
 
+                    // Redemption Codes
+                    const allRedemptionProducts = products.filter(p => p.type === 'redemption_code');
+                    const allTimeRedemptionAmount = allRedemptionProducts.reduce((sum, p) => {
+                        let claimedBy = [];
+                        try { claimedBy = p.title ? JSON.parse(p.title) : []; } catch(e) {}
+                        return sum + (claimedBy.length * p.min);
+                    }, 0);
+                    const todayRedemptionUsers = allRedemptionProducts.reduce((sum, p) => {
+                        let claimedBy = [];
+                        try { claimedBy = p.title ? JSON.parse(p.title) : []; } catch(e) {}
+                        if (p.roi >= todayStart.getTime()) {
+                            return sum + claimedBy.length;
+                        }
+                        return sum;
+                    }, 0);
+
                     const StatCard = ({ title, value, subtitle }: { title: string, value: string | number, subtitle?: string }) => (
                       <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-xl p-3 flex flex-col justify-center text-center">
                          <div className="text-[10px] text-white/60 font-bold uppercase mb-1 tracking-wider">{title}</div>
@@ -4784,6 +4806,9 @@ function MainApp() {
                         <StatCard title="Approved Tx" value={approvedTx.length} />
                         
                         <StatCard title="Rejected Tx" value={rejectedTx.length} />
+
+                        <StatCard title="Daily Code Claims" value={todayRedemptionUsers} subtitle="Today" />
+                        <StatCard title="Total Code Value" value={typeof formatCurrency === 'function' ? formatCurrency(allTimeRedemptionAmount) : `₦${allTimeRedemptionAmount.toLocaleString()}`} subtitle="All Time" />
                       </div>
                     );
                   })()}
@@ -5676,11 +5701,11 @@ function MainApp() {
               </button>
               <h3 className="text-[23px] font-bold mb-4 text-white text-center">About Us</h3>
               
-              <div className="w-full h-40 mb-4 overflow-hidden relative flex-shrink-0">
+              <div className="w-full h-48 mb-4 overflow-hidden relative flex-shrink-0 flex items-center justify-center bg-white/5 border border-white/20 rounded-[2rem]">
                 <img 
                   src={aboutUsImage || "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ed/Equinor_logo.svg/1024px-Equinor_logo.svg.png"}
                   alt="Equinor" 
-                  className="w-full h-full object-contain relative z-10"
+                  className="w-full h-full object-cover relative z-10"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
                   }}
@@ -5732,28 +5757,40 @@ function MainApp() {
 
         {activeModal === "equinorConfirm" && equinorSelectedPlan && (
           <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 transition-opacity duration-200" onClick={() => setActiveModal(null)}>
-            <div className="bg-white rounded-[20px] w-full max-w-[320px] flex flex-col items-center relative shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <div className="w-full bg-[#1E1E2D] py-5 px-6 flex justify-between items-center text-white">
+            <div className="bg-[#0B1B3D]/90 backdrop-blur-xl border border-white/20 rounded-[20px] w-full max-w-[320px] flex flex-col items-center relative shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="w-full border-b border-white/10 py-5 px-6 flex justify-between items-center text-white">
                 <h3 className="font-bold text-[18px]">Confirm Purchase</h3>
-                <button onClick={() => setActiveModal(null)} className="text-white/60 hover:text-white p-1">
-                  ✕
+                <button onClick={() => setActiveModal(null)} className="text-white/60 hover:text-white p-1 flex items-center justify-center rounded-full bg-white/5">
+                  <X size={18} />
                 </button>
               </div>
-              <div className="w-full py-6 px-6 bg-[#F9FAFB] flex flex-col space-y-4">
-                {equinorSelectedPlan.description && (
-                  <div className="flex flex-col space-y-1 mb-2">
-                    <span className="text-gray-500 text-[12px] font-semibold uppercase tracking-wider">Description</span>
-                    <span className="text-gray-800 text-[13px] leading-relaxed break-words whitespace-pre-wrap bg-white p-3 rounded-lg border border-gray-100">{equinorSelectedPlan.description}</span>
-                  </div>
-                )}
+              <div className="w-full py-6 px-6 flex flex-col space-y-4">
+                {equinorSelectedPlan.description && (() => {
+                   let descText = equinorSelectedPlan.description;
+                   let descColor = "";
+                   try {
+                     const parsed = JSON.parse(equinorSelectedPlan.description);
+                     if (parsed.text !== undefined) {
+                        descText = parsed.text;
+                        descColor = parsed.color || "";
+                     }
+                   } catch(e) {}
+                   if (!descText) return null;
+                   return (
+                    <div className="flex flex-col space-y-1 mb-2">
+                      <span className="text-[#FBBF24] text-[12px] font-bold uppercase tracking-wider">Project Details</span>
+                      <span className="text-[13px] leading-relaxed break-words whitespace-pre-wrap bg-white/5 p-3 rounded-lg border border-white/10" style={{ color: descColor || 'rgba(255,255,255,0.9)' }}>{descText}</span>
+                    </div>
+                   );
+                })()}
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-500 text-[14px]">Project</span>
-                  <span className="text-gray-900 font-semibold text-[14px]">{equinorSelectedPlan.name}</span>
+                  <span className="text-white/60 text-[14px]">Project</span>
+                  <span className="text-white font-semibold text-[14px] text-right">{equinorSelectedPlan.name}</span>
                 </div>
-                <div className="h-[1px] bg-gray-200 w-full" />
+                <div className="h-[1px] bg-white/10 w-full" />
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-500 text-[14px]">Investment Amount (Unit)</span>
-                  <span className="text-gray-900 font-bold text-[16px]">₦{equinorSelectedPlan.buyAmount.toLocaleString()}</span>
+                  <span className="text-white/60 text-[14px]">Investment Amount (Unit)</span>
+                  <span className="text-white font-bold text-[16px]">₦{equinorSelectedPlan.buyAmount.toLocaleString()}</span>
                 </div>
                 <div className="flex flex-col gap-2">
                   <span className="text-gray-500 text-[14px]">Purchase Quantity (Quota)</span>
@@ -7090,19 +7127,19 @@ function MainApp() {
               <form
                 onSubmit={async (e) => {
                   e.preventDefault();
-                  if (newProductName && (newProductRoi || newProductFixedDaily) && newProductMin && newProductDays && newProductType) {
+                  if (newProductName && newProductFixedDaily && newProductMin && newProductDays && newProductType) {
                     setIsProcessingProduct(true);
                     const success = await addProduct({
                         name: newProductName,
                         title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize, audienceType: newProductAudienceType }),
-                        description: newProductDescription,
-                        roi: newProductFixedDaily ? (((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100 : Number(newProductRoi),
+                        description: JSON.stringify({ text: newProductDescription, color: newProductDescColor }),
+                        roi: (((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100,
+                        fixedDailyReturn: Number(newProductFixedDaily),
                         min: Number(newProductMin),
                         days: Number(newProductDays),
                         tPlusDays: Number(newProductTPlusDays),
                         maxQuota: Number(newProductQuota),
                         type: newProductType,
-                        fixedDailyReturn: newProductFixedDaily ? Number(newProductFixedDaily) : undefined,
                         imageUrl: newProductImageUrl,
                         promotionalUnlockDate: getOffsetMs(newProductPromoUnlock) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoUnlock)).toISOString() : undefined,
                         promoClosingDate: getOffsetMs(newProductPromoClosing) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoClosing)).toISOString() : undefined
@@ -7111,7 +7148,7 @@ function MainApp() {
                       if (success) {
                         setNewProductName("");
                         setNewProductTitle("EQUINOR");
-                        setNewProductDescription("");
+                        setNewProductDescription(""); setNewProductDescColor("");
                         setNewProductRoi("");
                         setNewProductMin("");
                         setNewProductDays("30");
@@ -7183,20 +7220,29 @@ function MainApp() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Profit Percentage (Total ROI %)</label>
-                  <input
-                    type="number"
-                    required={!newProductFixedDaily}
-                    value={newProductRoi}
-                    onChange={(e) => setNewProductRoi(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
-                    placeholder="e.g. 12"
-                  />
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Description Text Color</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={newProductDescColor || "#000000"}
+                      onChange={(e) => setNewProductDescColor(e.target.value)}
+                      className="w-12 h-12 bg-slate-50 border border-slate-200 rounded-xl p-1 cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={newProductDescColor}
+                      onChange={(e) => setNewProductDescColor(e.target.value)}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-[#0A0E2E] font-medium"
+                      placeholder="#FFFFFF or Leave empty for default"
+                    />
+                  </div>
                 </div>
+
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Fixed Daily Income (Optional)</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Daily Income</label>
                   <input
                     type="number"
+                    required
                     value={newProductFixedDaily}
                     onChange={(e) => setNewProductFixedDaily(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
@@ -7225,21 +7271,21 @@ function MainApp() {
                   />
                 </div>
                 {/* Preview block */}
-                {(newProductRoi || newProductFixedDaily) && newProductMin && newProductDays && (
+                {newProductFixedDaily && newProductMin && newProductDays && (
                   <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl">
                     <p className="text-[10px] font-bold text-indigo-800 mb-2 uppercase tracking-wider">Income Preview</p>
                     <div className="grid grid-cols-3 gap-4">
                       <div>
                         <p className="text-[11px] text-indigo-600 font-medium">Daily Income</p>
-                        <p className="text-[14px] font-bold text-indigo-900">₦{newProductFixedDaily ? Number(newProductFixedDaily).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : (Number(newProductMin) * (1 + Number(newProductRoi) / 100) / Number(newProductDays)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                        <p className="text-[14px] font-bold text-indigo-900">₦{Number(newProductFixedDaily).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
                       </div>
                       <div>
                         <p className="text-[11px] text-indigo-600 font-medium">Total Return</p>
-                        <p className="text-[14px] font-bold text-indigo-900">₦{newProductFixedDaily ? (Number(newProductFixedDaily) * Number(newProductDays)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : (Number(newProductMin) * (1 + Number(newProductRoi) / 100)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                        <p className="text-[14px] font-bold text-indigo-900">₦{(Number(newProductFixedDaily) * Number(newProductDays)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
                       </div>
                       <div>
                         <p className="text-[11px] text-indigo-600 font-medium">Effective ROI</p>
-                        <p className="text-[14px] font-bold text-indigo-900">{newProductFixedDaily ? ((((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : Number(newProductRoi).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}%</p>
+                        <p className="text-[14px] font-bold text-indigo-900">{((((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}%</p>
                       </div>
                     </div>
                   </div>
@@ -7397,13 +7443,14 @@ function MainApp() {
               <form
                 onSubmit={async (e) => {
                   e.preventDefault();
-                  if (newProductName && newProductRoi && newProductMin && newProductDays && newProductType) {
+                  if (newProductName && newProductFixedDaily && newProductMin && newProductDays && newProductType) {
                     setIsProcessingProduct(true);
                     await editProduct(editingProduct.id, {
                         name: newProductName,
                         title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize, audienceType: newProductAudienceType }),
-                        description: newProductDescription,
-                        roi: newProductFixedDaily ? (((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100 : Number(newProductRoi),
+                        description: JSON.stringify({ text: newProductDescription, color: newProductDescColor }),
+                        roi: (((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100,
+                        fixedDailyReturn: Number(newProductFixedDaily),
                         min: Number(newProductMin),
                         days: Number(newProductDays),
                         tPlusDays: Number(newProductTPlusDays),
@@ -7415,7 +7462,7 @@ function MainApp() {
                             });
                       setNewProductName("");
                       setNewProductTitle("EQUINOR");
-                      setNewProductDescription("");
+                      setNewProductDescription(""); setNewProductDescColor("");
                       setNewProductRoi("");
                       setNewProductMin("");
                       setNewProductDays("30");
@@ -7487,20 +7534,29 @@ function MainApp() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Profit Percentage (Total ROI %)</label>
-                  <input
-                    type="number"
-                    required={!newProductFixedDaily}
-                    value={newProductRoi}
-                    onChange={(e) => setNewProductRoi(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
-                    placeholder="e.g. 12"
-                  />
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Description Text Color</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={newProductDescColor || "#000000"}
+                      onChange={(e) => setNewProductDescColor(e.target.value)}
+                      className="w-12 h-12 bg-slate-50 border border-slate-200 rounded-xl p-1 cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={newProductDescColor}
+                      onChange={(e) => setNewProductDescColor(e.target.value)}
+                      className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 text-[#0A0E2E] font-medium"
+                      placeholder="#FFFFFF or Leave empty for default"
+                    />
+                  </div>
                 </div>
+
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Fixed Daily Income (Optional)</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Daily Income</label>
                   <input
                     type="number"
+                    required
                     value={newProductFixedDaily}
                     onChange={(e) => setNewProductFixedDaily(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium"
@@ -7529,21 +7585,21 @@ function MainApp() {
                   />
                 </div>
                 {/* Preview block */}
-                {(newProductRoi || newProductFixedDaily) && newProductMin && newProductDays && (
+                {newProductFixedDaily && newProductMin && newProductDays && (
                   <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-xl">
                     <p className="text-[10px] font-bold text-indigo-800 mb-2 uppercase tracking-wider">Income Preview</p>
                     <div className="grid grid-cols-3 gap-4">
                       <div>
                         <p className="text-[11px] text-indigo-600 font-medium">Daily Income</p>
-                        <p className="text-[14px] font-bold text-indigo-900">₦{newProductFixedDaily ? Number(newProductFixedDaily).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : (Number(newProductMin) * (1 + Number(newProductRoi) / 100) / Number(newProductDays)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                        <p className="text-[14px] font-bold text-indigo-900">₦{Number(newProductFixedDaily).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
                       </div>
                       <div>
                         <p className="text-[11px] text-indigo-600 font-medium">Total Return</p>
-                        <p className="text-[14px] font-bold text-indigo-900">₦{newProductFixedDaily ? (Number(newProductFixedDaily) * Number(newProductDays)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : (Number(newProductMin) * (1 + Number(newProductRoi) / 100)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
+                        <p className="text-[14px] font-bold text-indigo-900">₦{(Number(newProductFixedDaily) * Number(newProductDays)).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</p>
                       </div>
                       <div>
                         <p className="text-[11px] text-indigo-600 font-medium">Effective ROI</p>
-                        <p className="text-[14px] font-bold text-indigo-900">{newProductFixedDaily ? ((((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}) : Number(newProductRoi).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}%</p>
+                        <p className="text-[14px] font-bold text-indigo-900">{((((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}%</p>
                       </div>
                     </div>
                   </div>
