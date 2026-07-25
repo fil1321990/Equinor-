@@ -103,10 +103,12 @@ export interface Product {
   imageUrl?: string;
   tPlusDays?: number;
   maxQuota?: number;
+  globalQuota?: number;
   max_quota?: number;
   sold_count?: number;
   promotionalUnlockDate?: string;
   promoClosingDate?: string;
+  countsForVip?: boolean;
 }
 
 export interface BankDetails {
@@ -589,6 +591,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const editProduct = async (id: string, product: Partial<Product>) => {
     const { error } = await supabase.from('products').update(product).eq('id', id);
+    if (error) console.error("Edit product error:", error);
     if (!error) {
       setProducts((prev) =>
         prev.map((p) => (p.id === id ? { ...p, ...product } : p))
@@ -598,6 +601,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const deleteProduct = async (id: string) => {
     const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) console.error("Edit product error:", error);
     if (!error) {
       setProducts((prev) => prev.filter((p) => p.id !== id));
     } else {
@@ -888,15 +892,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const product = products.find(p => p.name === planName);
     if (product) {
-      const quota = product.max_quota || product.maxQuota || 0;
+      const userQuota = product.max_quota || product.maxQuota || 0;
+      const globalQuota = product.globalQuota || 0;
       const soldCount = product.sold_count || 0;
-      if (quota > 0) {
+      if (userQuota > 0) {
         const userBoughtCount = investments.filter(inv => inv.userId === currentUser.id && inv.planName === planName && inv.status !== 'expired').reduce((sum, inv) => sum + (inv.quantity || 1), 0);
-        if (userBoughtCount + (quantity || 1) > quota) {
-          alert(`You have reached the maximum purchase limit of ${quota} for this product`);
+        if (userBoughtCount + (quantity || 1) > userQuota) {
+          alert(`You have reached the maximum purchase limit of ${userQuota} for this product`);
           return;
         }
-        if (soldCount >= quota) {
+      }
+      if (globalQuota > 0) {
+        if (soldCount + (quantity || 1) > globalQuota) {
           alert(`This product is sold out`);
           return;
         }
@@ -1219,6 +1226,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const disableUser = async (userId: string) => {
     // Instead of using a 'disabled' column which may not exist, we use the role property
     const { error } = await supabase.from('users').update({ role: 'disabled', disabled: true }).eq('id', userId);
+    if (error) console.error("Edit product error:", error);
     if (!error) {
       setUsers((users) =>
         users.map((u) =>
@@ -1238,6 +1246,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const enableUser = async (userId: string) => {
     const { error } = await supabase.from('users').update({ role: 'user', disabled: false }).eq('id', userId);
+    if (error) console.error("Edit product error:", error);
     if (!error) {
       setUsers((users) =>
         users.map((u) =>
@@ -1256,6 +1265,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const restrictUserWithdrawals = async (userId: string, restricted: boolean) => {
     const { error } = await supabase.from('users').update({ withdrawalRestricted: restricted }).eq('id', userId);
     globalMutate('appData');
+    if (error) console.error("Edit product error:", error);
     if (!error) {
        setUsers((users) =>
          users.map((u) =>
@@ -1758,6 +1768,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const editSystemDepositAccount = async (id: string, account: Partial<SystemDepositAccount>) => {
     const { error } = await supabase.from('system_deposit_accounts').update(account).eq('id', id);
     globalMutate('appData');
+    if (error) console.error("Edit product error:", error);
     if (!error) {
       setSystemDepositAccounts(prev => prev.map(a => a.id === id ? { ...a, ...account } : a));
     }
@@ -1766,6 +1777,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const deleteSystemDepositAccount = async (id: string) => {
     const { error } = await supabase.from('system_deposit_accounts').delete().eq('id', id);
     globalMutate('appData');
+    if (error) console.error("Edit product error:", error);
     if (!error) {
       setSystemDepositAccounts(prev => prev.filter(a => a.id !== id));
     }

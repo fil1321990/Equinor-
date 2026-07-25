@@ -432,11 +432,11 @@ const processImageUpload = async (file: File): Promise<string> => {
 };
 
 const getPrizeDrawReward = (productAmount: number) => {
-  const possibleOptions = [20, 30, 40, 50, 70, 80, 90, 100, 150, 200, 250, 300, 350, 400, 450, 500];
-  if (productAmount < 2000) return possibleOptions[Math.floor(Math.random() * 4)]; // 20 - 50
-  if (productAmount < 5000) return possibleOptions[Math.floor(Math.random() * 4) + 4]; // 70 - 100
-  if (productAmount < 15000) return possibleOptions[Math.floor(Math.random() * 4) + 8]; // 150 - 300
-  return possibleOptions[Math.floor(Math.random() * 4) + 12]; // 350 - 500
+  const possibleOptions = [50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 200, 250, 300];
+  if (productAmount < 5000) return possibleOptions[Math.floor(Math.random() * 5)]; // 50 - 90
+  if (productAmount < 15000) return possibleOptions[Math.floor(Math.random() * 5) + 5]; // 100 - 140
+  if (productAmount < 50000) return possibleOptions[Math.floor(Math.random() * 4) + 10]; // 150 - 180
+  return possibleOptions[Math.floor(Math.random() * 3) + 14]; // 200 - 300
 };
 
 function MainApp() {
@@ -853,6 +853,7 @@ function MainApp() {
   const [newProductDays, setNewProductDays] = useState("30");
   const [newProductTPlusDays, setNewProductTPlusDays] = useState("1");
   const [newProductQuota, setNewProductQuota] = useState("0");
+  const [newProductGlobalQuota, setNewProductGlobalQuota] = useState("0");
   const [newProductDescription, setNewProductDescription] = useState("");
   const [newProductDescColor, setNewProductDescColor] = useState("");
   const [newProductType, setNewProductType] = useState<"general"|"vip"|"special">("general");
@@ -860,6 +861,7 @@ function MainApp() {
   const [newProductImageUrl, setNewProductImageUrl] = useState("");
   const [newProductPromoUnlock, setNewProductPromoUnlock] = useState({ d: "", h: "", m: "", s: "" });
   const [newProductPromoClosing, setNewProductPromoClosing] = useState({ d: "", h: "", m: "", s: "" });
+  const [newProductCountsForVip, setNewProductCountsForVip] = useState(true);
   const [newDepositAccountBank, setNewDepositAccountBank] = useState("Opay");
   const [newDepositAccountName, setNewDepositAccountName] = useState("");
   const [newDepositAccountNumber, setNewDepositAccountNumber] = useState("");
@@ -1083,7 +1085,7 @@ function MainApp() {
 
   // They only get credit for verified active referrals who have an active investment
   const currentReferrals = currentUser
-    ? users.filter((u) => u.referredBy === currentUser.referralCode && investments.some(i => i.userId === u.id && i.status === 'active')).length
+    ? users.filter((u) => u.referredBy === currentUser.referralCode && investments.some(i => i.userId === u.id && i.status === 'active' && (getCountsForVip(products.find(p => p.name === i.planName) || {})))).length
     : 0;
   const requiredReferrals = nextVipLevel ? nextVipLevel.requiredFromPrev : 0;
   
@@ -1129,6 +1131,11 @@ function MainApp() {
     const amountNum = Number(withdrawAmount);
     if (amountNum < 6000) {
       triggerVisualNotification("alert", "Notice", "Minimum withdrawal is ₦6,000");
+      return;
+    }
+
+    if (amountNum > 600000) {
+      triggerVisualNotification("alert", "Notice", "Maximum withdrawal is ₦600,000");
       return;
     }
     
@@ -1679,11 +1686,11 @@ function MainApp() {
                     return (
                       <div key={day} className="aspect-square relative flex items-center justify-center">
                         <div className={`w-10 h-10 sm:w-11 sm:h-11 border-[1.5px] rounded-lg relative flex flex-col items-center justify-center gap-1 ${checked ? "bg-white/10 border-[#FFC107]" : "bg-transparent border-transparent"}`}>
-                          {isBonusDay && (
+                          {/* {isBonusDay && (
                             <div className="absolute -top-2 -right-2 bg-[#4ade80] text-[#0a0a1a] text-[9px] font-bold px-1 py-0.5 rounded-md leading-none shadow-sm z-10">
                               ₦{BONUSES[day as keyof typeof BONUSES]}
                             </div>
-                          )}
+                          )} */}
                           {checked ? (
                             <div className="w-4 h-4 bg-[#FFC107] rounded-full flex items-center justify-center shadow-sm shrink-0">
                               <Check className="text-[#0a0a1a] w-3 h-3 stroke-[4]" />
@@ -2715,14 +2722,17 @@ function MainApp() {
                     const promoDiff = plan.promotionalUnlockDate ? new Date(plan.promotionalUnlockDate).getTime() - Date.now() : 0;
                     const isPromoLocked = promoDiff > 0;
                     const planQuota = plan.max_quota || plan.maxQuota || 0;
+                    const globalQuota = plan.globalQuota || 0;
+                    const soldCount = plan.sold_count || 0;
                     const userBoughtCountForPlan = investments.filter(inv => inv.userId === currentUser?.id && inv.planName === plan.name && inv.status !== 'completed').reduce((sum, inv) => sum + (inv.quantity || 1), 0);
                     const isQuotaReached = planQuota > 0 && userBoughtCountForPlan >= planQuota;
-                    const isSoldOut = planQuota > 0 && (plan.sold_count !== undefined && plan.sold_count >= planQuota);
+                    const isSoldOut = globalQuota > 0 && soldCount >= globalQuota;
+                    
                     let buttonText = "Rush to buy";
                     if (isPromoLocked) buttonText = "Locked";
-                    else if (isSoldOut) buttonText = "Quota Reached";
-                    else if (isQuotaReached) buttonText = "Quota Reached";
-                    const isButtonDisabled = isPromoLocked || isQuotaReached || isSoldOut;
+                    else if (isSoldOut) buttonText = "Sold Out";
+                    
+                    const isButtonDisabled = isPromoLocked || isSoldOut || (isQuotaReached && (buttonText="Quota Reached", true));
                     let promoTimerString = "";
                     if (isPromoLocked) {
                       const h = Math.floor(promoDiff / (1000 * 60 * 60));
@@ -3263,9 +3273,9 @@ function MainApp() {
                 <div className="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none overflow-hidden z-0">
                   <EquinorStar className="w-[60vw] max-w-[300px] text-white absolute" />
                 </div>
-                <div className="relative z-10 p-4 pt-4 flex flex-col h-full overflow-hidden w-full max-w-md mx-auto">
+                <div className="relative z-10 p-4 pt-2 flex flex-col h-full overflow-hidden w-full max-w-md mx-auto">
                   {/* Summary Cards outside scroll */}
-                  <div className="flex gap-2 mb-1 shrink-0 z-10 w-full mt-1">
+                  <div className="flex gap-2 mb-1 shrink-0 z-10 w-full mt-0">
                     {/* Left Card */}
                     <div className="flex-1 bg-gradient-to-br from-[#FFB800] to-[#FFA000] rounded-[12px] p-3 text-white shadow-md flex flex-col justify-center min-w-0">
                       <div className="text-[14px] xs:text-[16px] font-black leading-tight mb-1 truncate">
@@ -3502,7 +3512,7 @@ function MainApp() {
                                      setStagedInvId(inv.id);
                                      setStagedPayoutAmount(profitAccrued);
                                   }}
-                                  className={`bg-[#FF4444] text-white px-8 py-1.5 rounded-[24px] font-semibold text-[15px] ${stagedCollections.includes(inv.id) ? 'opacity-80 scale-95' : 'active:scale-95'}`}
+                                  className={`bg-[#7B2FFF] text-white px-8 py-1.5 rounded-[24px] font-semibold text-[15px] shadow-[0_4px_12px_rgba(123,47,255,0.4)] ${stagedCollections.includes(inv.id) ? 'opacity-80 scale-95' : 'active:scale-95 transition-transform'}`}
                                 >
                                   {stagedCollections.includes(inv.id) ? "Collected" : "Get"}
                                 </button>
@@ -3618,7 +3628,7 @@ function MainApp() {
                 <div className="h-4 w-full"></div>
 
                 {/* Main container */}
-                <div className="bg-[#1E5BFF] rounded-t-[32px] pt-6 pb-32 px-4 -mx-5 -mb-32 flex flex-col flex-1 w-[calc(100%+40px)] min-h-[calc(100vh-250px)] shadow-[0_-4px_20px_rgba(0,0,0,0.15)]">
+                <div className="bg-[#1A237E] rounded-t-[32px] pt-6 pb-32 px-4 -mx-5 -mb-32 flex flex-col flex-1 w-[calc(100%+40px)] min-h-[calc(100vh-250px)] shadow-[0_-4px_20px_rgba(0,0,0,0.15)]">
                   
                   {/* Top: Promo Card */}
                   <div 
@@ -3795,7 +3805,7 @@ function MainApp() {
                     setNewProductMin("");
                     setNewProductDays("30");
                     setNewProductTPlusDays("1");
-                    setNewProductQuota("0");
+                    setNewProductQuota("0"); setNewProductGlobalQuota("0");
                     setNewProductType("general");
                         setNewProductAudienceType("all");
                     setNewProductImageUrl("");
@@ -3909,6 +3919,7 @@ function MainApp() {
                               setNewProductDays(p.days.toString());
                               setNewProductTPlusDays(p.tPlusDays?.toString() || "1");
                               setNewProductQuota(p.maxQuota?.toString() || "0");
+                              setNewProductGlobalQuota(p.globalQuota?.toString() || "0");
                               setNewProductType(p.type as any);
                               setNewProductAudienceType(getAudienceType(p));
                               setNewProductImageUrl(p.imageUrl || "");
@@ -3936,6 +3947,7 @@ function MainApp() {
                                 }
                               }
                               setNewProductPromoClosing({ d: closingD, h: closingH, m: closingM, s: closingS });
+                              setNewProductCountsForVip(getCountsForVip(p));
                               setActiveModal("editProduct");
                             }}
                             className="flex-1 bg-white/10 hover:bg-white/20 text-white py-1.5 rounded-lg text-xs font-bold transition-colors"
@@ -4923,14 +4935,15 @@ function MainApp() {
               </div>
              ) : notificationData.type === 'purchase_success' ? (
               <div 
-                className="relative w-full max-w-[340px] rounded-[24px] bg-gradient-to-b from-[#FFF0F5] to-[#FFFAFC] border-[2px] border-white shadow-[0_8px_24px_rgba(0,0,0,0.15)] flex flex-col items-center pt-8 pb-6 px-6 animate-in zoom-in-95 duration-300"
+                className="relative w-full max-w-[340px] p-1.5 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.3)] animate-in zoom-in-95 duration-300"
                 onClick={e => e.stopPropagation()}
               >
-                <div className="absolute inset-0 overflow-hidden rounded-[24px] pointer-events-none">
-                  <Confetti width={340} height={400} recycle={false} numberOfPieces={150} colors={['#FFB3D9', '#7FE7FF', '#D9B3FF', '#FF6B6B']} />
-                </div>
-                
-                <div className="relative mb-4 mt-2">
+                <div className="relative w-full rounded-xl bg-gradient-to-b from-[#FFF0F5] to-[#FFFAFC] shadow-inner flex flex-col items-center pt-8 pb-6 px-6 overflow-hidden">
+                  <div className="absolute inset-0 pointer-events-none z-0">
+                    <Confetti width={340} height={400} recycle={false} numberOfPieces={150} colors={['#FFB3D9', '#7FE7FF', '#D9B3FF', '#FF6B6B']} />
+                  </div>
+                  
+                  <div className="relative mb-4 mt-2 z-10">
                    <div className="absolute w-4 h-4 bg-[#FFB3D9] -top-2 -left-4 rotate-12 rounded-sm" />
                    <div className="absolute w-5 h-5 bg-[#7FE7FF] -bottom-2 -left-6 -rotate-12 rounded-sm" />
                    <div className="absolute w-4 h-4 bg-[#D9B3FF] -top-1 -right-5 rotate-45 rounded-sm" />
@@ -4958,6 +4971,7 @@ function MainApp() {
                 >
                   Confirm
                 </button>
+                </div>
               </div>
             ) : (
               <div className="relative w-full max-w-[340px] aspect-[3/4] rounded-[24px] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
@@ -5692,7 +5706,7 @@ function MainApp() {
 
         {activeModal === "about" && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-3 sm:p-4">
-            <div className="bg-[#0B1B3D] border border-white/10 p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] w-full relative shadow-2xl max-h-[92vh] flex flex-col">
+            <div className="bg-[#1A237E] border border-white/10 p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] w-full relative shadow-2xl max-h-[92vh] flex flex-col">
               <button
                 onClick={() => setActiveModal(null)}
                 className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center bg-white/10 rounded-full text-white/50 hover:text-white"
@@ -5737,8 +5751,8 @@ function MainApp() {
                       <p className="text-[#10B981] text-[14.5px] leading-relaxed">We do not charge any internal fees for deposits. Please ensure you transfer the exact amount displayed during the recharge process.</p>
                     </div>
                     <div className="bg-white/5 rounded-xl p-4 border border-white/5">
-                      <h5 className="font-semibold text-white text-[15px] mb-1.5">What is the minimum withdrawal amount?</h5>
-                      <p className="text-[#10B981] text-[14.5px] leading-relaxed">The minimum withdrawal amount is ₦6,000 to ensure efficient processing and coverage of standard network operations.</p>
+                      <h5 className="font-semibold text-white text-[15px] mb-1.5">What are the withdrawal limits and fees?</h5>
+                      <p className="text-[#10B981] text-[14.5px] leading-relaxed">The minimum withdrawal amount is ₦6,000 and the maximum is ₦600,000. A 12% service charge applies to all withdrawals. Requests are processed daily between 10:00 AM and 5:00 PM (WAT).</p>
                     </div>
                   </div>
                 </div>
@@ -5757,7 +5771,7 @@ function MainApp() {
 
         {activeModal === "equinorConfirm" && equinorSelectedPlan && (
           <div className="absolute inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 transition-opacity duration-200" onClick={() => setActiveModal(null)}>
-            <div className="bg-[#0B1B3D]/90 backdrop-blur-xl border border-white/20 rounded-[20px] w-full max-w-[320px] flex flex-col items-center relative shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-[#1A237E] backdrop-blur-xl border border-white/20 rounded-[20px] w-full max-w-[320px] flex flex-col items-center relative shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
               <div className="w-full border-b border-white/10 py-5 px-6 flex justify-between items-center text-white">
                 <h3 className="font-bold text-[18px]">Confirm Purchase</h3>
                 <button onClick={() => setActiveModal(null)} className="text-white/60 hover:text-white p-1 flex items-center justify-center rounded-full bg-white/5">
@@ -6243,25 +6257,6 @@ function MainApp() {
                 if (myTransactions.length === 0) {
                   return (
                     <div className="flex-1 flex flex-col items-center justify-center h-full -mt-10 pt-20">
-                      <div className="relative w-40 h-40 flex items-center justify-center mb-6">
-                         <div className="absolute inset-0 bg-[#3B82F6] blur-[60px] opacity-20 rounded-full"></div>
-                         <svg width="80" height="100" viewBox="0 0 80 100" fill="none" className="relative z-10 drop-shadow-[0_10px_20px_rgba(123,47,255,0.4)]">
-                           <linearGradient id="bookmarkGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-                             <stop stopColor="#4DA8FF" />
-                             <stop offset="1" stopColor="#7B2FFF" />
-                           </linearGradient>
-                           <path d="M10,0 C4.5,0 0,4.5 0,10 L0,100 L40,80 L80,100 L80,10 C80,4.5 75.5,0 70,0 L10,0 Z" fill="url(#bookmarkGrad)"/>
-                           <path d="M40,20 L45,35 L60,35 L48,45 L52,60 L40,50 L28,60 L32,45 L20,35 L35,35 Z" fill="#FFD700" className="drop-shadow-[0_0_8px_rgba(255,215,0,0.6)]" />
-                         </svg>
-                         <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 160 160">
-                           <circle cx="20" cy="40" r="4" fill="#4DA8FF" opacity="0.6" />
-                           <circle cx="140" cy="60" r="3" fill="#A855F7" opacity="0.8" />
-                           <circle cx="30" cy="120" r="5" fill="#FFD700" opacity="0.4" />
-                           <circle cx="130" cy="110" r="4" fill="#3B82F6" opacity="0.5" />
-                           <path d="M 40 100 C 35 100 30 105 30 110 C 30 115 35 120 40 120 L 120 120 C 125 120 130 115 130 110 C 130 105 125 100 120 100 Z" fill="rgba(80,80,200,0.15)" />
-                           <path d="M 45 105 C 45 95 55 90 65 95 C 70 85 85 85 90 95 C 100 90 110 95 110 105 Z" fill="rgba(80,80,200,0.2)" />
-                         </svg>
-                      </div>
                       <h3 className="text-white/60 text-[16px] mb-8 font-medium">
                         {txSearch ? 'No transactions match your search' : 
                          fundingTab === 'deposit' ? 'No recharge records' : 
@@ -6894,9 +6889,11 @@ function MainApp() {
               
               <div className="overflow-y-auto pr-2 scrollbar-hide flex-1 space-y-4 text-white/80 text-sm leading-relaxed">
                 <p>1. Ensure your bank details are correct before requesting a withdrawal.</p>
-                <p>2. The minimum withdrawal amount is ₦6,000.</p>
-                <p>3. Withdrawals typically arrive between 2 to 24 hours after submitting the withdrawal request. Delays may occur during weekends or public holidays.</p>
-                <p>4. Please wait for the current withdrawal request to be completed before submitting a new one.</p>
+                <p>2. The minimum withdrawal amount is ₦6,000, and the maximum is ₦600,000.</p>
+                <p>3. Withdrawal requests are processed daily between 10:00 AM and 5:00 PM (WAT).</p>
+                <p>4. A 12% service charge applies to all withdrawals.</p>
+                <p>5. Withdrawals typically arrive within 2 to 24 hours. Delays may occur during weekends or public holidays.</p>
+                <p>6. Please allow your current withdrawal to complete before submitting a new request.</p>
               </div>
               
               <div className="mt-6 border-t border-white/10 pt-4">
@@ -7131,7 +7128,7 @@ function MainApp() {
                     setIsProcessingProduct(true);
                     const success = await addProduct({
                         name: newProductName,
-                        title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize, audienceType: newProductAudienceType }),
+                        title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize, audienceType: newProductAudienceType, countsForVip: newProductCountsForVip }),
                         description: JSON.stringify({ text: newProductDescription, color: newProductDescColor }),
                         roi: (((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100,
                         fixedDailyReturn: Number(newProductFixedDaily),
@@ -7139,10 +7136,12 @@ function MainApp() {
                         days: Number(newProductDays),
                         tPlusDays: Number(newProductTPlusDays),
                         maxQuota: Number(newProductQuota),
+                        globalQuota: Number(newProductGlobalQuota),
                         type: newProductType,
                         imageUrl: newProductImageUrl,
                         promotionalUnlockDate: getOffsetMs(newProductPromoUnlock) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoUnlock)).toISOString() : undefined,
-                        promoClosingDate: getOffsetMs(newProductPromoClosing) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoClosing)).toISOString() : undefined
+                        promoClosingDate: getOffsetMs(newProductPromoClosing) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoClosing)).toISOString() : undefined,
+                        
                             });
                       setIsProcessingProduct(false);
                       if (success) {
@@ -7153,12 +7152,13 @@ function MainApp() {
                         setNewProductMin("");
                         setNewProductDays("30");
                         setNewProductTPlusDays("1");
-                        setNewProductQuota("0");
+                        setNewProductQuota("0"); setNewProductGlobalQuota("0");
                         setNewProductType("general");
                         setNewProductAudienceType("all");
                         setNewProductImageUrl("");
                         setNewProductPromoUnlock("");
                         setNewProductPromoClosing("");
+                        setNewProductCountsForVip(true);
                         setActiveModal(null);
                         // triggerVisualNotification("alert", "Notice", "Product added successfully!");
                       }
@@ -7302,7 +7302,22 @@ function MainApp() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Max Quota (0 for unlimited)</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Total stock / Global quota (0 = unlimited)</label>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setNewProductGlobalQuota(String(Math.max(0, Number(newProductGlobalQuota) - 1)))} className="bg-slate-200 p-3 rounded-lg font-bold text-slate-700 w-12 flex items-center justify-center hover:bg-slate-300">-</button>
+                    <input
+                      type="number"
+                      required
+                      value={newProductGlobalQuota}
+                      onChange={(e) => setNewProductGlobalQuota(e.target.value)}
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium text-center"
+                      placeholder="e.g. 1000"
+                    />
+                    <button type="button" onClick={() => setNewProductGlobalQuota(String(Number(newProductGlobalQuota) + 1))} className="bg-slate-200 p-3 rounded-lg font-bold text-slate-700 w-12 flex items-center justify-center hover:bg-slate-300">+</button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Purchase limit / Per user quota (0 = unlimited)</label>
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={() => setNewProductQuota(String(Math.max(0, Number(newProductQuota) - 1)))} className="bg-slate-200 p-3 rounded-lg font-bold text-slate-700 w-12 flex items-center justify-center hover:bg-slate-300">-</button>
                     <input
@@ -7333,6 +7348,16 @@ function MainApp() {
                     </div>
                   </div>
                 </div>
+                <div className="flex items-center justify-between bg-slate-50 border border-slate-200 p-4 rounded-xl mb-4">
+                  <div>
+                    <label className="block text-sm font-bold text-[#0A0E2E]">Counts for VIP Upgrade</label>
+                    <span className="text-xs text-slate-500 block mt-1">If checked, subordinates buying this product count towards VIP upgrade.</span>
+                  </div>
+                  <button type="button" onClick={() => setNewProductCountsForVip(!newProductCountsForVip)} className={`w-12 h-6 rounded-full relative transition-colors ${newProductCountsForVip ? "bg-[#7B2FF7]" : "bg-slate-300"} shrink-0`}>
+                    <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${newProductCountsForVip ? "translate-x-6" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Audience Type</label>
                   <div className="relative">
@@ -7447,7 +7472,7 @@ function MainApp() {
                     setIsProcessingProduct(true);
                     await editProduct(editingProduct.id, {
                         name: newProductName,
-                        title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize, audienceType: newProductAudienceType }),
+                        title: JSON.stringify({ text: newProductTitle, color: newProductTitleColor, size: newProductTitleSize, audienceType: newProductAudienceType, countsForVip: newProductCountsForVip }),
                         description: JSON.stringify({ text: newProductDescription, color: newProductDescColor }),
                         roi: (((Number(newProductFixedDaily) * Number(newProductDays)) - Number(newProductMin)) / Number(newProductMin)) * 100,
                         fixedDailyReturn: Number(newProductFixedDaily),
@@ -7455,10 +7480,12 @@ function MainApp() {
                         days: Number(newProductDays),
                         tPlusDays: Number(newProductTPlusDays),
                         maxQuota: Number(newProductQuota),
+                        globalQuota: Number(newProductGlobalQuota),
                         type: newProductType,
                         imageUrl: newProductImageUrl,
                         promotionalUnlockDate: getOffsetMs(newProductPromoUnlock) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoUnlock)).toISOString() : undefined,
-                        promoClosingDate: getOffsetMs(newProductPromoClosing) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoClosing)).toISOString() : undefined
+                        promoClosingDate: getOffsetMs(newProductPromoClosing) > 0 ? new Date(Date.now() + getOffsetMs(newProductPromoClosing)).toISOString() : undefined,
+                        
                             });
                       setNewProductName("");
                       setNewProductTitle("EQUINOR");
@@ -7467,12 +7494,13 @@ function MainApp() {
                       setNewProductMin("");
                       setNewProductDays("30");
                       setNewProductTPlusDays("1");
-                      setNewProductQuota("0");
+                      setNewProductQuota("0"); setNewProductGlobalQuota("0");
                       setNewProductType("general");
                         setNewProductAudienceType("all");
                       setNewProductImageUrl("");
                       setNewProductPromoUnlock("");
                       setNewProductPromoClosing("");
+                      setNewProductCountsForVip(true);
                       setIsProcessingProduct(false);
                       setActiveModal(null);
                       setEditingProduct(null);
@@ -7616,7 +7644,22 @@ function MainApp() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Max Quota (0 for unlimited)</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Total stock / Global quota (0 = unlimited)</label>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setNewProductGlobalQuota(String(Math.max(0, Number(newProductGlobalQuota) - 1)))} className="bg-slate-200 p-3 rounded-lg font-bold text-slate-700 w-12 flex items-center justify-center hover:bg-slate-300">-</button>
+                    <input
+                      type="number"
+                      required
+                      value={newProductGlobalQuota}
+                      onChange={(e) => setNewProductGlobalQuota(e.target.value)}
+                      className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[#0A0E2E] font-medium text-center"
+                      placeholder="e.g. 1000"
+                    />
+                    <button type="button" onClick={() => setNewProductGlobalQuota(String(Number(newProductGlobalQuota) + 1))} className="bg-slate-200 p-3 rounded-lg font-bold text-slate-700 w-12 flex items-center justify-center hover:bg-slate-300">+</button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Purchase limit / Per user quota (0 = unlimited)</label>
                   <div className="flex items-center gap-2">
                     <button type="button" onClick={() => setNewProductQuota(String(Math.max(0, Number(newProductQuota) - 1)))} className="bg-slate-200 p-3 rounded-lg font-bold text-slate-700 w-12 flex items-center justify-center hover:bg-slate-300">-</button>
                     <input
@@ -7648,6 +7691,16 @@ function MainApp() {
                   </div>
                 </div>
                 <div>
+                <div className="flex items-center justify-between bg-slate-50 border border-slate-200 p-4 rounded-xl mb-4">
+                  <div>
+                    <label className="block text-sm font-bold text-[#0A0E2E]">Counts for VIP Upgrade</label>
+                    <span className="text-xs text-slate-500 block mt-1">If checked, subordinates buying this product count towards VIP upgrade.</span>
+                  </div>
+                  <button type="button" onClick={() => setNewProductCountsForVip(!newProductCountsForVip)} className={`w-12 h-6 rounded-full relative transition-colors ${newProductCountsForVip ? "bg-[#7B2FF7]" : "bg-slate-300"} shrink-0`}>
+                    <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform ${newProductCountsForVip ? "translate-x-6" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
                   <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wider">Audience Type</label>
                   <div className="relative">
                     <select
@@ -8574,6 +8627,15 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
+
+export const getCountsForVip = (p: any) => {
+  if (p.countsForVip !== undefined) return p.countsForVip;
+  try {
+    const parsed = JSON.parse(p.title || "{}");
+    if (parsed.countsForVip !== undefined) return parsed.countsForVip;
+  } catch(e) {}
+  return true;
+};
 
 export const getAudienceType = (p: any) => {
   if (p.audienceType) return p.audienceType;

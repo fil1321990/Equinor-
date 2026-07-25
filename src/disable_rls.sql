@@ -8,12 +8,21 @@ ALTER TABLE chat_messages DISABLE ROW LEVEL SECURITY;
 ALTER TABLE products DISABLE ROW LEVEL SECURITY;
 ALTER TABLE investments DISABLE ROW LEVEL SECURITY;
 
--- Enable Realtime for all tables
-BEGIN;
+DO $$ 
+BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
     CREATE PUBLICATION supabase_realtime;
   END IF;
+END $$;
+
+-- Try adding tables to publication, ignoring errors if they're already added
+DO $$
+BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE users, transactions, investments, products, commissions, "incomeRecords", system_deposit_accounts, chat_messages;
-COMMIT;
+EXCEPTION WHEN OTHERS THEN
+  -- Do nothing
+END $$;
+
 ALTER TABLE products ADD COLUMN IF NOT EXISTS max_quota INT DEFAULT 0;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS sold_count INT DEFAULT 0;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS "globalQuota" INT DEFAULT 0;
