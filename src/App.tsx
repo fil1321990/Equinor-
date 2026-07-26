@@ -33,7 +33,6 @@ import {
   LogOut,
   Loader2,
   ShieldCheck,
-  Check,
   X,
   Barcode,
   Clock,
@@ -58,7 +57,7 @@ import {
   CheckCircle2,
   Banknote,
   ImagePlus,
-  AlertTriangle,
+  AlertTriangle, AlertCircle,
 } from "lucide-react";
 import { AppProvider, useAppStore } from "./store";
 import { getDailyIncome } from "./lib/earnings";
@@ -653,6 +652,31 @@ function MainApp() {
   const [editingTxId, setEditingTxId] = useState<string | null>(null);
   const [editingTxNotes, setEditingTxNotes] = useState("");
   const [editingTxTags, setEditingTxTags] = useState("");
+  const [showRejectedBanner, setShowRejectedBanner] = useState(false);
+  const [dismissedRejectedTxId, setDismissedRejectedTxId] = useState<string | null>(() => localStorage.getItem('dismissedRejectedTxId'));
+  const [currentRejectedTxId, setCurrentRejectedTxId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTab === "mine" && currentUser) {
+      const userDeposits = transactions.filter(t => t.userId === currentUser.id && t.type === 'deposit');
+      if (userDeposits.length > 0) {
+        userDeposits.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const latestDeposit = userDeposits[0];
+        if (latestDeposit.status === 'rejected' && latestDeposit.id !== dismissedRejectedTxId) {
+          setShowRejectedBanner(true);
+          setCurrentRejectedTxId(latestDeposit.id);
+          const timer = setTimeout(() => {
+            setShowRejectedBanner(false);
+            setDismissedRejectedTxId(latestDeposit.id);
+            localStorage.setItem('dismissedRejectedTxId', latestDeposit.id);
+          }, 8000);
+          return () => clearTimeout(timer);
+        }
+      }
+    } else {
+      setShowRejectedBanner(false);
+    }
+  }, [activeTab, currentUser, transactions, dismissedRejectedTxId]);
   
   useEffect(() => {
     const interval = setInterval(() => setTick(t => t + 1), 1000);
@@ -1740,18 +1764,18 @@ function MainApp() {
         {activeTab === "task" && (() => {
           const claimedInfo = currentUser?.claimedTasks || [];
           
-          const inviteCount = users.filter(u => u.referredBy === currentUser?.referralCode).length;
+          const inviteCount = users.filter(u => u.referredBy === currentUser?.referralCode && transactions.some(t => t.userId === u.id && t.type === "deposit" && t.status === "approved")).length;
           const myInvestments = investments.filter(inv => inv.userId === currentUser?.id);
           const hasBigFirstInvest = myInvestments.length > 0 && myInvestments[0].amount >= 250000;
           const cumulativeInvest = myInvestments.reduce((sum, inv) => sum + inv.amount, 0);
           const currentVip = currentUser?.vipLevelIndex || 0;
 
           const tasks = [
-            { id: "task1", title: "Invite registration", desc: `Invite 10 friends to register reward N1500 (${inviteCount}/10)`, reward: 1500, done: inviteCount >= 10 },
+            { id: "task1", title: "Invite and Deposit", desc: `Invite 10 friends to register and deposit to receive N1500 (${inviteCount}/10)`, reward: 1500, done: inviteCount >= 10 },
             { id: "task2", title: "First deposit", desc: `First investment >= ₦250000 projects award ₦25000`, reward: 25000, done: hasBigFirstInvest },
             { id: "task3", title: "Cumulative investment", desc: `Accumulated investment ₦1500000 Reward ₦100000 (${cumulativeInvest}/1500000)`, reward: 100000, done: cumulativeInvest >= 1500000 },
             { id: "task4", title: "VIP level", desc: `Upgrade to VIP2 to receive reward ₦40000`, reward: 40000, done: currentVip >= 2 },
-            { id: "task5", title: "Register and top up", desc: `Invite 20 friends to register and get 15000 Naira top-up bonus (${inviteCount}/20)`, reward: 15000, done: inviteCount >= 20 },
+            { id: "task5", title: "Register and top up", desc: `Invite 20 friends to register and deposit to get 15000 Naira top-up bonus (${inviteCount}/20)`, reward: 15000, done: inviteCount >= 20 },
           ];
 
           const totalNotReceived = tasks.filter(t => !claimedInfo.includes(t.id)).reduce((sum, t) => sum + t.reward, 0);
@@ -3539,6 +3563,28 @@ function MainApp() {
 
           {activeTab === "mine" && (
             <div className="pb-0 relative z-10 w-full">
+              {showRejectedBanner && (
+                <div className="absolute top-4 left-4 right-4 bg-red-500 text-white p-3 rounded-xl shadow-lg z-50 animate-in fade-in slide-in-from-top-5 duration-500 flex items-start gap-3">
+                  <div className="bg-white/20 p-1.5 rounded-full mt-0.5 shrink-0">
+                    <AlertCircle className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-bold text-sm">Deposit Rejected</span>
+                    <span className="text-xs leading-snug">
+                      Your recent deposit was rejected. Please submit your payment proof to the manager via CS chat or Telegram for approval, then request a new deposit.
+                    </span>
+                  </div>
+                  <button onClick={() => {
+                    setShowRejectedBanner(false);
+                    if (currentRejectedTxId) {
+                      setDismissedRejectedTxId(currentRejectedTxId);
+                      localStorage.setItem('dismissedRejectedTxId', currentRejectedTxId);
+                    }
+                  }} className="shrink-0 p-1 bg-white/10 rounded-full active:bg-white/20 ml-auto">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
               {/* Profile Header */}
               <div className="flex justify-between items-center px-4 mb-5 mt-5">
                 <div className="flex items-center gap-3">
@@ -4365,7 +4411,7 @@ function MainApp() {
                         {tx.type} Request
                       </div>
                       <div className="text-slate-400 text-xs">
-                        {new Date(tx.date).toLocaleDateString()}
+                        {new Date(tx.date).toLocaleString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
                     
@@ -4476,7 +4522,7 @@ function MainApp() {
                                 {tx.type === 'deposit' ? <ArrowDownCircle className="w-4 h-4 text-[#00D4FF]" /> : <ArrowUpCircle className="w-4 h-4 text-[#F472B6]" />}
                                 <span className="capitalize">{tx.type}</span>
                               </div>
-                              <div className="text-xs text-white/50">{new Date(tx.date).toLocaleDateString()}</div>
+                              <div className="text-xs text-white/50">{new Date(tx.date).toLocaleString(undefined, { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
                               <div className="text-[10px] text-white/40 font-mono mt-0.5">
                                 Main ID: <span className="text-[#D8B4FE] font-bold">{users.find(u => u.id === tx.userId)?.referralCode || 'N/A'}</span>
                                 <span className="mx-1">|</span>
@@ -6286,6 +6332,13 @@ function MainApp() {
                             </span>
                           </div>
                         </div>
+                        {t.type === 'deposit' && t.status === 'rejected' && (
+                          <div className="pt-3 mt-1 border-t border-white/10">
+                            <p className="text-[12px] text-red-400 font-medium leading-snug">
+                              Deposit rejected. Please submit your payment proof to the manager via CS chat or Telegram for approval, then request a new deposit.
+                            </p>
+                          </div>
+                        )}
                         {t.type === 'withdrawal' && t.status === 'pending' && (
                           <div className="pt-2 border-t border-white/5">
                             <div className="flex justify-between items-center text-[10px] text-white/50 mb-2 font-medium px-1">
@@ -6502,7 +6555,7 @@ function MainApp() {
                             setDepositReference("");
                             setSuccessAnimType("deposit");
                             setSuccessAnimTitle("Deposit Requested");
-                            setSuccessAnimMessage("Deposit request submitted! Awaiting Bank confirmation.");
+                            setSuccessAnimMessage("Deposit request submitted! Please send your payment proof to the manager via CS chat or Telegram for approval.");
                             setSuccessAnimAmount(amt);
                             setActiveModal("successAnimated");
                     }}
@@ -6672,7 +6725,7 @@ function MainApp() {
                         setDepositReference("");
                         setSuccessAnimType("deposit");
                         setSuccessAnimTitle("Deposit Requested");
-                        setSuccessAnimMessage("Deposit request submitted! Awaiting Bank confirmation.");
+                        setSuccessAnimMessage("Deposit request submitted! Please send your payment proof to the manager via CS chat or Telegram for approval.");
                         setSuccessAnimAmount(amt);
                         setActiveModal("successAnimated");
                 }}
